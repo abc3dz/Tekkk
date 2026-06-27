@@ -4,10 +4,8 @@ use avian3d::prelude::*;
 mod player;
 mod camera;
 mod world;
-mod enemy;
-mod combat;
 mod components;
-mod states;
+
 
 fn main() {
     App::new()
@@ -15,7 +13,7 @@ fn main() {
         .add_plugins((
             DefaultPlugins,
             PhysicsPlugins::default(),
-            PhysicsDebugPlugin,
+            //PhysicsDebugPlugin,
         ))
         .add_plugins((
             world::WorldPlugin,
