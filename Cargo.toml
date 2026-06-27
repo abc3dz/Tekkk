@@ -1,0 +1,8 @@
+[package]
+name = "Tekkk"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+bevy = "0.18"
+avian3d = { version = "0.6.1", features = ["debug-plugin"] }
