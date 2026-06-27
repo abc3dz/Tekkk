@@ -22,18 +22,29 @@ fn spawn_player(
     mut commands: Commands,
     asset_server: Res<AssetServer>,
 ) {
-    commands.spawn((
+    commands
+    .spawn((
         Player,
         PlayerActionState::Idle,
         MoveSpeed(6.0),
         Health { current: 100, max: 100 },
-        SceneRoot(asset_server.load(GltfAssetLabel::Scene(0).from_asset("models/PlayerMoya.glb"))),
+
         Transform::from_xyz(0.0, 2.0, 0.0),
         RigidBody::Dynamic,
-        Collider::capsule(0.45, 1.4),
+        Collider::capsule(0.28, 1.0),
         LockedAxes::ROTATION_LOCKED,
         LinearVelocity::ZERO,
-    ));
+    ))
+    .with_children(|parent| {
+        parent.spawn((
+            SceneRoot(
+                asset_server.load(
+                    GltfAssetLabel::Scene(0).from_asset("models/PlayerMoya.glb")
+                )
+            ),
+            Transform::from_xyz(0.0, -0.8, 0.0),
+        ));
+    });
 }
 
 fn player_movement(

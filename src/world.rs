@@ -15,14 +15,22 @@ fn setup_world(
     mut materials: ResMut<Assets<StandardMaterial>>,
 ) {
     commands.spawn((
-        Mesh3d(meshes.add(Plane3d::default().mesh().size(50.0, 50.0))),
-        MeshMaterial3d(materials.add(Color::srgb(0.3, 0.5, 0.3))),
+        Mesh3d(meshes.add(Plane3d::default().mesh().size(80.0, 80.0))),
+        MeshMaterial3d(materials.add(StandardMaterial {
+            base_color: Color::srgb(0.76, 0.62, 0.38), // sand color
+            perceptual_roughness: 1.0,
+            ..default()
+        })),
         RigidBody::Static,
-        Collider::cuboid(50.0, 0.1, 50.0),
+        Collider::cuboid(80.0, 0.1, 80.0),
     ));
 
     commands.spawn((
-        DirectionalLight::default(),
-        Transform::from_xyz(3.0, 8.0, 5.0).looking_at(Vec3::ZERO, Vec3::Y),
+        DirectionalLight {
+            illuminance: 8000.0,
+            shadows_enabled: true,
+            ..default()
+        },
+        Transform::from_xyz(5.0, 10.0, 5.0).looking_at(Vec3::ZERO, Vec3::Y),
     ));
 }
