@@ -4,5 +4,6 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
-bevy = "0.18"
-avian3d = { version = "0.6.1", features = ["debug-plugin"] }
+bevy = "0.19"
+avian3d = "0.7"
+bevy_framepace = "0.20"
