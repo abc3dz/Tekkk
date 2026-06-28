@@ -37,7 +37,7 @@ fn spawn_player(
     ))
     .with_children(|parent| {
         parent.spawn((
-            SceneRoot(
+            WorldAssetRoot(
                 asset_server.load(
                     GltfAssetLabel::Scene(0).from_asset("models/PlayerMoya.glb")
                 )
@@ -101,7 +101,6 @@ fn setup_player_animation_graph(
 
     let graph_handle = graphs.add(graph);
 
-    // ✅ insert_resource ต้องมี Resource derive ใน components.rs
     commands.insert_resource(PlayerAnimationGraph {
         graph: graph_handle,
         idle,
@@ -117,7 +116,6 @@ fn setup_player_animation_player(
     for (entity, mut player) in &mut query {
         commands.entity(entity).insert((
             AnimationGraphHandle(anim_graph.graph.clone()),
-            // ✅ ใช้ PlayerAnimState (ไม่ใช่ PlayerAnimationState)
             PlayerAnimState::Idle,
         ));
 
