@@ -6,24 +6,25 @@ pub struct WorldPlugin;
 impl Plugin for WorldPlugin {
     fn build(&self, app: &mut App) {
         app.add_systems(Startup, setup_world);
+        app.add_plugins(crate::biomes::desert::DesertPlugin);
     }
 }
 
 fn setup_world(
     mut commands: Commands,
-    mut meshes: ResMut<Assets<Mesh>>,
-    mut materials: ResMut<Assets<StandardMaterial>>,
+    //mut meshes: ResMut<Assets<Mesh>>,
+    //mut materials: ResMut<Assets<StandardMaterial>>,
 ) {
-    commands.spawn((
-        Mesh3d(meshes.add(Plane3d::default().mesh().size(80.0, 80.0))),
-        MeshMaterial3d(materials.add(StandardMaterial {
-            base_color: Color::srgb(0.76, 0.62, 0.38), // sand color
-            perceptual_roughness: 1.0,
-            ..default()
-        })),
-        RigidBody::Static,
-        Collider::cuboid(80.0, 0.1, 80.0),
-    ));
+    // commands.spawn((
+    //     Mesh3d(meshes.add(Plane3d::default().mesh().size(100.0, 100.0))),
+    //     MeshMaterial3d(materials.add(StandardMaterial {
+    //         base_color: Color::srgb(0.76, 0.62, 0.38), // sand color
+    //         perceptual_roughness: 1.0,
+    //         ..default()
+    //     })),
+    //     RigidBody::Static,
+    //     Collider::cuboid(100.0, 0.1, 100.0),
+    // ));
 
     commands.spawn((
         DirectionalLight {
