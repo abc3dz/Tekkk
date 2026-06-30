@@ -1,5 +1,11 @@
 use bevy::prelude::*;
 use crate::components::Player;
+use bevy::core_pipeline::prepass::{
+    DepthPrepass,
+    NormalPrepass,
+};
+
+use bevy_edge_detection_outline::EdgeDetection;
 
 pub struct CameraPlugin;
 
@@ -19,6 +25,10 @@ fn spawn_camera(mut commands: Commands) {
         Camera3d::default(),
         MainCamera,
         Transform::from_xyz(0.0, 5.0, 5.0).looking_at(Vec3::ZERO, Vec3::Y),
+        DepthPrepass::default(),
+        NormalPrepass::default(),
+
+        EdgeDetection::default(),
     ));
 }
 

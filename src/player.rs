@@ -3,6 +3,7 @@ use bevy::gltf::GltfAssetLabel;
 use bevy::animation::graph::AnimationGraph;
 use bevy::animation::AnimationPlayer;
 use avian3d::prelude::*;
+use bevy_wind_waker_shader::prelude::*;
 use crate::components::*;
 
 pub struct PlayerPlugin;
@@ -34,15 +35,20 @@ fn spawn_player(
         Collider::capsule(0.28, 1.0),
         LockedAxes::ROTATION_LOCKED,
         LinearVelocity::ZERO,
+        
     ))
     .with_children(|parent| {
         parent.spawn((
-            WorldAssetRoot(
+            SceneRoot(
                 asset_server.load(
                     GltfAssetLabel::Scene(0).from_asset("models/PlayerMoya.glb")
                 )
             ),
             Transform::from_xyz(0.0, -0.8, 0.0),
+            WindWakerShaderBuilder::default()
+            .time_of_day(TimeOfDay::Day)
+            .weather(Weather::Sunny)
+            .build(),
         ));
     });
 }

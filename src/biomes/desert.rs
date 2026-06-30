@@ -1,6 +1,7 @@
 use bevy::prelude::*;
 use bevy::gltf::GltfAssetLabel;
 use avian3d::prelude::*;
+use bevy_wind_waker_shader::prelude::*;
 
 pub struct DesertPlugin;
 
@@ -15,12 +16,16 @@ fn spawn_desert(
     asset_server: Res<AssetServer>,
 ) {
     commands.spawn((
-        WorldAssetRoot(
+        SceneRoot(
             asset_server.load(
                 GltfAssetLabel::Scene(0).from_asset("maps/EvrmDesert.glb")
             )
         ),
-    //Transform::default(),
+        WindWakerShaderBuilder::default()
+            .time_of_day(TimeOfDay::Day)
+            .weather(Weather::Sunny)
+            .build(),
+        Transform::default(),
     ));
 
     commands.spawn((
