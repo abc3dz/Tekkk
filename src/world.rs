@@ -18,6 +18,9 @@ pub enum GameScene {
 impl Plugin for WorldPlugin {
     fn build(&self, app: &mut App) {
         app.init_state::<GameScene>()
+            .add_systems(Startup, crate::npc::guardian::setup_guardian_animation_graph)
+            .add_systems(Update, crate::npc::guardian::setup_guardian_animation_player)
+            
             .add_systems(OnEnter(GameScene::LoadingHub), spawn_loading_ui)
             .add_systems(Update, go_to_hub.run_if(in_state(GameScene::LoadingHub)))
             .add_systems(OnExit(GameScene::LoadingHub), cleanup_loading_ui)

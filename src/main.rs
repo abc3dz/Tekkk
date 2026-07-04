@@ -10,6 +10,7 @@ mod world;
 mod components;
 //mod fps;
 mod biomes;
+mod npc;
 
 fn main() {
     App::new()

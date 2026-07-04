@@ -123,22 +123,69 @@ fn setup_player_animation_graph(
 fn setup_player_animation_player(
     mut commands: Commands,
     anim_graph: Res<PlayerAnimationGraph>,
-    mut query: Query<(Entity, &mut AnimationPlayer), Added<AnimationPlayer>>,
+    player_root_query: Query<&Children, With<Player>>,
+    children_query: Query<&Children>,
+    mut anim_query: Query<(Entity, &mut AnimationPlayer), Added<AnimationPlayer>>,
 ) {
-    for (entity, mut player) in &mut query {
+    let Ok(player_children) = player_root_query.single() else {
+        return;
+    };
+
+    let mut player_anim_entity: Option<Entity> = None;
+
+    for child in player_children.iter() {
+        find_animation_player_recursive(
+            child,
+            &children_query,
+            &anim_query,
+            &mut player_anim_entity,
+        );
+    }
+
+    let Some(target_entity) = player_anim_entity else {
+        return;
+    };
+
+    if let Ok((entity, mut player)) = anim_query.get_mut(target_entity) {
         commands.entity(entity).insert((
             AnimationGraphHandle(anim_graph.graph.clone()),
             PlayerAnimState::Idle,
+            PlayerAnimationTarget,
         ));
 
         player.play(anim_graph.idle).repeat();
     }
 }
 
+fn find_animation_player_recursive(
+    entity: Entity,
+    children_query: &Query<&Children>,
+    anim_query: &Query<(Entity, &mut AnimationPlayer), Added<AnimationPlayer>>,
+    result: &mut Option<Entity>,
+) {
+    if result.is_some() {
+        return;
+    }
+
+    if anim_query.get(entity).is_ok() {
+        *result = Some(entity);
+        return;
+    }
+
+    if let Ok(children) = children_query.get(entity) {
+        for child in children.iter() {
+            find_animation_player_recursive(child, children_query, anim_query, result);
+        }
+    }
+}
+
 fn update_player_animation(
     anim_graph: Res<PlayerAnimationGraph>,
     player_query: Query<&PlayerActionState, With<Player>>,
-    mut anim_query: Query<(&mut AnimationPlayer, &mut PlayerAnimState)>,
+    mut anim_query: Query<
+        (&mut AnimationPlayer, &mut PlayerAnimState),
+        With<PlayerAnimationTarget>,
+    >,
 ) {
     let Ok(action_state) = player_query.single() else {
         return;

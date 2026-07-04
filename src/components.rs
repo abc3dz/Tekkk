@@ -32,6 +32,18 @@ pub enum PlayerAnimState {
 }
 
 #[derive(Component)]
+pub struct PlayerAnimationTarget;
+
+#[derive(Resource)]
+pub struct GuardianAnimationGraph {
+    pub graph: Handle<AnimationGraph>,
+    pub idle: AnimationNodeIndex,
+}
+
+#[derive(Component)]
+pub struct GuardianAnimationTarget;
+
+#[derive(Component)]
 pub struct CurrentScene;
 
 #[derive(Component)]
@@ -39,3 +51,9 @@ pub struct LoadingUI;
 
 #[derive(Component)]
 pub struct WarpToDesert;
+
+#[derive(Component)]
+pub struct Npc;
+
+#[derive(Component)]
+pub struct GuardianNpc;
