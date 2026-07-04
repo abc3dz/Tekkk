@@ -8,7 +8,7 @@ mod player;
 mod camera;
 mod world;
 mod components;
-mod fps;
+//mod fps;
 mod biomes;
 
 fn main() {
@@ -33,8 +33,8 @@ fn main() {
             player::PlayerPlugin,
             camera::CameraPlugin,
             //fps::FpsPlugin, 
-            // enemy::EnemyPlugin,
-            // combat::CombatPlugin,
+            //enemy::EnemyPlugin,
+            //combat::CombatPlugin,
         ))
         .run();
 }

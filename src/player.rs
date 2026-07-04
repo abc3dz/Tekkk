@@ -44,7 +44,7 @@ fn spawn_player(
                     GltfAssetLabel::Scene(0).from_asset("models/PlayerMoya.glb")
                 )
             ),
-            Transform::from_xyz(0.0, -0.8, 0.0),
+            Transform::from_xyz(0.0, -0.83, 0.0),
             WindWakerShaderBuilder::default()
             .time_of_day(TimeOfDay::Day)
             .weather(Weather::Sunny)
@@ -83,6 +83,12 @@ fn player_movement(
         velocity.x = 0.0;
         velocity.z = 0.0;
         *action_state = PlayerActionState::Idle;
+    }
+    if transform.translation.y < -5.0 {
+        transform.translation = Vec3::new(0.0, 2.0, 0.0);
+        velocity.x = 0.0;
+        velocity.y = 0.0;
+        velocity.z = 0.0;
     }
 }
 

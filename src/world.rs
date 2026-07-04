@@ -1,37 +1,107 @@
 use bevy::prelude::*;
 //use avian3d::prelude::*;
 
+use crate::components::*;
+use crate::biomes::{hub, desert};
+
 pub struct WorldPlugin;
+
+#[derive(States, Debug, Clone, Copy, PartialEq, Eq, Hash, Default)]
+pub enum GameScene {
+    #[default]
+    LoadingHub,
+    Hub,
+    LoadingDesert,
+    Desert,
+}
 
 impl Plugin for WorldPlugin {
     fn build(&self, app: &mut App) {
-        app.add_systems(Startup, setup_world);
-        app.add_plugins(crate::biomes::desert::DesertPlugin);
+        app.init_state::<GameScene>()
+            .add_systems(OnEnter(GameScene::LoadingHub), spawn_loading_ui)
+            .add_systems(Update, go_to_hub.run_if(in_state(GameScene::LoadingHub)))
+            .add_systems(OnExit(GameScene::LoadingHub), cleanup_loading_ui)
+
+            .add_systems(OnEnter(GameScene::Hub), hub::spawn_hub)
+            .add_systems(Update, check_warp_to_desert.run_if(in_state(GameScene::Hub)))
+            .add_systems(OnExit(GameScene::Hub), cleanup_current_scene)
+
+            .add_systems(OnEnter(GameScene::LoadingDesert), spawn_loading_ui)
+            .add_systems(Update, go_to_desert.run_if(in_state(GameScene::LoadingDesert)))
+            .add_systems(OnExit(GameScene::LoadingDesert), cleanup_loading_ui)
+
+            .add_systems(OnEnter(GameScene::Desert), desert::spawn_desert);
     }
 }
 
-fn setup_world(
-    mut commands: Commands,
-    //mut meshes: ResMut<Assets<Mesh>>,
-    //mut materials: ResMut<Assets<StandardMaterial>>,
-) {
-    // commands.spawn((
-    //     Mesh3d(meshes.add(Plane3d::default().mesh().size(100.0, 100.0))),
-    //     MeshMaterial3d(materials.add(StandardMaterial {
-    //         base_color: Color::srgb(0.76, 0.62, 0.38), // sand color
-    //         perceptual_roughness: 1.0,
-    //         ..default()
-    //     })),
-    //     RigidBody::Static,
-    //     Collider::cuboid(100.0, 0.1, 100.0),
-    // ));
-
+fn spawn_loading_ui(mut commands: Commands) {
     commands.spawn((
-        DirectionalLight {
-            illuminance: 8000.0,
-            shadows_enabled: true,
+        LoadingUI,
+        Node {
+            width: Val::Percent(100.0),
+            height: Val::Percent(100.0),
+            justify_content: JustifyContent::Center,
+            align_items: AlignItems::Center,
             ..default()
         },
-        Transform::from_xyz(5.0, 10.0, 5.0).looking_at(Vec3::ZERO, Vec3::Y),
-    ));
+        BackgroundColor(Color::BLACK),
+    ))
+    .with_children(|parent| {
+        parent.spawn((
+            Text::new("Loading..."),
+            TextFont {
+                font_size: 48.0,
+                ..default()
+            },
+            TextColor(Color::WHITE),
+        ));
+    });
+}
+
+fn cleanup_loading_ui(
+    mut commands: Commands,
+    query: Query<Entity, With<LoadingUI>>,
+) {
+    for entity in &query {
+        commands.entity(entity).despawn();
+    }
+}
+
+fn cleanup_current_scene(
+    mut commands: Commands,
+    query: Query<Entity, With<CurrentScene>>,
+) {
+    for entity in &query {
+        commands.entity(entity).despawn();
+    }
+}
+
+fn go_to_hub(
+    mut next_state: ResMut<NextState<GameScene>>,
+) {
+    next_state.set(GameScene::Hub);
+}
+
+fn go_to_desert(
+    mut next_state: ResMut<NextState<GameScene>>,
+) {
+    next_state.set(GameScene::Desert);
+}
+
+fn check_warp_to_desert(
+    player_query: Query<&Transform, With<Player>>,
+    warp_query: Query<&Transform, With<WarpToDesert>>,
+    mut next_state: ResMut<NextState<GameScene>>,
+) {
+    let Ok(player_tf) = player_query.single() else {
+        return;
+    };
+
+    for warp_tf in &warp_query {
+        let distance = player_tf.translation.distance(warp_tf.translation);
+
+        if distance < 2.0 {
+            next_state.set(GameScene::LoadingDesert);
+        }
+    }
 }

@@ -5,15 +5,14 @@ use bevy_wind_waker_shader::prelude::*;
 
 use crate::components::*;
 
-pub fn spawn_desert(
+pub fn spawn_hub(
     mut commands: Commands,
     asset_server: Res<AssetServer>,
-    mut player_query: Query<&mut Transform, With<Player>>,
 ) {
     commands.spawn((
         SceneRoot(
             asset_server.load(
-                GltfAssetLabel::Scene(0).from_asset("maps/EvrmDesert.glb")
+                GltfAssetLabel::Scene(0).from_asset("maps/EvrmHub.glb")
             )
         ),
         WindWakerShaderBuilder::default()
@@ -26,11 +25,15 @@ pub fn spawn_desert(
 
     commands.spawn((
         RigidBody::Static,
-        Collider::cuboid(50.0, 0.1, 50.0),
+        Collider::cuboid(36.0, 0.1, 39.0),
         Transform::from_xyz(0.0, 0.0, 0.0),
     ));
-
-    if let Ok(mut player_tf) = player_query.single_mut() {
-        player_tf.translation = Vec3::new(0.0, 2.0, 0.0);
-    }
+    //gate
+    commands.spawn((
+        WarpToDesert,
+        CurrentScene,
+        Sensor,
+        Collider::cuboid(2.0, 2.0, 2.0),
+        Transform::from_xyz(0.0, 1.0, -15.0),
+    ));
 }

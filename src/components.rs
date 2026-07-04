@@ -30,3 +30,12 @@ pub enum PlayerAnimState {
     Idle,
     Walk,
 }
+
+#[derive(Component)]
+pub struct CurrentScene;
+
+#[derive(Component)]
+pub struct LoadingUI;
+
+#[derive(Component)]
+pub struct WarpToDesert;

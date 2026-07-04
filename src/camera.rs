@@ -1,11 +1,6 @@
 use bevy::prelude::*;
 use crate::components::Player;
-use bevy::core_pipeline::prepass::{
-    DepthPrepass,
-    NormalPrepass,
-};
-
-use bevy_edge_detection_outline::EdgeDetection;
+use bevy_edge_detection_outline::{EdgeDetection, EdgeOperator};
 
 pub struct CameraPlugin;
 
@@ -24,11 +19,13 @@ fn spawn_camera(mut commands: Commands) {
     commands.spawn((
         Camera3d::default(),
         MainCamera,
-        Transform::from_xyz(0.0, 5.0, 5.0).looking_at(Vec3::ZERO, Vec3::Y),
-        DepthPrepass::default(),
-        NormalPrepass::default(),
-
-        EdgeDetection::default(),
+        Transform::from_xyz(0.0, 2.0, 3.0).looking_at(Vec3::ZERO, Vec3::Y),
+        EdgeDetection {
+            operator: EdgeOperator::RobertsCross,
+            depth_thickness: 0.45,
+            normal_thickness: 0.45,
+            ..default()
+        }
     ));
 }
 
@@ -44,7 +41,7 @@ fn follow_player(
         return;
     };
 
-    let target = player_tf.translation + Vec3::new(0.0, 8.0, 10.0);
+    let target = player_tf.translation + Vec3::new(0.0, 5.0, 8.0);
     camera_tf.translation = camera_tf.translation.lerp(target, 0.1);
     camera_tf.look_at(player_tf.translation, Vec3::Y);
 }
