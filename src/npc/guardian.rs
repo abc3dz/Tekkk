@@ -62,6 +62,27 @@ pub fn setup_guardian_animation_graph(
 
     let idle = graph.add_clip(
         asset_server.load(
+            GltfAssetLabel::Animation(2).from_asset("npc/Guardian.glb")
+        ),
+        1.0,
+        graph.root,
+    );
+    let welcome = graph.add_clip(
+        asset_server.load(
+            GltfAssetLabel::Animation(3).from_asset("npc/Guardian.glb")
+        ),
+        1.0,
+        graph.root,
+    );
+    let basic_practice = graph.add_clip(
+        asset_server.load(
+            GltfAssetLabel::Animation(1).from_asset("npc/Guardian.glb")
+        ),
+        1.0,
+        graph.root,
+    );
+    let advanced_practice = graph.add_clip(
+        asset_server.load(
             GltfAssetLabel::Animation(0).from_asset("npc/Guardian.glb")
         ),
         1.0,
@@ -73,6 +94,9 @@ pub fn setup_guardian_animation_graph(
     commands.insert_resource(GuardianAnimationGraph {
         graph: graph_handle,
         idle,
+        welcome,
+        basic_practice,
+        advanced_practice,
     });
 }
 pub fn setup_guardian_animation_player(
@@ -95,6 +119,8 @@ pub fn check_guardian_interaction_area(
     mut collision_events: MessageReader<CollisionStart>,
     guardian_area_query: Query<Entity, With<GuardianInteractArea>>,
     player_query: Query<Entity, With<Player>>,
+    anim_graph: Res<GuardianAnimationGraph>,
+    mut guardian_anim_query: Query<&mut AnimationPlayer, With<GuardianAnimationTarget>>,
 ) {
     for event in collision_events.read() {
         let collider1 = event.collider1;
@@ -128,6 +154,10 @@ pub fn check_guardian_interaction_area(
         if let Some(player_entity) = player_entity {
             println!("Player entered Guardian area");
             commands.entity(player_entity).insert(PlayerInGuardianArea);
+
+            for mut anim_player in &mut guardian_anim_query {
+                anim_player.play(anim_graph.welcome);
+            }
         }
     }
 }
@@ -137,6 +167,8 @@ pub fn check_guardian_interaction_area_exit(
     mut collision_events: MessageReader<CollisionEnd>,
     guardian_area_query: Query<Entity, With<GuardianInteractArea>>,
     player_query: Query<Entity, With<Player>>,
+    anim_graph: Res<GuardianAnimationGraph>,
+    mut guardian_anim_query: Query<&mut AnimationPlayer, With<GuardianAnimationTarget>>,
 ) {
     for event in collision_events.read() {
         let collider1 = event.collider1;
@@ -169,6 +201,11 @@ pub fn check_guardian_interaction_area_exit(
         if let Some(player_entity) = player_entity {
             println!("Player left Guardian area");
             commands.entity(player_entity).remove::<PlayerInGuardianArea>();
+
+            for mut anim_player in &mut guardian_anim_query {
+                anim_player.play(anim_graph.idle).repeat();
+            }
+
         }
     }
 }
@@ -176,7 +213,6 @@ pub fn check_guardian_interaction_area_exit(
 pub fn guardian_interact_input(
     mut commands: Commands,
     player_query: Query<(), With<PlayerInGuardianArea>>,
-    popup_query: Query<Entity, With<GuardianPopupUI>>,
     menu_query: Query<Entity, With<GuardianMenuUI>>,
 ) {
 
@@ -189,10 +225,6 @@ pub fn guardian_interact_input(
     }
 
     println!("Interact with Guardian");
-
-    for entity in &popup_query {
-        commands.entity(entity).despawn();
-    }
 
     commands
         .spawn((
@@ -253,6 +285,9 @@ pub fn guardian_menu_input(
     mut commands: Commands,
     keyboard: Res<ButtonInput<KeyCode>>,
     menu_query: Query<Entity, With<GuardianMenuUI>>,
+    anim_graph: Res<GuardianAnimationGraph>,
+    mut guardian_anim_query: Query<&mut AnimationPlayer, With<GuardianAnimationTarget>>,
+    mut player_query: Query<&mut Transform, With<Player>>,
 ) {
     if menu_query.is_empty() {
         return;
@@ -274,23 +309,26 @@ pub fn guardian_menu_input(
     if keyboard.just_pressed(KeyCode::Digit3) || keyboard.just_pressed(KeyCode::Escape) {
         println!("Exit Guardian menu");
 
-        for entity in &menu_query {
-            commands.entity(entity).despawn();
+        for mut anim_player in &mut guardian_anim_query {
+                anim_player.play(anim_graph.idle).repeat();
+
+            for entity in &menu_query {
+                commands.entity(entity).despawn();
+            }
+
+            for mut transform in &mut player_query {
+                transform.translation.z += 2.0;
+            }
         }
     }
 }
 pub fn cleanup_guardian_ui_when_player_leave(
     mut commands: Commands,
     player_query: Query<(), With<PlayerInGuardianArea>>,
-    popup_query: Query<Entity, With<GuardianPopupUI>>,
     menu_query: Query<Entity, With<GuardianMenuUI>>,
 ) {
     if !player_query.is_empty() {
         return;
-    }
-
-    for entity in &popup_query {
-        commands.entity(entity).despawn();
     }
 
     for entity in &menu_query {

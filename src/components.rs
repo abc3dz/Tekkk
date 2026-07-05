@@ -38,6 +38,9 @@ pub struct PlayerAnimationTarget;
 pub struct GuardianAnimationGraph {
     pub graph: Handle<AnimationGraph>,
     pub idle: AnimationNodeIndex,
+    pub welcome: AnimationNodeIndex,
+    pub basic_practice: AnimationNodeIndex,
+    pub advanced_practice: AnimationNodeIndex,
 }
 
 #[derive(Component)]
@@ -64,8 +67,8 @@ pub struct GuardianInteractArea;
 #[derive(Component)]
 pub struct PlayerInGuardianArea;
 
-#[derive(Component)]
-pub struct GuardianPopupUI;
+// #[derive(Component)]
+// pub struct GuardianPopupUI;
 
 #[derive(Component)]
 pub struct GuardianMenuUI;
