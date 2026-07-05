@@ -57,3 +57,18 @@ pub struct Npc;
 
 #[derive(Component)]
 pub struct GuardianNpc;
+
+#[derive(Component)]
+pub struct GuardianInteractArea;
+
+#[derive(Component)]
+pub struct PlayerInGuardianArea;
+
+#[derive(Component)]
+pub struct GuardianPopupUI;
+
+#[derive(Component)]
+pub struct GuardianMenuUI;
+
+#[derive(Component)]
+pub struct HubOnly;

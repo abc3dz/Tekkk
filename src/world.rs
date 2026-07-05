@@ -3,6 +3,17 @@ use bevy::prelude::*;
 
 use crate::components::*;
 use crate::biomes::{hub, desert};
+use crate::npc::guardian::{
+    setup_guardian_npc,
+    setup_guardian_animation_graph, 
+    setup_guardian_animation_player, 
+    check_guardian_interaction_area, 
+    check_guardian_interaction_area_exit,
+    guardian_interact_input,
+    guardian_menu_input,
+    cleanup_guardian_ui_when_player_leave,
+    despawn_hub_only_entities,
+};
 
 pub struct WorldPlugin;
 
@@ -18,9 +29,19 @@ pub enum GameScene {
 impl Plugin for WorldPlugin {
     fn build(&self, app: &mut App) {
         app.init_state::<GameScene>()
-            .add_systems(Startup, crate::npc::guardian::setup_guardian_animation_graph)
-            .add_systems(Update, crate::npc::guardian::setup_guardian_animation_player)
-            
+            .add_systems(Startup, setup_guardian_animation_graph)
+            .add_systems(OnEnter(GameScene::Hub), setup_guardian_npc)
+            .add_systems(Update, (
+                
+                setup_guardian_animation_player,
+                check_guardian_interaction_area,
+                check_guardian_interaction_area_exit,
+                guardian_interact_input,
+                guardian_menu_input,
+                cleanup_guardian_ui_when_player_leave,
+            ))
+            .add_systems(OnExit(GameScene::Hub), despawn_hub_only_entities)
+
             .add_systems(OnEnter(GameScene::LoadingHub), spawn_loading_ui)
             .add_systems(Update, go_to_hub.run_if(in_state(GameScene::LoadingHub)))
             .add_systems(OnExit(GameScene::LoadingHub), cleanup_loading_ui)
