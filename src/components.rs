@@ -1,5 +1,7 @@
 use bevy::prelude::*;
 
+//player
+
 #[derive(Component)]
 pub struct Player;
 
@@ -34,26 +36,23 @@ pub enum PlayerAnimState {
 #[derive(Component)]
 pub struct PlayerAnimationTarget;
 
+//guardian
+
 #[derive(Resource)]
 pub struct GuardianAnimationGraph {
     pub graph: Handle<AnimationGraph>,
     pub idle: AnimationNodeIndex,
     pub welcome: AnimationNodeIndex,
-    pub basic_practice: AnimationNodeIndex,
-    pub advanced_practice: AnimationNodeIndex,
+}
+
+#[derive(Component, PartialEq, Eq, Clone, Copy)]
+pub enum GuardianAnimState {
+    Idle,
+    Welcome,
 }
 
 #[derive(Component)]
 pub struct GuardianAnimationTarget;
-
-#[derive(Component)]
-pub struct CurrentScene;
-
-#[derive(Component)]
-pub struct LoadingUI;
-
-#[derive(Component)]
-pub struct WarpToDesert;
 
 #[derive(Component)]
 pub struct Npc;
@@ -67,11 +66,46 @@ pub struct GuardianInteractArea;
 #[derive(Component)]
 pub struct PlayerInGuardianArea;
 
-// #[derive(Component)]
-// pub struct GuardianPopupUI;
+#[derive(Component)]
+pub struct GuardianDialogUI;
+
+#[derive(Component)]
+pub struct PracticeEntity;
+
+#[derive(Component)]
+pub struct BasicPracticeGun;
+
+#[derive(Component)]
+pub struct GuardianClone;
+
+#[derive(Component)]
+pub struct GuardianClonePunchTimer(pub Timer);
+
+// scenes
+
+#[derive(Component)]
+pub struct CurrentScene;
+
+#[derive(Component)]
+pub struct LoadingUI;
+
+#[derive(Component)]
+pub struct WarpToDesert;
+
+#[derive(Component)]
+pub struct WarpToHub;
 
 #[derive(Component)]
 pub struct GuardianMenuUI;
 
 #[derive(Component)]
 pub struct HubOnly;
+
+#[derive(States, Debug, Clone, Copy, PartialEq, Eq, Hash, Default)]
+pub enum GameScene {
+    #[default]
+    LoadingHub,
+    Hub,
+    LoadingDesert,
+    Desert,
+}

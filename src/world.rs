@@ -9,22 +9,14 @@ use crate::npc::guardian::{
     setup_guardian_animation_player, 
     check_guardian_interaction_area, 
     check_guardian_interaction_area_exit,
-    guardian_interact_input,
-    guardian_menu_input,
+    show_guardian_dialog,
+    guardian_dialog_exit_input,
+    //guardian_menu_input,
     cleanup_guardian_ui_when_player_leave,
     despawn_hub_only_entities,
 };
 
 pub struct WorldPlugin;
-
-#[derive(States, Debug, Clone, Copy, PartialEq, Eq, Hash, Default)]
-pub enum GameScene {
-    #[default]
-    LoadingHub,
-    Hub,
-    LoadingDesert,
-    Desert,
-}
 
 impl Plugin for WorldPlugin {
     fn build(&self, app: &mut App) {
@@ -36,8 +28,9 @@ impl Plugin for WorldPlugin {
                 setup_guardian_animation_player,
                 check_guardian_interaction_area,
                 check_guardian_interaction_area_exit,
-                guardian_interact_input,
-                guardian_menu_input,
+                show_guardian_dialog,
+                guardian_dialog_exit_input,
+                //guardian_menu_input,
                 cleanup_guardian_ui_when_player_leave,
             ))
             .add_systems(OnExit(GameScene::Hub), despawn_hub_only_entities)
@@ -54,7 +47,9 @@ impl Plugin for WorldPlugin {
             .add_systems(Update, go_to_desert.run_if(in_state(GameScene::LoadingDesert)))
             .add_systems(OnExit(GameScene::LoadingDesert), cleanup_loading_ui)
 
-            .add_systems(OnEnter(GameScene::Desert), desert::spawn_desert);
+            .add_systems(OnEnter(GameScene::Desert), desert::spawn_desert)
+            .add_systems(Update, check_warp_to_hub.run_if(in_state(GameScene::Desert)))
+            .add_systems(OnExit(GameScene::Desert), cleanup_current_scene);
     }
 }
 
@@ -126,6 +121,23 @@ fn check_warp_to_desert(
 
         if distance < 2.0 {
             next_state.set(GameScene::LoadingDesert);
+        }
+    }
+}
+fn check_warp_to_hub(
+    player_query: Query<&Transform, With<Player>>,
+    warp_query: Query<&Transform, With<WarpToHub>>,
+    mut next_state: ResMut<NextState<GameScene>>,
+) {
+    let Ok(player_tf) = player_query.single() else {
+        return;
+    };
+
+    for warp_tf in &warp_query {
+        let distance = player_tf.translation.distance(warp_tf.translation);
+
+        if distance < 2.0 {
+            next_state.set(GameScene::LoadingHub);
         }
     }
 }

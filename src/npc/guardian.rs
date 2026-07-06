@@ -43,7 +43,7 @@ pub fn spawn_guardian_npc(
             Sensor,
             CollisionEventsEnabled,
             Collider::cuboid(2.0, 2.0, 2.0),
-            Transform::from_xyz(0.0, 0.0, 2.0),
+            Transform::from_xyz(0.0, 0.0, 1.5),
         ));
     });
 }
@@ -74,20 +74,6 @@ pub fn setup_guardian_animation_graph(
         1.0,
         graph.root,
     );
-    let basic_practice = graph.add_clip(
-        asset_server.load(
-            GltfAssetLabel::Animation(1).from_asset("npc/Guardian.glb")
-        ),
-        1.0,
-        graph.root,
-    );
-    let advanced_practice = graph.add_clip(
-        asset_server.load(
-            GltfAssetLabel::Animation(0).from_asset("npc/Guardian.glb")
-        ),
-        1.0,
-        graph.root,
-    );
 
     let graph_handle = graphs.add(graph);
 
@@ -95,8 +81,6 @@ pub fn setup_guardian_animation_graph(
         graph: graph_handle,
         idle,
         welcome,
-        basic_practice,
-        advanced_practice,
     });
 }
 pub fn setup_guardian_animation_player(
@@ -108,8 +92,9 @@ pub fn setup_guardian_animation_player(
         commands.entity(entity).insert((
             AnimationGraphHandle(anim_graph.graph.clone()),
             GuardianAnimationTarget,
+            GuardianAnimState::Idle,
         ));
-
+        player.stop_all();
         player.play(anim_graph.idle).repeat();
     }
 }
@@ -156,6 +141,7 @@ pub fn check_guardian_interaction_area(
             commands.entity(player_entity).insert(PlayerInGuardianArea);
 
             for mut anim_player in &mut guardian_anim_query {
+                anim_player.stop_all();
                 anim_player.play(anim_graph.welcome);
             }
         }
@@ -203,83 +189,103 @@ pub fn check_guardian_interaction_area_exit(
             commands.entity(player_entity).remove::<PlayerInGuardianArea>();
 
             for mut anim_player in &mut guardian_anim_query {
+                anim_player.stop_all();
                 anim_player.play(anim_graph.idle).repeat();
             }
 
         }
     }
 }
-
-pub fn guardian_interact_input(
+pub fn show_guardian_dialog(
     mut commands: Commands,
+    asset_server: Res<AssetServer>,
     player_query: Query<(), With<PlayerInGuardianArea>>,
-    menu_query: Query<Entity, With<GuardianMenuUI>>,
+    dialog_query: Query<Entity, With<GuardianDialogUI>>,
 ) {
-
     if player_query.is_empty() {
         return;
     }
 
-    if !menu_query.is_empty() {
+    if !dialog_query.is_empty() {
         return;
     }
 
-    println!("Interact with Guardian");
-
     commands
         .spawn((
-            GuardianMenuUI,
+            GuardianDialogUI,
             Node {
                 position_type: PositionType::Absolute,
-                top: Val::Percent(30.0),
-                left: Val::Percent(35.0),
-                width: Val::Percent(30.0),
-                height: Val::Percent(35.0),
-                flex_direction: FlexDirection::Column,
+                top: Val::Px(0.0),
+                left: Val::Px(0.0),
+                width: Val::Percent(100.0),
+                height: Val::Percent(100.0),
+
                 justify_content: JustifyContent::Center,
-                align_items: AlignItems::Center,
-                row_gap: Val::Px(16.0),
+                align_items: AlignItems::FlexEnd,
+
+                padding: UiRect::bottom(Val::Px(40.0)),
                 ..default()
             },
-            BackgroundColor(Color::srgba(0.0, 0.0, 0.0, 0.75)),
+
+            // อันนี้คือ blur ปลอม / dim background
+            BackgroundColor(Color::srgba(0.0, 0.0, 0.0, 0.45)),
         ))
-        .with_children(|parent| {
-            parent.spawn((
-                Text::new("Guardian Practice"),
-                TextFont {
-                    font_size: 34.0,
+        .with_children(|root| {
+            root.spawn((
+                Node {
+                    width: Val::Percent(80.0),
+                    height: Val::Px(220.0),
+                    flex_direction: FlexDirection::Row,
+                    align_items: AlignItems::Center,
+                    column_gap: Val::Px(24.0),
+                    padding: UiRect::all(Val::Px(20.0)),
                     ..default()
                 },
-                TextColor(Color::WHITE),
-            ));
+                BackgroundColor(Color::srgba(0.0, 0.0, 0.0, 0.78)),
+            ))
+            .with_children(|parent| {
+                parent.spawn((
+                    ImageNode::new(asset_server.load("npc/guardian_welcome.png")),
+                    Node {
+                        width: Val::Px(150.0),
+                        height: Val::Px(150.0),
+                        ..default()
+                    },
+                ));
 
-            parent.spawn((
-                Text::new("1. Basic Practice"),
-                TextFont {
-                    font_size: 26.0,
-                    ..default()
-                },
-                TextColor(Color::WHITE),
-            ));
-
-            parent.spawn((
-                Text::new("2. Advance Practice"),
-                TextFont {
-                    font_size: 26.0,
-                    ..default()
-                },
-                TextColor(Color::WHITE),
-            ));
-
-            parent.spawn((
-                Text::new("3. Exit"),
-                TextFont {
-                    font_size: 26.0,
-                    ..default()
-                },
-                TextColor(Color::WHITE),
-            ));
+                parent.spawn((
+                    Text::new(
+                        "Guardian:\nWhat kind of practice do you want?\n\n1. Basic Practice\n2. Advanced Practice\n3. Exit"
+                    ),
+                    TextFont {
+                        font_size: 26.0,
+                        ..default()
+                    },
+                    TextColor(Color::WHITE),
+                ));
+            });
         });
+}
+pub fn guardian_dialog_exit_input(
+    mut commands: Commands,
+    keyboard: Res<ButtonInput<KeyCode>>,
+    dialog_query: Query<Entity, With<GuardianDialogUI>>,
+    mut player_query: Query<&mut Transform, With<Player>>,
+) {
+    if dialog_query.is_empty() {
+        return;
+    }
+
+    if keyboard.just_pressed(KeyCode::Digit3) || keyboard.just_pressed(KeyCode::Escape) {
+        println!("Exit Guardian dialog");
+
+        for entity in &dialog_query {
+            commands.entity(entity).despawn();
+        }
+        for mut transform in &mut player_query {
+            transform.translation.z += 3.5;
+        }
+    }
 }
 pub fn guardian_menu_input(
     mut commands: Commands,
@@ -296,42 +302,51 @@ pub fn guardian_menu_input(
     if keyboard.just_pressed(KeyCode::Digit1) {
         println!("Basic Practice selected");
 
-        // ตรงนี้ค่อยเปลี่ยน State หรือเปิดระบบฝึก basic
-        // commands.insert_resource(...);
+       for entity in &menu_query {
+            commands.entity(entity).despawn();
+        }
+        for mut transform in &mut player_query {
+            transform.translation.z += 3.5;
+        }
     }
 
     if keyboard.just_pressed(KeyCode::Digit2) {
         println!("Advance Practice selected");
 
-        // ตรงนี้ค่อยเปลี่ยน State หรือเปิดระบบฝึก advance
+        for entity in &menu_query {
+            commands.entity(entity).despawn();
+        }
+        for mut transform in &mut player_query {
+            transform.translation.z += 3.5;
+        }
     }
 
     if keyboard.just_pressed(KeyCode::Digit3) || keyboard.just_pressed(KeyCode::Escape) {
         println!("Exit Guardian menu");
 
         for mut anim_player in &mut guardian_anim_query {
-                anim_player.play(anim_graph.idle).repeat();
-
-            for entity in &menu_query {
-                commands.entity(entity).despawn();
-            }
-
-            for mut transform in &mut player_query {
-                transform.translation.z += 2.0;
-            }
+            anim_player.stop_all();
+            anim_player.play(anim_graph.idle).repeat();
         }
+        for entity in &menu_query {
+            commands.entity(entity).despawn();
+        }
+        for mut transform in &mut player_query {
+            transform.translation.z += 3.5;
+        }
+        
     }
 }
 pub fn cleanup_guardian_ui_when_player_leave(
     mut commands: Commands,
     player_query: Query<(), With<PlayerInGuardianArea>>,
-    menu_query: Query<Entity, With<GuardianMenuUI>>,
+    dialog_query: Query<Entity, With<GuardianDialogUI>>,
 ) {
     if !player_query.is_empty() {
         return;
     }
 
-    for entity in &menu_query {
+    for entity in &dialog_query {
         commands.entity(entity).despawn();
     }
 }
