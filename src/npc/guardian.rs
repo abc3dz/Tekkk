@@ -228,7 +228,7 @@ pub fn show_guardian_dialog(
             },
 
             // อันนี้คือ blur ปลอม / dim background
-            BackgroundColor(Color::srgba(0.0, 0.0, 0.0, 0.45)),
+            BackgroundColor(Color::srgba(0.0, 0.0, 0.0, 0.60)),
         ))
         .with_children(|root| {
             root.spawn((
@@ -245,7 +245,7 @@ pub fn show_guardian_dialog(
             ))
             .with_children(|parent| {
                 parent.spawn((
-                    ImageNode::new(asset_server.load("npc/guardian_welcome.png")),
+                    ImageNode::new(asset_server.load("npc/GuardianWelcome.png")),
                     Node {
                         width: Val::Px(150.0),
                         height: Val::Px(150.0),
@@ -279,64 +279,15 @@ pub fn guardian_dialog_exit_input(
     if keyboard.just_pressed(KeyCode::Digit3) || keyboard.just_pressed(KeyCode::Escape) {
         println!("Exit Guardian dialog");
 
-        for entity in &dialog_query {
-            commands.entity(entity).despawn();
-        }
+        // for entity in &dialog_query {
+        //     commands.entity(entity).despawn();
+        // }
         for mut transform in &mut player_query {
             transform.translation.z += 3.5;
         }
     }
 }
-pub fn guardian_menu_input(
-    mut commands: Commands,
-    keyboard: Res<ButtonInput<KeyCode>>,
-    menu_query: Query<Entity, With<GuardianMenuUI>>,
-    anim_graph: Res<GuardianAnimationGraph>,
-    mut guardian_anim_query: Query<&mut AnimationPlayer, With<GuardianAnimationTarget>>,
-    mut player_query: Query<&mut Transform, With<Player>>,
-) {
-    if menu_query.is_empty() {
-        return;
-    }
 
-    if keyboard.just_pressed(KeyCode::Digit1) {
-        println!("Basic Practice selected");
-
-       for entity in &menu_query {
-            commands.entity(entity).despawn();
-        }
-        for mut transform in &mut player_query {
-            transform.translation.z += 3.5;
-        }
-    }
-
-    if keyboard.just_pressed(KeyCode::Digit2) {
-        println!("Advance Practice selected");
-
-        for entity in &menu_query {
-            commands.entity(entity).despawn();
-        }
-        for mut transform in &mut player_query {
-            transform.translation.z += 3.5;
-        }
-    }
-
-    if keyboard.just_pressed(KeyCode::Digit3) || keyboard.just_pressed(KeyCode::Escape) {
-        println!("Exit Guardian menu");
-
-        for mut anim_player in &mut guardian_anim_query {
-            anim_player.stop_all();
-            anim_player.play(anim_graph.idle).repeat();
-        }
-        for entity in &menu_query {
-            commands.entity(entity).despawn();
-        }
-        for mut transform in &mut player_query {
-            transform.translation.z += 3.5;
-        }
-        
-    }
-}
 pub fn cleanup_guardian_ui_when_player_leave(
     mut commands: Commands,
     player_query: Query<(), With<PlayerInGuardianArea>>,
@@ -356,5 +307,78 @@ pub fn despawn_hub_only_entities(
 ) {
     for entity in &hub_query {
         commands.entity(entity).despawn();
+    }
+}
+fn spawn_basic_practice_gun(
+    commands: &mut Commands,
+    asset_server: &Res<AssetServer>,
+) {
+    commands.spawn((
+        HubOnly,
+        PracticeEntity,
+        BasicPracticeGun,
+        SceneRoot(
+            asset_server.load(
+                GltfAssetLabel::Scene(0).from_asset("npc/BasicPractice.glb")
+            )
+        ),
+        Transform::from_xyz(-4.0, 0.0, -4.0),
+        GlobalTransform::default(),
+    ));
+}
+pub fn guardian_dialog_basic_input(
+    mut commands: Commands,
+    keyboard: Res<ButtonInput<KeyCode>>,
+    asset_server: Res<AssetServer>,
+    dialog_query: Query<Entity, With<GuardianDialogUI>>,
+    practice_query: Query<Entity, With<PracticeEntity>>,
+    mut player_query: Query<&mut Transform, With<Player>>,
+) {
+    if dialog_query.is_empty() {
+        return;
+    }
+
+    if !keyboard.just_pressed(KeyCode::Digit1) {
+        return;
+    }
+
+    println!("Basic Practice selected");
+
+    // ลบ practice เก่าก่อน
+    for entity in &practice_query {
+        commands.entity(entity).despawn();
+    }
+
+    // ปิด dialog
+    // for entity in &dialog_query {
+    //     commands.entity(entity).despawn();
+    // }
+
+    // spawn ปืน
+    spawn_basic_practice_gun(&mut commands, &asset_server);
+
+    for mut transform in &mut player_query {
+        transform.translation.z += 3.5;
+    }
+}
+pub fn rotate_basic_practice_gun_to_player(
+    player_query: Query<&Transform, (With<Player>, Without<BasicPracticeGun>)>,
+    mut gun_query: Query<&mut Transform, (With<BasicPracticeGun>, Without<Player>)>,
+) {
+    let Ok(player_tf) = player_query.single() else {
+        return;
+    };
+
+    for mut gun_tf in &mut gun_query {
+        let mut direction = player_tf.translation - gun_tf.translation;
+        direction.y = 0.0;
+
+        if direction.length_squared() < 0.0001 {
+            continue;
+        }
+
+        let yaw = direction.x.atan2(direction.z);
+
+        gun_tf.rotation = Quat::from_rotation_y(yaw);
     }
 }

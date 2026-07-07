@@ -11,9 +11,11 @@ use crate::npc::guardian::{
     check_guardian_interaction_area_exit,
     show_guardian_dialog,
     guardian_dialog_exit_input,
-    //guardian_menu_input,
+    guardian_dialog_basic_input,
+    rotate_basic_practice_gun_to_player,
     cleanup_guardian_ui_when_player_leave,
     despawn_hub_only_entities,
+    
 };
 
 pub struct WorldPlugin;
@@ -25,13 +27,14 @@ impl Plugin for WorldPlugin {
             .add_systems(OnEnter(GameScene::Hub), setup_guardian_npc)
             .add_systems(Update, (
                 
-                setup_guardian_animation_player,
+                //setup_guardian_animation_player,
                 check_guardian_interaction_area,
                 check_guardian_interaction_area_exit,
                 show_guardian_dialog,
                 guardian_dialog_exit_input,
-                //guardian_menu_input,
+                guardian_dialog_basic_input,
                 cleanup_guardian_ui_when_player_leave,
+                rotate_basic_practice_gun_to_player,
             ))
             .add_systems(OnExit(GameScene::Hub), despawn_hub_only_entities)
 
