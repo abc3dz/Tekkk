@@ -255,7 +255,7 @@ pub fn show_guardian_dialog(
 
                 parent.spawn((
                     Text::new(
-                        "Guardian:\nWhat kind of practice do you want?\n\n1. Basic Practice\n2. Advanced Practice\n3. Exit"
+                        "Guardian:\nWhat kind of practice do you want?\n\n1. Basic Practice\n2. Advanced Practice\n3. Full HP / Mana\nEsc. Exit"
                     ),
                     TextFont {
                         font_size: 26.0,
@@ -270,21 +270,35 @@ pub fn guardian_dialog_exit_input(
     mut commands: Commands,
     keyboard: Res<ButtonInput<KeyCode>>,
     dialog_query: Query<Entity, With<GuardianDialogUI>>,
-    mut player_query: Query<&mut Transform, With<Player>>,
+    practice_query: Query<Entity, With<PracticeEntity>>,
+    mut player_query: Query<(&mut Health, &mut Mana, &mut Transform), With<Player>>,
 ) {
     if dialog_query.is_empty() {
         return;
     }
 
-    if keyboard.just_pressed(KeyCode::Digit3) || keyboard.just_pressed(KeyCode::Escape) {
-        println!("Exit Guardian dialog");
+    let Ok((mut health, mut mana, mut transform)) = player_query.single_mut() else {
+        return;
+    };
 
-        // for entity in &dialog_query {
-        //     commands.entity(entity).despawn();
-        // }
-        for mut transform in &mut player_query {
-            transform.translation.z += 3.5;
+    if keyboard.just_pressed(KeyCode::Digit3) {
+        health.current = health.max;
+        mana.current = mana.max;
+
+        println!(
+            "Player recovered! HP: {}/{} Mana: {}/{}",
+            health.current,
+            health.max,
+            mana.current,
+            mana.max,
+        );
+    }
+
+    if keyboard.just_pressed(KeyCode::Escape) {
+        for entity in &practice_query {
+            commands.entity(entity).despawn();
         }
+        transform.translation.z += 3.5;
     }
 }
 
@@ -317,12 +331,13 @@ fn spawn_basic_practice_gun(
         HubOnly,
         PracticeEntity,
         BasicPracticeGun,
+        BasicGunShootTimer(Timer::from_seconds(1.0, TimerMode::Repeating)),
         SceneRoot(
             asset_server.load(
                 GltfAssetLabel::Scene(0).from_asset("npc/BasicPractice.glb")
             )
         ),
-        Transform::from_xyz(-4.0, 0.0, -4.0),
+        Transform::from_xyz(-4.0, 1.0, -4.0),
         GlobalTransform::default(),
     ));
 }
@@ -344,17 +359,10 @@ pub fn guardian_dialog_basic_input(
 
     println!("Basic Practice selected");
 
-    // ลบ practice เก่าก่อน
     for entity in &practice_query {
         commands.entity(entity).despawn();
     }
 
-    // ปิด dialog
-    // for entity in &dialog_query {
-    //     commands.entity(entity).despawn();
-    // }
-
-    // spawn ปืน
     spawn_basic_practice_gun(&mut commands, &asset_server);
 
     for mut transform in &mut player_query {
@@ -380,5 +388,200 @@ pub fn rotate_basic_practice_gun_to_player(
         let yaw = direction.x.atan2(direction.z);
 
         gun_tf.rotation = Quat::from_rotation_y(yaw);
+    }
+}
+pub fn basic_practice_gun_shoot_projectile(
+    mut commands: Commands,
+    time: Res<Time>,
+    mut meshes: ResMut<Assets<Mesh>>,
+    mut materials: ResMut<Assets<StandardMaterial>>,
+    player_query: Query<&Transform, (With<Player>, Without<BasicPracticeGun>)>,
+    mut gun_query: Query<
+        (&Transform, &mut BasicGunShootTimer),
+        (With<BasicPracticeGun>, Without<Player>),
+    >,
+) {
+    let Ok(player_tf) = player_query.single() else {
+        return;
+    };
+
+    for (gun_tf, mut shoot_timer) in &mut gun_query {
+        shoot_timer.0.tick(time.delta());
+
+        if !shoot_timer.0.just_finished() {
+            continue;
+        }
+
+        let mut direction = player_tf.translation - gun_tf.translation;
+        direction.y = 0.0;
+
+        if direction.length_squared() < 0.0001 {
+            continue;
+        }
+
+        let direction = direction.normalize();
+        let speed = 7.0;
+
+        let spawn_pos = gun_tf.translation + direction * 0.8 + Vec3::Y * 0.3;
+
+        commands.spawn((
+            PracticeEntity,
+            BasicPracticeProjectile {
+                velocity: direction * speed,
+                hp_damage: 5,
+                mana_damage: 3,
+            },
+            ProjectileLifetime(Timer::from_seconds(4.0, TimerMode::Once)),
+
+            Mesh3d(meshes.add(Cuboid::new(0.2, 0.2, 0.2))),
+            MeshMaterial3d(materials.add(StandardMaterial {
+                base_color: Color::srgb(1.0, 0.2, 0.1),
+                ..default()
+            })),
+
+            Transform::from_translation(spawn_pos),
+            GlobalTransform::default(),
+        ));
+
+        println!("Basic gun shoot projectile");
+    }
+}
+pub fn move_basic_practice_projectiles(
+    mut commands: Commands,
+    time: Res<Time>,
+    mut projectile_query: Query<(
+        Entity,
+        &mut Transform,
+        &BasicPracticeProjectile,
+        &mut ProjectileLifetime,
+    )>,
+) {
+    for (entity, mut transform, projectile, mut lifetime) in &mut projectile_query {
+        transform.translation += projectile.velocity * time.delta_secs();
+
+        lifetime.0.tick(time.delta());
+
+        if lifetime.0.is_finished() {
+            commands.entity(entity).despawn();
+        }
+    }
+}
+pub fn basic_projectile_hit_player(
+    mut commands: Commands,
+    projectile_query: Query<
+        (Entity, &Transform, &BasicPracticeProjectile),
+        (With<BasicPracticeProjectile>, Without<Player>),
+    >,
+    mut player_query: Query<
+        (&Transform, &mut Health, &mut Mana),
+        (With<Player>, Without<BasicPracticeProjectile>),
+    >,
+) {
+    let Ok((player_tf, mut health, mut mana)) = player_query.single_mut() else {
+        return;
+    };
+
+    for (projectile_entity, projectile_tf, projectile) in &projectile_query {
+        let distance = player_tf.translation.distance(projectile_tf.translation);
+
+        if distance < 0.8 {
+            health.current -= projectile.hp_damage;
+            mana.current -= projectile.mana_damage;
+
+            health.current = health.current.clamp(0, health.max);
+            mana.current = mana.current.clamp(0, mana.max);
+
+            println!(
+                "Player hit! HP: {}/{} Mana: {}/{}",
+                health.current,
+                health.max,
+                mana.current,
+                mana.max,
+            );
+
+            commands.entity(projectile_entity).despawn();
+        }
+    }
+}
+fn spawn_guardian_clone(
+    commands: &mut Commands,
+    meshes: &mut ResMut<Assets<Mesh>>,
+    materials: &mut ResMut<Assets<StandardMaterial>>,
+) {
+    commands.spawn((
+        HubOnly,
+        PracticeEntity,
+        GuardianClone,
+
+        Mesh3d(meshes.add(Capsule3d::new(0.45, 1.6))),
+        MeshMaterial3d(materials.add(StandardMaterial {
+            base_color: Color::srgb(0.6, 0.4, 1.0),
+            ..default()
+        })),
+
+        Transform::from_xyz(-2.0, 1.0, -2.0),
+        GlobalTransform::default(),
+    ));
+
+    println!("Guardian capsule clone spawned");
+}
+pub fn guardian_dialog_advanced_input(
+    mut commands: Commands,
+    keyboard: Res<ButtonInput<KeyCode>>,
+    mut meshes: ResMut<Assets<Mesh>>,
+    mut materials: ResMut<Assets<StandardMaterial>>,
+    dialog_query: Query<Entity, With<GuardianDialogUI>>,
+    practice_query: Query<Entity, With<PracticeEntity>>,
+) {
+    if dialog_query.is_empty() {
+        return;
+    }
+
+    if !keyboard.just_pressed(KeyCode::Digit2) {
+        return;
+    }
+
+    println!("Advanced Practice selected");
+
+    for entity in &practice_query {
+        commands.entity(entity).despawn();
+    }
+
+    for entity in &dialog_query {
+        commands.entity(entity).despawn();
+    }
+
+    spawn_guardian_clone(&mut commands, &mut meshes, &mut materials);
+}
+pub fn guardian_clone_chase_player(
+    time: Res<Time>,
+    player_query: Query<&Transform, (With<Player>, Without<GuardianClone>)>,
+    mut clone_query: Query<&mut Transform, (With<GuardianClone>, Without<Player>)>,
+) {
+    let Ok(player_tf) = player_query.single() else {
+        return;
+    };
+
+    for mut clone_tf in &mut clone_query {
+        let mut direction = player_tf.translation - clone_tf.translation;
+
+        // Do not move up/down
+        direction.y = 0.0;
+
+        let distance = direction.length();
+
+        // Stop near player
+        if distance < 1.3 {
+            continue;
+        }
+
+        let move_dir = direction.normalize();
+        let speed = 2.5;
+
+        clone_tf.translation += move_dir * speed * time.delta_secs();
+
+        // Rotate capsule to face player
+        let yaw = move_dir.x.atan2(move_dir.z);
+        clone_tf.rotation = Quat::from_rotation_y(yaw);
     }
 }

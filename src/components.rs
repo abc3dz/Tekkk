@@ -8,11 +8,26 @@ pub struct Player;
 #[derive(Component)]
 pub struct MoveSpeed(pub f32);
 
-#[derive(Component)]
+#[derive(Component)] //
 pub struct Health {
     pub current: i32,
     pub max: i32,
 }
+
+#[derive(Component)] //
+pub struct Mana {
+    pub current: i32,
+    pub max: i32,
+}
+
+#[derive(Component)]
+pub struct PlayerStatusUI;
+
+#[derive(Component)]
+pub struct HealthBarFill;
+
+#[derive(Component)]
+pub struct ManaBarFill;
 
 #[derive(Resource)]
 pub struct PlayerAnimationGraph {
@@ -74,6 +89,19 @@ pub struct PracticeEntity;
 
 #[derive(Component)]
 pub struct BasicPracticeGun;
+
+#[derive(Component)]
+pub struct BasicGunShootTimer(pub Timer);
+
+#[derive(Component)]
+pub struct BasicPracticeProjectile {
+    pub velocity: Vec3,
+    pub hp_damage: i32,
+    pub mana_damage: i32,
+}
+
+#[derive(Component)]
+pub struct ProjectileLifetime(pub Timer);
 
 #[derive(Component)]
 pub struct GuardianClone;

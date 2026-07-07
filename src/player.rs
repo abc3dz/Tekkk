@@ -10,12 +10,18 @@ pub struct PlayerPlugin;
 
 impl Plugin for PlayerPlugin {
     fn build(&self, app: &mut App) {
-        app.add_systems(Startup, (setup_player_animation_graph, spawn_player))
+        app.add_systems(Startup, (
+            setup_player_animation_graph, 
+            spawn_player,
+            setup_player_status_ui
+        ))
             .add_systems(Update, (
                 setup_player_animation_player,
                 player_movement,
                 update_player_animation,
-            ).chain());
+                update_player_status_ui,
+            ).chain()
+        );
     }
 }
 
@@ -28,8 +34,8 @@ fn spawn_player(
         Player,
         PlayerActionState::Idle,
         MoveSpeed(6.0),
-        Health { current: 100, max: 100 },
-
+        Health { current: 80, max: 100 },
+        Mana { current: 70, max: 100 },
         Transform::from_xyz(0.0, 2.0, 0.0),
         RigidBody::Dynamic,
         Collider::capsule(0.28, 1.0),
@@ -209,5 +215,86 @@ fn update_player_animation(
                 }
             }
         }
+    }
+}
+pub fn setup_player_status_ui(mut commands: Commands) {
+    commands
+        .spawn((
+            PlayerStatusUI,
+            Node {
+                position_type: PositionType::Absolute,
+                top: Val::Px(20.0),
+                left: Val::Px(20.0),
+                width: Val::Px(260.0),
+                height: Val::Px(70.0),
+                flex_direction: FlexDirection::Column,
+                row_gap: Val::Px(10.0),
+                ..default()
+            },
+        ))
+        .with_children(|parent| {
+            // Health bar background
+            parent
+                .spawn((
+                    Node {
+                        width: Val::Px(240.0),
+                        height: Val::Px(24.0),
+                        ..default()
+                    },
+                    BackgroundColor(Color::srgba(0.1, 0.1, 0.1, 0.8)),
+                ))
+                .with_children(|bar| {
+                    bar.spawn((
+                        HealthBarFill,
+                        Node {
+                            width: Val::Percent(100.0),
+                            height: Val::Percent(100.0),
+                            ..default()
+                        },
+                        BackgroundColor(Color::srgb(0.8, 0.1, 0.1)),
+                    ));
+                });
+
+            // Mana bar background
+            parent
+                .spawn((
+                    Node {
+                        width: Val::Px(240.0),
+                        height: Val::Px(24.0),
+                        ..default()
+                    },
+                    BackgroundColor(Color::srgba(0.1, 0.1, 0.1, 0.8)),
+                ))
+                .with_children(|bar| {
+                    bar.spawn((
+                        ManaBarFill,
+                        Node {
+                            width: Val::Percent(50.0),
+                            height: Val::Percent(100.0),
+                            ..default()
+                        },
+                        BackgroundColor(Color::srgb(0.1, 0.2, 0.9)),
+                    ));
+                });
+        });
+}
+pub fn update_player_status_ui(
+    player_query: Query<(&Health, &Mana), With<Player>>,
+    mut health_bar_query: Query<&mut Node, (With<HealthBarFill>, Without<ManaBarFill>)>,
+    mut mana_bar_query: Query<&mut Node, (With<ManaBarFill>, Without<HealthBarFill>)>,
+) {
+    let Ok((health, mana)) = player_query.single() else {
+        return;
+    };
+
+    let health_percent = health.current as f32 / health.max as f32 * 100.0;
+    let mana_percent = mana.current as f32 / mana.max as f32 * 100.0;
+
+    for mut node in &mut health_bar_query {
+        node.width = Val::Percent(health_percent.clamp(0.0, 100.0));
+    }
+
+    for mut node in &mut mana_bar_query {
+        node.width = Val::Percent(mana_percent.clamp(0.0, 100.0));
     }
 }
