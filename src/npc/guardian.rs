@@ -323,28 +323,69 @@ pub fn despawn_hub_only_entities(
         commands.entity(entity).despawn();
     }
 }
+
+// Basic practice
 fn spawn_basic_practice_gun(
     commands: &mut Commands,
     asset_server: &Res<AssetServer>,
+    meshes: &mut ResMut<Assets<Mesh>>,
+    materials: &mut ResMut<Assets<StandardMaterial>>,
 ) {
-    commands.spawn((
-        HubOnly,
-        PracticeEntity,
-        BasicPracticeGun,
-        BasicGunShootTimer(Timer::from_seconds(1.0, TimerMode::Repeating)),
-        SceneRoot(
-            asset_server.load(
-                GltfAssetLabel::Scene(0).from_asset("npc/BasicPractice.glb")
-            )
-        ),
-        Transform::from_xyz(-4.0, 1.0, -4.0),
-        GlobalTransform::default(),
-    ));
+    commands
+        .spawn((
+            HubOnly,
+            PracticeEntity,
+            BasicPracticeGun,
+
+            Health {
+                current: 100,
+                max: 100,
+            },
+
+            BasicGunShootTimer(Timer::from_seconds(1.0, TimerMode::Repeating)),
+
+            SceneRoot(
+                asset_server.load(
+                    GltfAssetLabel::Scene(0).from_asset("npc/BasicPractice.glb")
+                )
+            ),
+
+            Transform::from_xyz(-4.0, 1.0, -4.0),
+            GlobalTransform::default(),
+        ))
+        .with_children(|parent| {
+            // Bar background
+            parent.spawn((
+                Mesh3d(meshes.add(Cuboid::new(1.3, 0.12, 0.05))),
+                MeshMaterial3d(materials.add(StandardMaterial {
+                    base_color: Color::srgb(0.1, 0.1, 0.1),
+                    ..default()
+                })),
+                Transform::from_xyz(0.0, 1.3, 0.0),
+                GlobalTransform::default(),
+            ));
+
+            // Bar fill
+            parent.spawn((
+                BasicGunHealthBarFill,
+                Mesh3d(meshes.add(Cuboid::new(1.3, 0.14, 0.06))),
+                MeshMaterial3d(materials.add(StandardMaterial {
+                    base_color: Color::srgb(0.9, 0.1, 0.1),
+                    ..default()
+                })),
+                Transform::from_xyz(0.0, 1.3, 0.04),
+                GlobalTransform::default(),
+            ));
+        });
+
+    println!("Basic Practice Gun spawned with health bar");
 }
 pub fn guardian_dialog_basic_input(
     mut commands: Commands,
     keyboard: Res<ButtonInput<KeyCode>>,
     asset_server: Res<AssetServer>,
+    mut meshes: ResMut<Assets<Mesh>>,
+    mut materials: ResMut<Assets<StandardMaterial>>,
     dialog_query: Query<Entity, With<GuardianDialogUI>>,
     practice_query: Query<Entity, With<PracticeEntity>>,
     mut player_query: Query<&mut Transform, With<Player>>,
@@ -363,11 +404,16 @@ pub fn guardian_dialog_basic_input(
         commands.entity(entity).despawn();
     }
 
-    spawn_basic_practice_gun(&mut commands, &asset_server);
-
-    for mut transform in &mut player_query {
+    if let Ok(mut transform) = player_query.single_mut() {
         transform.translation.z += 3.5;
     }
+
+    spawn_basic_practice_gun(
+        &mut commands,
+        &asset_server,
+        &mut meshes,
+        &mut materials,
+    );
 }
 pub fn rotate_basic_practice_gun_to_player(
     player_query: Query<&Transform, (With<Player>, Without<BasicPracticeGun>)>,
@@ -503,35 +549,113 @@ pub fn basic_projectile_hit_player(
         }
     }
 }
+pub fn update_basic_gun_health_bar(
+    gun_query: Query<(&Health, &Children), With<BasicPracticeGun>>,
+    mut fill_query: Query<&mut Transform, With<BasicGunHealthBarFill>>,
+) {
+    let full_width = 1.3;
+
+    for (health, children) in &gun_query {
+        let ratio = health.current as f32 / health.max as f32;
+        let ratio = ratio.clamp(0.0, 1.0);
+
+        for child in children.iter() {
+            if let Ok(mut fill_tf) = fill_query.get_mut(child) {
+                fill_tf.scale.x = ratio;
+
+                // Keep the left side fixed while shrinking
+                fill_tf.translation.x = -full_width * (1.0 - ratio) * 0.5;
+            }
+        }
+    }
+}
+pub fn debug_damage_basic_gun(
+    keyboard: Res<ButtonInput<KeyCode>>,
+    mut gun_query: Query<&mut Health, With<BasicPracticeGun>>,
+) {
+    if !keyboard.just_pressed(KeyCode::KeyH) {
+        return;
+    }
+
+    for mut health in &mut gun_query {
+        health.current -= 10;
+        health.current = health.current.clamp(0, health.max);
+
+        println!("Basic gun HP: {}/{}", health.current, health.max);
+    }
+}
+
+//Advanced practice
 fn spawn_guardian_clone(
     commands: &mut Commands,
+    asset_server: &Res<AssetServer>,
     meshes: &mut ResMut<Assets<Mesh>>,
     materials: &mut ResMut<Assets<StandardMaterial>>,
 ) {
-    commands.spawn((
-        HubOnly,
-        PracticeEntity,
-        GuardianClone,
+    commands
+        .spawn((
+            HubOnly,
+            PracticeEntity,
+            GuardianClone,
 
-        Mesh3d(meshes.add(Capsule3d::new(0.45, 1.6))),
-        MeshMaterial3d(materials.add(StandardMaterial {
-            base_color: Color::srgb(0.6, 0.4, 1.0),
-            ..default()
-        })),
+            Health {
+                current: 100,
+                max: 100,
+            },
 
-        Transform::from_xyz(-2.0, 1.0, -2.0),
-        GlobalTransform::default(),
-    ));
+            MinionLifeDrainTimer(
+                Timer::from_seconds(0.5, TimerMode::Repeating)
+            ),
 
-    println!("Guardian capsule clone spawned");
+            SceneRoot(
+                asset_server.load(
+                    GltfAssetLabel::Scene(0).from_asset("npc/MinionChar.glb")
+                )
+            ),
+
+            Transform {
+                translation: Vec3::new(-2.0, 0.0, -2.0),
+                scale: Vec3::splat(1.0),
+                ..default()
+            },
+            GlobalTransform::default(),
+        ))
+        .with_children(|parent| {
+            // background bar
+            parent.spawn((
+                Mesh3d(meshes.add(Cuboid::new(1.2, 0.10, 0.05))),
+                MeshMaterial3d(materials.add(StandardMaterial {
+                    base_color: Color::srgb(0.1, 0.1, 0.1),
+                    ..default()
+                })),
+                Transform::from_xyz(0.0, 2.2, 0.0),
+                GlobalTransform::default(),
+            ));
+
+            // fill bar
+            parent.spawn((
+                MinionHealthBarFill,
+                Mesh3d(meshes.add(Cuboid::new(1.2, 0.12, 0.06))),
+                MeshMaterial3d(materials.add(StandardMaterial {
+                    base_color: Color::srgb(0.9, 0.1, 0.1),
+                    ..default()
+                })),
+                Transform::from_xyz(0.0, 2.2, 0.04),
+                GlobalTransform::default(),
+            ));
+        });
+
+    println!("MinionChar spawned with health bar");
 }
 pub fn guardian_dialog_advanced_input(
     mut commands: Commands,
     keyboard: Res<ButtonInput<KeyCode>>,
+    asset_server: Res<AssetServer>,
     mut meshes: ResMut<Assets<Mesh>>,
     mut materials: ResMut<Assets<StandardMaterial>>,
     dialog_query: Query<Entity, With<GuardianDialogUI>>,
     practice_query: Query<Entity, With<PracticeEntity>>,
+    mut player_query: Query<&mut Transform, With<Player>>,
 ) {
     if dialog_query.is_empty() {
         return;
@@ -547,11 +671,16 @@ pub fn guardian_dialog_advanced_input(
         commands.entity(entity).despawn();
     }
 
-    for entity in &dialog_query {
-        commands.entity(entity).despawn();
-    }
+    spawn_guardian_clone(
+        &mut commands, 
+        &asset_server, 
+        &mut meshes, 
+        &mut materials
+    );
 
-    spawn_guardian_clone(&mut commands, &mut meshes, &mut materials);
+    if let Ok(mut player_tf) = player_query.single_mut() {
+        player_tf.translation.z += 3.5;
+    };
 }
 pub fn guardian_clone_chase_player(
     time: Res<Time>,
@@ -583,5 +712,84 @@ pub fn guardian_clone_chase_player(
         // Rotate capsule to face player
         let yaw = move_dir.x.atan2(move_dir.z);
         clone_tf.rotation = Quat::from_rotation_y(yaw);
+    }
+}
+pub fn minion_drain_player_life(
+    time: Res<Time>,
+    mut player_query: Query<
+        (&Transform, &mut Health),
+        (With<Player>, Without<GuardianClone>),
+    >,
+    mut minion_query: Query<
+        (&Transform, &mut Health, &mut MinionLifeDrainTimer),
+        (With<GuardianClone>, Without<Player>),
+    >,
+) {
+    let Ok((player_tf, mut player_health)) = player_query.single_mut() else {
+        return;
+    };
+
+    for (minion_tf, mut minion_health, mut drain_timer) in &mut minion_query {
+        drain_timer.0.tick(time.delta());
+
+        let distance = player_tf.translation.distance(minion_tf.translation);
+
+        if distance < 1.4 && drain_timer.0.just_finished() {
+            let drain_amount = 2;
+
+            player_health.current -= drain_amount;
+            player_health.current = player_health.current.clamp(0, player_health.max);
+
+            // ดูดเลือดมาเติมให้ Minion ด้วย
+            minion_health.current += drain_amount;
+            minion_health.current = minion_health.current.clamp(0, minion_health.max);
+
+            println!(
+                "Minion drains life! Player HP: {}/{} | Minion HP: {}/{}",
+                player_health.current,
+                player_health.max,
+                minion_health.current,
+                minion_health.max,
+            );
+        }
+    }
+}
+pub fn update_minion_health_bar(
+    minion_query: Query<(&Health, &Children), With<GuardianClone>>,
+    mut fill_query: Query<&mut Transform, With<MinionHealthBarFill>>,
+) {
+    let full_width = 1.2;
+
+    for (health, children) in &minion_query {
+        let ratio = health.current as f32 / health.max as f32;
+        let ratio = ratio.clamp(0.0, 1.0);
+
+        for child in children.iter() {
+            if let Ok(mut fill_tf) = fill_query.get_mut(child) {
+                fill_tf.scale.x = ratio;
+
+                // ให้แถบเลือดหดจากขวาไปซ้าย
+                fill_tf.translation.x = -full_width * (1.0 - ratio) * 0.5;
+            }
+        }
+    }
+}
+pub fn debug_damage_minion_char(
+    keyboard: Res<ButtonInput<KeyCode>>,
+    mut minion_query: Query<&mut Health, With<GuardianClone>>,
+) {
+    if !keyboard.just_pressed(KeyCode::KeyJ) {
+        return;
+    }
+
+    for mut health in &mut minion_query {
+        health.current -= 10;
+        health.current = health.current.clamp(0, health.max);
+
+        println!(
+            "MinionChar HP: {}/{}",
+            health.current,
+            health.max,
+        );
     }
 }

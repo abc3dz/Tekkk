@@ -6,20 +6,29 @@ use crate::biomes::{hub, desert};
 use crate::npc::guardian::{
     setup_guardian_npc,
     setup_guardian_animation_graph, 
-    setup_guardian_animation_player, 
+    //setup_guardian_animation_player, 
     check_guardian_interaction_area, 
     check_guardian_interaction_area_exit,
     show_guardian_dialog,
     guardian_dialog_exit_input,
+    //basic practice
     guardian_dialog_basic_input,
-    guardian_dialog_advanced_input,
-    guardian_clone_chase_player,
     rotate_basic_practice_gun_to_player,
-    cleanup_guardian_ui_when_player_leave,
-    despawn_hub_only_entities,
     basic_practice_gun_shoot_projectile,
     move_basic_practice_projectiles,
+    update_basic_gun_health_bar,
     basic_projectile_hit_player,
+    debug_damage_basic_gun,
+    //advanced practice
+    guardian_dialog_advanced_input,
+    guardian_clone_chase_player,
+    minion_drain_player_life,
+    update_minion_health_bar,
+    debug_damage_minion_char,
+    //
+    cleanup_guardian_ui_when_player_leave,
+    despawn_hub_only_entities,
+    
 };
 
 pub struct WorldPlugin;
@@ -29,22 +38,44 @@ impl Plugin for WorldPlugin {
         app.init_state::<GameScene>()
             .add_systems(Startup, setup_guardian_animation_graph)
             .add_systems(OnEnter(GameScene::Hub), setup_guardian_npc)
-            .add_systems(Update, (
-                
-                //setup_guardian_animation_player,
-                check_guardian_interaction_area,
-                check_guardian_interaction_area_exit,
-                show_guardian_dialog,
-                guardian_dialog_exit_input,
-                guardian_dialog_basic_input,
-                guardian_dialog_advanced_input,
-                guardian_clone_chase_player,
-                cleanup_guardian_ui_when_player_leave,
-                rotate_basic_practice_gun_to_player,
-                basic_practice_gun_shoot_projectile,
-                move_basic_practice_projectiles,
-                basic_projectile_hit_player,
-            ))
+            .add_systems(
+                Update,
+                (
+                    check_guardian_interaction_area,
+                    check_guardian_interaction_area_exit,
+                    show_guardian_dialog,
+                    cleanup_guardian_ui_when_player_leave,
+                )
+                .run_if(in_state(GameScene::Hub))
+            )
+
+            .add_systems(Update, guardian_dialog_exit_input.run_if(in_state(GameScene::Hub)))
+            .add_systems(Update, guardian_dialog_basic_input.run_if(in_state(GameScene::Hub)))
+            .add_systems(Update, guardian_dialog_advanced_input.run_if(in_state(GameScene::Hub)))
+
+            .add_systems(
+                Update,
+                (
+                    rotate_basic_practice_gun_to_player,
+                    basic_practice_gun_shoot_projectile,
+                    move_basic_practice_projectiles,
+                    basic_projectile_hit_player,
+                    debug_damage_basic_gun,
+                    update_basic_gun_health_bar,
+                )
+                .run_if(in_state(GameScene::Hub))
+            )
+
+            .add_systems(
+                Update,
+                (
+                    guardian_clone_chase_player,
+                    minion_drain_player_life,
+                    update_minion_health_bar,
+                    debug_damage_minion_char,
+                )
+                .run_if(in_state(GameScene::Hub))
+            )
             .add_systems(OnExit(GameScene::Hub), despawn_hub_only_entities)
 
             .add_systems(OnEnter(GameScene::LoadingHub), spawn_loading_ui)

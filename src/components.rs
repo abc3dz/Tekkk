@@ -91,6 +91,9 @@ pub struct PracticeEntity;
 pub struct BasicPracticeGun;
 
 #[derive(Component)]
+pub struct BasicGunHealthBarFill;
+
+#[derive(Component)]
 pub struct BasicGunShootTimer(pub Timer);
 
 #[derive(Component)]
@@ -107,7 +110,10 @@ pub struct ProjectileLifetime(pub Timer);
 pub struct GuardianClone;
 
 #[derive(Component)]
-pub struct GuardianClonePunchTimer(pub Timer);
+pub struct MinionLifeDrainTimer(pub Timer);
+
+#[derive(Component)]
+pub struct MinionHealthBarFill;
 
 // scenes
 
