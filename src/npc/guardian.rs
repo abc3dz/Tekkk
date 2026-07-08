@@ -346,12 +346,16 @@ fn spawn_basic_practice_gun(
 
             SceneRoot(
                 asset_server.load(
-                    GltfAssetLabel::Scene(0).from_asset("npc/BasicPractice.glb")
+                    GltfAssetLabel::Scene(0).from_asset("npc/BasicPracticeGun.glb")
                 )
             ),
 
-            Transform::from_xyz(-4.0, 1.0, -4.0),
+            Transform::from_xyz(-4.0, 0.0, -4.0),
             GlobalTransform::default(),
+            WindWakerShaderBuilder::default()
+            .time_of_day(TimeOfDay::Day)
+            .weather(Weather::Sunny)
+            .build(),
         ))
         .with_children(|parent| {
             // Bar background
@@ -619,6 +623,10 @@ fn spawn_guardian_clone(
                 ..default()
             },
             GlobalTransform::default(),
+            WindWakerShaderBuilder::default()
+            .time_of_day(TimeOfDay::Day)
+            .weather(Weather::Sunny)
+            .build(),
         ))
         .with_children(|parent| {
             // background bar
