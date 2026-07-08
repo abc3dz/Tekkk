@@ -6,7 +6,7 @@ use crate::biomes::{hub, desert};
 use crate::npc::guardian::{
     setup_guardian_npc,
     setup_guardian_animation_graph, 
-    //setup_guardian_animation_player, 
+    setup_guardian_animation_player, 
     check_guardian_interaction_area, 
     check_guardian_interaction_area_exit,
     show_guardian_dialog,
@@ -38,6 +38,8 @@ impl Plugin for WorldPlugin {
         app.init_state::<GameScene>()
             .add_systems(Startup, setup_guardian_animation_graph)
             .add_systems(OnEnter(GameScene::Hub), setup_guardian_npc)
+            .add_systems(Update,setup_guardian_animation_player.run_if(in_state(GameScene::Hub))
+            )
             .add_systems(
                 Update,
                 (
