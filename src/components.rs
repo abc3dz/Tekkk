@@ -35,6 +35,7 @@ pub struct PlayerAnimationGraph {
     pub idle: AnimationNodeIndex,
     pub walk: AnimationNodeIndex,
     pub punch_r: AnimationNodeIndex,
+    pub punch_l: AnimationNodeIndex,
 }
 
 #[derive(Component, PartialEq, Eq, Clone, Copy)]
@@ -42,6 +43,14 @@ pub enum PlayerAnimState {
     Idle,
     Walk,
     PunchR,
+    PunchL,
+}
+
+#[derive(Component)]
+pub struct PlayerCombo {
+    pub current_index: Option<usize>,
+    pub queued_next: bool,
+    pub timer: Timer,
 }
 
 #[derive(Component)]

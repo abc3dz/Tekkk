@@ -18,10 +18,10 @@ impl Plugin for PlayerPlugin {
             .add_systems(Update, (
                 setup_player_animation_player,
                 player_movement,
+                player_combo_input,
+                player_combo_update,
                 update_player_animation,
                 update_player_status_ui,
-                player_punch_input,
-                player_return_to_idle_after_punch
             ).chain()
         );
     }
@@ -37,6 +37,11 @@ fn spawn_player(
         MoveSpeed(6.0),
         Health { current: 80, max: 100 },
         Mana { current: 70, max: 100 },
+        PlayerCombo {
+            current_index: None,
+            queued_next: false,
+            timer: Timer::from_seconds(0.0, TimerMode::Once),
+        },
         Transform::from_xyz(0.0, 2.0, 0.0),
         RigidBody::Dynamic,
         Collider::capsule(0.28, 1.0),
@@ -122,6 +127,11 @@ fn setup_player_animation_graph(
         1.0,
         graph.root,
     );
+    let punch_l = graph.add_clip(
+        asset_server.load(GltfAssetLabel::Animation(2).from_asset("models/PlayerMoya.glb")),
+        1.0,
+        graph.root,
+    );
 
     let graph_handle = graphs.add(graph);
 
@@ -130,6 +140,7 @@ fn setup_player_animation_graph(
         idle,
         walk,
         punch_r,
+        punch_l,
     });
 }
 
@@ -170,12 +181,12 @@ fn setup_player_animation_player(
     }
 }
 
-pub fn player_punch_input(
-    mut commands: Commands,
+pub fn player_combo_input(
     keyboard: Res<ButtonInput<KeyCode>>,
     anim_graph: Res<PlayerAnimationGraph>,
-    mut player_anim_query: Query<
-        (Entity, &mut AnimationPlayer, &mut PlayerAnimState),
+    mut combo_query: Query<&mut PlayerCombo, With<Player>>,
+    mut anim_query: Query<
+        (&mut AnimationPlayer, &mut PlayerAnimState),
         With<PlayerAnimationTarget>,
     >,
 ) {
@@ -183,40 +194,75 @@ pub fn player_punch_input(
         return;
     }
 
-    for (entity, mut anim_player, mut anim_state) in &mut player_anim_query {
-        println!("Player punch R");
+    let Ok(mut combo) = combo_query.single_mut() else {
+        return;
+    };
 
-        anim_player.stop_all();
-        anim_player.play(anim_graph.punch_r);
+    let Ok((mut anim_player, mut anim_state)) = anim_query.single_mut() else {
+        return;
+    };
 
-        *anim_state = PlayerAnimState::PunchR;
-
-        commands.entity(entity).insert(
-            PlayerPunchTimer(Timer::from_seconds(0.6, TimerMode::Once))
+    if combo.current_index.is_none() {
+        start_player_combo_attack(
+            0,
+            &anim_graph,
+            &mut anim_player,
+            &mut anim_state,
+            &mut combo,
         );
+    } else {
+        combo.queued_next = true;
+        println!("Queue next combo");
     }
 }
 
-pub fn player_return_to_idle_after_punch(
-    mut commands: Commands,
+pub fn player_combo_update(
     time: Res<Time>,
     anim_graph: Res<PlayerAnimationGraph>,
-    mut player_anim_query: Query<
-        (Entity, &mut AnimationPlayer, &mut PlayerAnimState, &mut PlayerPunchTimer),
+    mut combo_query: Query<&mut PlayerCombo, With<Player>>,
+    mut anim_query: Query<
+        (&mut AnimationPlayer, &mut PlayerAnimState),
         With<PlayerAnimationTarget>,
     >,
 ) {
-    for (entity, mut anim_player, mut anim_state, mut punch_timer) in &mut player_anim_query {
-        punch_timer.0.tick(time.delta());
+    let Ok(mut combo) = combo_query.single_mut() else {
+        return;
+    };
 
-        if punch_timer.0.is_finished() {
-            anim_player.stop_all();
-            anim_player.play(anim_graph.idle).repeat();
+    let Some(current_index) = combo.current_index else {
+        return;
+    };
 
-            *anim_state = PlayerAnimState::Idle;
+    combo.timer.tick(time.delta());
 
-            commands.entity(entity).remove::<PlayerPunchTimer>();
-        }
+    if !combo.timer.is_finished() {
+        return;
+    }
+
+    let Ok((mut anim_player, mut anim_state)) = anim_query.single_mut() else {
+        return;
+    };
+
+    let next_index = current_index + 1;
+
+    if combo.queued_next && next_index < PLAYER_COMBO_COUNT {
+        start_player_combo_attack(
+            next_index,
+            &anim_graph,
+            &mut anim_player,
+            &mut anim_state,
+            &mut combo,
+        );
+    } else {
+        anim_player.stop_all();
+        anim_player.play(anim_graph.idle).repeat();
+
+        *anim_state = PlayerAnimState::Idle;
+
+        combo.current_index = None;
+        combo.queued_next = false;
+
+        println!("Combo finished");
     }
 }
 
@@ -257,8 +303,10 @@ fn update_player_animation(
     let is_moving = velocity.x.abs() > 0.01 || velocity.z.abs() > 0.01;
 
     for (mut player, mut anim_state) in &mut anim_query {
-        // สำคัญมาก: ถ้ากำลัง punch อยู่ ห้าม idle/walk ทับ
-        if *anim_state == PlayerAnimState::PunchR {
+        if matches!(
+            *anim_state,
+            PlayerAnimState::PunchR | PlayerAnimState::PunchL
+        ) {
             continue;
         }
 
@@ -277,6 +325,7 @@ fn update_player_animation(
         }
     }
 }
+
 pub fn setup_player_status_ui(mut commands: Commands) {
     commands
         .spawn((
@@ -357,4 +406,52 @@ pub fn update_player_status_ui(
     for mut node in &mut mana_bar_query {
         node.width = Val::Percent(mana_percent.clamp(0.0, 100.0));
     }
+}
+
+const PLAYER_COMBO_COUNT: usize = 2;
+
+fn combo_duration(index: usize) -> f32 {
+    match index {
+        0 => 0.45, // punch_r
+        1 => 0.45, // punch_l
+        _ => 0.45,
+    }
+}
+
+fn combo_anim_node(
+    anim_graph: &PlayerAnimationGraph,
+    index: usize,
+) -> AnimationNodeIndex {
+    match index {
+        0 => anim_graph.punch_r,
+        1 => anim_graph.punch_l,
+        _ => anim_graph.punch_r,
+    }
+}
+
+fn combo_anim_state(index: usize) -> PlayerAnimState {
+    match index {
+        0 => PlayerAnimState::PunchR,
+        1 => PlayerAnimState::PunchL,
+        _ => PlayerAnimState::PunchR,
+    }
+}
+
+fn start_player_combo_attack(
+    index: usize,
+    anim_graph: &PlayerAnimationGraph,
+    anim_player: &mut AnimationPlayer,
+    anim_state: &mut PlayerAnimState,
+    combo: &mut PlayerCombo,
+) {
+    anim_player.stop_all();
+    anim_player.play(combo_anim_node(anim_graph, index));
+
+    *anim_state = combo_anim_state(index);
+
+    combo.current_index = Some(index);
+    combo.queued_next = false;
+    combo.timer = Timer::from_seconds(combo_duration(index), TimerMode::Once);
+
+    println!("Combo attack {}", index);
 }
