@@ -20,6 +20,8 @@ impl Plugin for PlayerPlugin {
                 player_movement,
                 update_player_animation,
                 update_player_status_ui,
+                player_punch_input,
+                player_return_to_idle_after_punch
             ).chain()
         );
     }
@@ -32,7 +34,6 @@ fn spawn_player(
     commands
     .spawn((
         Player,
-        PlayerActionState::Idle,
         MoveSpeed(6.0),
         Health { current: 80, max: 100 },
         Mana { current: 70, max: 100 },
@@ -65,10 +66,9 @@ fn player_movement(
         &MoveSpeed,
         &mut LinearVelocity,
         &mut Transform,
-        &mut PlayerActionState,
     ), With<Player>>,
 ) {
-    let Ok((speed, mut velocity, mut transform, mut action_state)) = query.single_mut() else {
+    let Ok((speed, mut velocity, mut transform)) = query.single_mut() else {
         return;
     };
 
@@ -81,15 +81,16 @@ fn player_movement(
 
     if dir.length_squared() > 0.0 {
         dir = dir.normalize();
+
         velocity.x = dir.x * speed.0;
         velocity.z = dir.z * speed.0;
+
         transform.rotation = Quat::from_rotation_y(dir.x.atan2(dir.z));
-        *action_state = PlayerActionState::Walk;
     } else {
         velocity.x = 0.0;
         velocity.z = 0.0;
-        *action_state = PlayerActionState::Idle;
     }
+
     if transform.translation.y < -5.0 {
         transform.translation = Vec3::new(0.0, 2.0, 0.0);
         velocity.x = 0.0;
@@ -106,13 +107,18 @@ fn setup_player_animation_graph(
     let mut graph = AnimationGraph::new();
 
     let idle = graph.add_clip(
-        asset_server.load(GltfAssetLabel::Animation(0).from_asset("models/PlayerMoya.glb")),
+        asset_server.load(GltfAssetLabel::Animation(1).from_asset("models/PlayerMoya.glb")),
         1.0,
         graph.root,
     );
 
     let walk = graph.add_clip(
-        asset_server.load(GltfAssetLabel::Animation(1).from_asset("models/PlayerMoya.glb")),
+        asset_server.load(GltfAssetLabel::Animation(4).from_asset("models/PlayerMoya.glb")),
+        1.0,
+        graph.root,
+    );
+    let punch_r = graph.add_clip(
+        asset_server.load(GltfAssetLabel::Animation(3).from_asset("models/PlayerMoya.glb")),
         1.0,
         graph.root,
     );
@@ -123,6 +129,7 @@ fn setup_player_animation_graph(
         graph: graph_handle,
         idle,
         walk,
+        punch_r,
     });
 }
 
@@ -163,6 +170,56 @@ fn setup_player_animation_player(
     }
 }
 
+pub fn player_punch_input(
+    mut commands: Commands,
+    keyboard: Res<ButtonInput<KeyCode>>,
+    anim_graph: Res<PlayerAnimationGraph>,
+    mut player_anim_query: Query<
+        (Entity, &mut AnimationPlayer, &mut PlayerAnimState),
+        With<PlayerAnimationTarget>,
+    >,
+) {
+    if !keyboard.just_pressed(KeyCode::KeyJ) {
+        return;
+    }
+
+    for (entity, mut anim_player, mut anim_state) in &mut player_anim_query {
+        println!("Player punch R");
+
+        anim_player.stop_all();
+        anim_player.play(anim_graph.punch_r);
+
+        *anim_state = PlayerAnimState::PunchR;
+
+        commands.entity(entity).insert(
+            PlayerPunchTimer(Timer::from_seconds(0.6, TimerMode::Once))
+        );
+    }
+}
+
+pub fn player_return_to_idle_after_punch(
+    mut commands: Commands,
+    time: Res<Time>,
+    anim_graph: Res<PlayerAnimationGraph>,
+    mut player_anim_query: Query<
+        (Entity, &mut AnimationPlayer, &mut PlayerAnimState, &mut PlayerPunchTimer),
+        With<PlayerAnimationTarget>,
+    >,
+) {
+    for (entity, mut anim_player, mut anim_state, mut punch_timer) in &mut player_anim_query {
+        punch_timer.0.tick(time.delta());
+
+        if punch_timer.0.is_finished() {
+            anim_player.stop_all();
+            anim_player.play(anim_graph.idle).repeat();
+
+            *anim_state = PlayerAnimState::Idle;
+
+            commands.entity(entity).remove::<PlayerPunchTimer>();
+        }
+    }
+}
+
 fn find_animation_player_recursive(
     entity: Entity,
     children_query: &Query<&Children>,
@@ -187,32 +244,35 @@ fn find_animation_player_recursive(
 
 fn update_player_animation(
     anim_graph: Res<PlayerAnimationGraph>,
-    player_query: Query<&PlayerActionState, With<Player>>,
+    player_query: Query<&LinearVelocity, With<Player>>,
     mut anim_query: Query<
         (&mut AnimationPlayer, &mut PlayerAnimState),
         With<PlayerAnimationTarget>,
     >,
 ) {
-    let Ok(action_state) = player_query.single() else {
+    let Ok(velocity) = player_query.single() else {
         return;
     };
 
-    for (mut player, mut anim_state) in &mut anim_query {
-        match *action_state {
-            PlayerActionState::Idle => {
-                if *anim_state != PlayerAnimState::Idle {
-                    player.stop(anim_graph.walk);
-                    player.play(anim_graph.idle).repeat();
-                    *anim_state = PlayerAnimState::Idle;
-                }
-            }
+    let is_moving = velocity.x.abs() > 0.01 || velocity.z.abs() > 0.01;
 
-            PlayerActionState::Walk => {
-                if *anim_state != PlayerAnimState::Walk {
-                    player.stop(anim_graph.idle);
-                    player.play(anim_graph.walk).repeat();
-                    *anim_state = PlayerAnimState::Walk;
-                }
+    for (mut player, mut anim_state) in &mut anim_query {
+        // สำคัญมาก: ถ้ากำลัง punch อยู่ ห้าม idle/walk ทับ
+        if *anim_state == PlayerAnimState::PunchR {
+            continue;
+        }
+
+        if is_moving {
+            if *anim_state != PlayerAnimState::Walk {
+                player.stop_all();
+                player.play(anim_graph.walk).repeat();
+                *anim_state = PlayerAnimState::Walk;
+            }
+        } else {
+            if *anim_state != PlayerAnimState::Idle {
+                player.stop_all();
+                player.play(anim_graph.idle).repeat();
+                *anim_state = PlayerAnimState::Idle;
             }
         }
     }

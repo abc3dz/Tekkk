@@ -34,19 +34,18 @@ pub struct PlayerAnimationGraph {
     pub graph: Handle<AnimationGraph>,
     pub idle: AnimationNodeIndex,
     pub walk: AnimationNodeIndex,
-}
-
-#[derive(Component, PartialEq, Eq, Clone, Copy)]
-pub enum PlayerActionState {
-    Idle,
-    Walk,
+    pub punch_r: AnimationNodeIndex,
 }
 
 #[derive(Component, PartialEq, Eq, Clone, Copy)]
 pub enum PlayerAnimState {
     Idle,
     Walk,
+    PunchR,
 }
+
+#[derive(Component)]
+pub struct PlayerPunchTimer(pub Timer);
 
 #[derive(Component)]
 pub struct PlayerAnimationTarget;
