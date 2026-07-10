@@ -54,7 +54,11 @@ pub struct PlayerCombo {
 }
 
 #[derive(Component)]
-pub struct PlayerPunchTimer(pub Timer);
+pub struct FloatingDamageText {
+    pub timer: Timer,
+    pub world_position: Vec3,
+    pub velocity: Vec3,
+}
 
 #[derive(Component)]
 pub struct PlayerAnimationTarget;

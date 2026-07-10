@@ -22,6 +22,9 @@ impl Plugin for PlayerPlugin {
                 player_combo_update,
                 update_player_animation,
                 update_player_status_ui,
+                player_punch_basic_gun_damage,
+                player_punch_minion_char_damage,
+                update_floating_damage_text,
             ).chain()
         );
     }
@@ -453,5 +456,151 @@ fn start_player_combo_attack(
     combo.queued_next = false;
     combo.timer = Timer::from_seconds(combo_duration(index), TimerMode::Once);
 
-    println!("Combo attack {}", index);
+    //println!("Combo attack {}", index);
+}
+fn spawn_floating_damage_text(
+    commands: &mut Commands,
+    damage: i32,
+    position: Vec3,
+) {
+    commands.spawn((
+        FloatingDamageText {
+            timer: Timer::from_seconds(0.8, TimerMode::Once),
+            world_position: position,
+            velocity: Vec3::new(0.0, 1.5, 0.0),
+        },
+        Text::new(format!("-{}", damage)),
+        TextFont {
+            font_size: 32.0,
+            ..default()
+        },
+        TextColor(Color::srgb(1.0, 0.2, 0.1)),
+        Node {
+            position_type: PositionType::Absolute,
+            left: Val::Px(0.0),
+            top: Val::Px(0.0),
+            ..default()
+        },
+    ));
+}
+pub fn player_punch_basic_gun_damage(
+    mut commands: Commands,
+    keyboard: Res<ButtonInput<KeyCode>>,
+    player_query: Query<&Transform, (With<Player>, Without<BasicPracticeGun>)>,
+    mut gun_query: Query<
+        (Entity, &Transform, &mut Health),
+        (With<BasicPracticeGun>, Without<Player>),
+    >,
+) {
+    if !keyboard.just_pressed(KeyCode::KeyJ) {
+        return;
+    }
+
+    let Ok(player_tf) = player_query.single() else {
+        return;
+    };
+
+    for (gun_entity, gun_tf, mut gun_health) in &mut gun_query {
+        let distance = player_tf.translation.distance(gun_tf.translation);
+
+        if distance > 2.0 {
+            continue;
+        }
+
+        let damage = 10;
+
+        gun_health.current -= damage;
+        gun_health.current = gun_health.current.clamp(0, gun_health.max);
+
+        spawn_floating_damage_text(
+            &mut commands,
+            damage,
+            gun_tf.translation + Vec3::new(0.0, 2.0, 0.0),
+        );
+        if gun_health.current <= 0 {
+            commands.entity(gun_entity).despawn();
+        }
+    }
+}
+pub fn update_floating_damage_text(
+    mut commands: Commands,
+    time: Res<Time>,
+    camera_query: Query<(&Camera, &GlobalTransform), With<Camera3d>>,
+    mut text_query: Query<(Entity, &mut Node, &mut FloatingDamageText)>,
+) {
+    let Ok((camera, camera_transform)) = camera_query.single() else {
+        return;
+    };
+
+    for (entity, mut node, mut floating_text) in &mut text_query {
+        floating_text.timer.tick(time.delta());
+
+        let velocity = floating_text.velocity;
+        let delta_seconds = time.delta_secs();
+
+        floating_text.world_position += velocity * delta_seconds;
+
+        if floating_text.timer.is_finished() {
+            commands.entity(entity).despawn();
+            continue;
+        }
+
+        let Ok(screen_pos) = camera.world_to_viewport(
+            camera_transform,
+            floating_text.world_position,
+        ) else {
+            continue;
+        };
+
+        node.left = Val::Px(screen_pos.x);
+        node.top = Val::Px(screen_pos.y);
+    }
+}
+
+pub fn player_punch_minion_char_damage(
+    mut commands: Commands,
+    keyboard: Res<ButtonInput<KeyCode>>,
+    player_query: Query<&Transform, (With<Player>, Without<GuardianClone>)>,
+    mut minion_query: Query<
+        (Entity, &Transform, &mut Health),
+        (With<GuardianClone>, Without<Player>),
+    >,
+) {
+    if !keyboard.just_pressed(KeyCode::KeyJ) {
+        return;
+    }
+
+    let Ok(player_tf) = player_query.single() else {
+        return;
+    };
+
+    for (minion_entity, minion_tf, mut minion_health) in &mut minion_query {
+        let distance = player_tf.translation.distance(minion_tf.translation);
+
+        if distance > 2.0 {
+            continue;
+        }
+
+        let damage = 10;
+
+        minion_health.current -= damage;
+        minion_health.current = minion_health.current.clamp(0, minion_health.max);
+
+        println!(
+            "Player punched MinionChar! Minion HP: {}/{}",
+            minion_health.current,
+            minion_health.max,
+        );
+
+        spawn_floating_damage_text(
+            &mut commands,
+            damage,
+            minion_tf.translation + Vec3::new(0.0, 2.2, 0.0),
+        );
+
+        if minion_health.current <= 0 {
+            println!("MinionChar destroyed");
+            commands.entity(minion_entity).despawn();
+        }
+    }
 }
