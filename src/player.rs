@@ -25,6 +25,7 @@ impl Plugin for PlayerPlugin {
                 player_punch_basic_gun_damage,
                 player_punch_minion_char_damage,
                 update_floating_damage_text,
+                update_basic_gun_defeat_particles,
             ).chain()
         );
     }
@@ -486,6 +487,9 @@ fn spawn_floating_damage_text(
 pub fn player_punch_basic_gun_damage(
     mut commands: Commands,
     keyboard: Res<ButtonInput<KeyCode>>,
+    time: Res<Time>,
+    mut meshes: ResMut<Assets<Mesh>>,
+    mut materials: ResMut<Assets<StandardMaterial>>,
     player_query: Query<&Transform, (With<Player>, Without<BasicPracticeGun>)>,
     mut gun_query: Query<
         (Entity, &Transform, &mut Health),
@@ -518,6 +522,16 @@ pub fn player_punch_basic_gun_damage(
             gun_tf.translation + Vec3::new(0.0, 2.0, 0.0),
         );
         if gun_health.current <= 0 {
+            println!("Basic Gun destroyed");
+
+            spawn_defeat_particles(
+                &mut commands,
+                &mut meshes,
+                &mut materials,
+                gun_tf.translation + Vec3::Y * 1.0,
+                time.elapsed_secs(),
+            );
+
             commands.entity(gun_entity).despawn();
         }
     }
@@ -560,6 +574,9 @@ pub fn update_floating_damage_text(
 pub fn player_punch_minion_char_damage(
     mut commands: Commands,
     keyboard: Res<ButtonInput<KeyCode>>,
+    time: Res<Time>,
+    mut meshes: ResMut<Assets<Mesh>>,
+    mut materials: ResMut<Assets<StandardMaterial>>,
     player_query: Query<&Transform, (With<Player>, Without<GuardianClone>)>,
     mut minion_query: Query<
         (Entity, &Transform, &mut Health),
@@ -600,7 +617,78 @@ pub fn player_punch_minion_char_damage(
 
         if minion_health.current <= 0 {
             println!("MinionChar destroyed");
+
+            spawn_defeat_particles(
+                &mut commands,
+                &mut meshes,
+                &mut materials,
+                minion_tf.translation + Vec3::Y * 1.0,
+                time.elapsed_secs(),
+            );
+
             commands.entity(minion_entity).despawn();
+        }
+    }
+}
+
+fn pseudo_random(seed: f32) -> f32 {
+    (seed.sin() * 43758.5453).fract().abs()
+}
+
+fn spawn_defeat_particles(
+    commands: &mut Commands,
+    meshes: &mut ResMut<Assets<Mesh>>,
+    materials: &mut ResMut<Assets<StandardMaterial>>,
+    position: Vec3,
+    seed: f32,
+) {
+    for i in 0..12 {
+        let r1 = pseudo_random(seed + i as f32 * 1.37);
+        let r2 = pseudo_random(seed + i as f32 * 2.11);
+        let r3 = pseudo_random(seed + i as f32 * 3.73);
+
+        let size = 0.08 + r1 * 0.22;
+
+        let offset = Vec3::new(
+            (r2 - 0.5) * 1.2,
+            0.3 + r1 * 0.4,
+            (r3 - 0.5) * 1.2,
+        );
+
+        let velocity = Vec3::new(
+            (r2 - 0.5) * 0.6,
+            1.2 + r1 * 1.4,
+            (r3 - 0.5) * 0.6,
+        );
+
+        commands.spawn((
+            BasicGunDefeatParticle {
+                velocity,
+                lifetime: Timer::from_seconds(0.8 + r3 * 0.5, TimerMode::Once),
+            },
+            Mesh3d(meshes.add(Sphere::new(size))),
+            MeshMaterial3d(materials.add(StandardMaterial {
+                base_color: Color::srgba(1.0, 1.0, 1.0, 0.45),
+                alpha_mode: AlphaMode::Blend,
+                ..default()
+            })),
+            Transform::from_translation(position + offset),
+            GlobalTransform::default(),
+        ));
+    }
+}
+pub fn update_basic_gun_defeat_particles(
+    mut commands: Commands,
+    time: Res<Time>,
+    mut particle_query: Query<(Entity, &mut Transform, &mut BasicGunDefeatParticle)>,
+) {
+    for (entity, mut transform, mut particle) in &mut particle_query {
+        particle.lifetime.tick(time.delta());
+
+        transform.translation += particle.velocity * time.delta_secs();
+
+        if particle.lifetime.is_finished() {
+            commands.entity(entity).despawn();
         }
     }
 }

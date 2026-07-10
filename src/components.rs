@@ -152,3 +152,10 @@ pub enum GameScene {
     LoadingDesert,
     Desert,
 }
+
+//
+#[derive(Component)]
+pub struct BasicGunDefeatParticle {
+    pub velocity: Vec3,
+    pub lifetime: Timer,
+}
