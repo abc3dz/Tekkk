@@ -36,6 +36,7 @@ pub struct PlayerAnimationGraph {
     pub walk: AnimationNodeIndex,
     pub punch_r: AnimationNodeIndex,
     pub punch_l: AnimationNodeIndex,
+    pub dash: AnimationNodeIndex,
 }
 
 #[derive(Component, PartialEq, Eq, Clone, Copy)]
@@ -44,6 +45,17 @@ pub enum PlayerAnimState {
     Walk,
     PunchR,
     PunchL,
+    Dash,
+}
+
+#[derive(Component)]
+pub struct PlayerDashTimer(pub Timer);
+
+#[derive(Component)]
+pub struct PlayerDashMove {
+    pub timer: Timer,
+    pub direction: Vec3,
+    pub speed: f32,
 }
 
 #[derive(Component)]
@@ -62,6 +74,14 @@ pub struct FloatingDamageText {
 
 #[derive(Component)]
 pub struct PlayerAnimationTarget;
+
+#[derive(Component)]
+pub struct PlayerDashEffect {
+    pub timer: Timer,
+}
+
+#[derive(Component)]
+pub struct PlayerDashTrailTimer(pub Timer);
 
 //guardian
 

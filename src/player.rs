@@ -19,7 +19,12 @@ impl Plugin for PlayerPlugin {
                 setup_player_animation_player,
                 player_movement,
                 player_combo_input,
+                player_dash_move,
+                spawn_player_dash_trail_during_dash,
                 player_combo_update,
+                player_dash_input,
+                player_dash_update,
+                update_player_dash_effect,
                 update_player_animation,
                 update_player_status_ui,
                 player_punch_basic_gun_damage,
@@ -136,6 +141,11 @@ fn setup_player_animation_graph(
         1.0,
         graph.root,
     );
+    let dash = graph.add_clip(
+        asset_server.load(GltfAssetLabel::Animation(0).from_asset("models/PlayerMoya.glb")),
+        1.0,
+        graph.root,
+    );
 
     let graph_handle = graphs.add(graph);
 
@@ -145,6 +155,7 @@ fn setup_player_animation_graph(
         walk,
         punch_r,
         punch_l,
+        dash,
     });
 }
 
@@ -182,6 +193,147 @@ fn setup_player_animation_player(
         ));
 
         player.play(anim_graph.idle).repeat();
+    }
+}
+
+pub fn player_dash_input(
+    mut commands: Commands,
+    keyboard: Res<ButtonInput<KeyCode>>,
+    anim_graph: Res<PlayerAnimationGraph>,
+    player_query: Query<(Entity, &Transform, &PlayerCombo), With<Player>>,
+    mut anim_query: Query<
+        (Entity, &mut AnimationPlayer, &mut PlayerAnimState),
+        With<PlayerAnimationTarget>,
+    >,
+) {
+    if !keyboard.just_pressed(KeyCode::KeyL) {
+        return;
+    }
+
+    let Ok((player_entity, player_tf, combo)) = player_query.single() else {
+        return;
+    };
+
+    if combo.current_index.is_some() {
+        return;
+    }
+
+    let Ok((entity, mut anim_player, mut anim_state)) = anim_query.single_mut() else {
+        return;
+    };
+
+    println!("Player dash");
+
+    anim_player.stop_all();
+    anim_player.play(anim_graph.dash);
+
+    *anim_state = PlayerAnimState::Dash;
+
+
+    commands.entity(entity).insert(
+        PlayerDashTimer(Timer::from_seconds(0.45, TimerMode::Once))
+    );
+
+    let dash_direction = player_tf.rotation * Vec3::Z;
+
+    commands.entity(player_entity).insert((
+        PlayerDashMove {
+            timer: Timer::from_seconds(0.25, TimerMode::Once),
+            direction: dash_direction.normalize(),
+            speed: 14.0,
+        },
+        PlayerDashTrailTimer(
+            Timer::from_seconds(0.05, TimerMode::Repeating)
+        ),
+    ));
+}
+pub fn player_dash_update(
+    mut commands: Commands,
+    time: Res<Time>,
+    anim_graph: Res<PlayerAnimationGraph>,
+    mut anim_query: Query<
+        (Entity, &mut AnimationPlayer, &mut PlayerAnimState, &mut PlayerDashTimer),
+        With<PlayerAnimationTarget>,
+    >,
+) {
+    for (entity, mut anim_player, mut anim_state, mut dash_timer) in &mut anim_query {
+        dash_timer.0.tick(time.delta());
+
+        if dash_timer.0.is_finished() {
+            anim_player.stop_all();
+            anim_player.play(anim_graph.idle).repeat();
+
+            *anim_state = PlayerAnimState::Idle;
+
+            commands.entity(entity).remove::<PlayerDashTimer>();
+        }
+    }
+}
+pub fn player_dash_move(
+    mut commands: Commands,
+    time: Res<Time>,
+    mut player_query: Query<(Entity, &mut LinearVelocity, &mut PlayerDashMove), With<Player>>,
+) {
+    for (entity, mut velocity, mut dash_move) in &mut player_query {
+        dash_move.timer.tick(time.delta());
+
+        velocity.x = dash_move.direction.x * dash_move.speed;
+        velocity.z = dash_move.direction.z * dash_move.speed;
+
+        if dash_move.timer.is_finished() {
+            commands.entity(entity).remove::<PlayerDashMove>();
+            commands.entity(entity).remove::<PlayerDashTrailTimer>();
+
+            velocity.x = 0.0;
+            velocity.z = 0.0;
+        }
+    }
+}
+pub fn update_player_dash_effect(
+    mut commands: Commands,
+    time: Res<Time>,
+    mut effect_query: Query<(Entity, &mut PlayerDashEffect)>,
+) {
+    for (entity, mut effect) in &mut effect_query {
+        effect.timer.tick(time.delta());
+
+        if effect.timer.is_finished() {
+            commands.entity(entity).despawn();
+        }
+    }
+}
+pub fn spawn_player_dash_trail_during_dash(
+    mut commands: Commands,
+    time: Res<Time>,
+    asset_server: Res<AssetServer>,
+    mut player_query: Query<
+        (&Transform, &mut PlayerDashTrailTimer),
+        With<PlayerDashMove>,
+    >,
+) {
+    for (player_tf, mut trail_timer) in &mut player_query {
+        trail_timer.0.tick(time.delta());
+
+        if !trail_timer.0.just_finished() {
+            continue;
+        }
+
+        commands.spawn((
+            PlayerDashEffect {
+                timer: Timer::from_seconds(0.35, TimerMode::Once),
+            },
+            SceneRoot(
+                asset_server.load(
+                    GltfAssetLabel::Scene(0).from_asset("models/PlayerMoyaDash.glb")
+                )
+            ),
+            Transform {
+                translation: player_tf.translation + Vec3::Y * -1.0,
+                rotation: player_tf.rotation,
+                scale: Vec3::splat(1.0),
+            },
+            GlobalTransform::default(),
+        ));
     }
 }
 
@@ -309,7 +461,7 @@ fn update_player_animation(
     for (mut player, mut anim_state) in &mut anim_query {
         if matches!(
             *anim_state,
-            PlayerAnimState::PunchR | PlayerAnimState::PunchL
+            PlayerAnimState::PunchR | PlayerAnimState::PunchL | PlayerAnimState::Dash
         ) {
             continue;
         }
