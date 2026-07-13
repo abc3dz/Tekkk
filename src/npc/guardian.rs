@@ -6,6 +6,7 @@ use bevy::animation::graph::AnimationGraph;
 use bevy::animation::AnimationPlayer;
 
 use crate::components::*;
+use crate::player::play_player_hurt_animation;
 
 pub fn spawn_guardian_npc(
     commands: &mut Commands,
@@ -87,15 +88,41 @@ pub fn setup_guardian_animation_player(
     mut commands: Commands,
     anim_graph: Res<GuardianAnimationGraph>,
     mut query: Query<(Entity, &mut AnimationPlayer), Added<AnimationPlayer>>,
+    parent_query: Query<&ChildOf>,
+    guardian_query: Query<(), With<GuardianNpc>>,
 ) {
     for (entity, mut player) in &mut query {
+        if !is_child_of_guardian(entity, &parent_query, &guardian_query) {
+            continue;
+        }
+
+        println!("Guardian AnimationPlayer found");
+
         commands.entity(entity).insert((
             AnimationGraphHandle(anim_graph.graph.clone()),
             GuardianAnimationTarget,
             GuardianAnimState::Idle,
         ));
+
         player.stop_all();
         player.play(anim_graph.idle).repeat();
+    }
+}
+fn is_child_of_guardian(
+    mut entity: Entity,
+    parent_query: &Query<&ChildOf>,
+    guardian_query: &Query<(), With<GuardianNpc>>,
+) -> bool {
+    loop {
+        if guardian_query.get(entity).is_ok() {
+            return true;
+        }
+
+        let Ok(parent) = parent_query.get(entity) else {
+            return false;
+        };
+
+        entity = parent.0;
     }
 }
 
@@ -255,7 +282,7 @@ pub fn show_guardian_dialog(
 
                 parent.spawn((
                     Text::new(
-                        "Guardian:\nWhat kind of practice do you want?\n\n1. Basic Practice\n2. Advanced Practice\n3. Full HP / Mana\nEsc. Exit"
+                        "Guardian:\nWhat kind of practice do you want?\n\n1. Basic Practice\n2. Advanced Practice\n3. Full HP / Mana\nEsc. Stop Practice"
                     ),
                     TextFont {
                         font_size: 26.0,
@@ -443,8 +470,7 @@ pub fn rotate_basic_practice_gun_to_player(
 pub fn basic_practice_gun_shoot_projectile(
     mut commands: Commands,
     time: Res<Time>,
-    mut meshes: ResMut<Assets<Mesh>>,
-    mut materials: ResMut<Assets<StandardMaterial>>,
+    asset_server: Res<AssetServer>,
     player_query: Query<&Transform, (With<Player>, Without<BasicPracticeGun>)>,
     mut gun_query: Query<
         (&Transform, &mut BasicGunShootTimer),
@@ -474,6 +500,8 @@ pub fn basic_practice_gun_shoot_projectile(
 
         let spawn_pos = gun_tf.translation + direction * 0.8 + Vec3::Y * 0.3;
 
+        let yaw = direction.x.atan2(direction.z);
+
         commands.spawn((
             PracticeEntity,
             BasicPracticeProjectile {
@@ -483,17 +511,20 @@ pub fn basic_practice_gun_shoot_projectile(
             },
             ProjectileLifetime(Timer::from_seconds(4.0, TimerMode::Once)),
 
-            Mesh3d(meshes.add(Cuboid::new(0.2, 0.2, 0.2))),
-            MeshMaterial3d(materials.add(StandardMaterial {
-                base_color: Color::srgb(1.0, 0.2, 0.1),
-                ..default()
-            })),
+            SceneRoot(
+                asset_server.load(
+                    GltfAssetLabel::Scene(0).from_asset("npc/BasicPracticeProjectile.glb")
+                )
+            ),
 
-            Transform::from_translation(spawn_pos),
+            Transform {
+                translation: spawn_pos,
+                rotation: Quat::from_rotation_y(yaw),
+                scale: Vec3::splat(1.0),
+                ..default()
+            },
             GlobalTransform::default(),
         ));
-
-        println!("Basic gun shoot projectile");
     }
 }
 pub fn move_basic_practice_projectiles(
@@ -518,39 +549,55 @@ pub fn move_basic_practice_projectiles(
 }
 pub fn basic_projectile_hit_player(
     mut commands: Commands,
+
     projectile_query: Query<
         (Entity, &Transform, &BasicPracticeProjectile),
         (With<BasicPracticeProjectile>, Without<Player>),
     >,
+
     mut player_query: Query<
-        (&Transform, &mut Health, &mut Mana),
+        (Entity, &Transform, &mut Health),
         (With<Player>, Without<BasicPracticeProjectile>),
     >,
+
+    anim_graph: Res<PlayerAnimationGraph>,
+
+    mut anim_query: Query<
+        (&mut AnimationPlayer, &mut PlayerAnimState),
+        With<PlayerAnimationTarget>,
+    >,
 ) {
-    let Ok((player_tf, mut health, mut mana)) = player_query.single_mut() else {
+    let Ok((player_entity, player_tf, mut health)) =
+        player_query.single_mut()
+    else {
         return;
     };
 
     for (projectile_entity, projectile_tf, projectile) in &projectile_query {
-        let distance = player_tf.translation.distance(projectile_tf.translation);
+        let distance =
+            player_tf.translation.distance(projectile_tf.translation);
 
-        if distance < 0.8 {
-            health.current -= projectile.hp_damage;
-            mana.current -= projectile.mana_damage;
-
-            health.current = health.current.clamp(0, health.max);
-            mana.current = mana.current.clamp(0, mana.max);
-
-            println!(
-                "Player hit! HP: {}/{} Mana: {}/{}",
-                health.current,
-                health.max,
-                mana.current,
-                mana.max,
-            );
-
-            commands.entity(projectile_entity).despawn();
+        if distance >= 0.8 {
+            continue;
         }
+
+        health.current -= projectile.hp_damage;
+        health.current = health.current.clamp(0, health.max);
+
+        println!(
+            "Projectile hit player! HP: {}/{}",
+            health.current,
+            health.max,
+        );
+
+        play_player_hurt_animation(
+            &mut commands,
+            player_entity,
+            &anim_graph,
+            &mut anim_query,
+        );
+
+        commands.entity(projectile_entity).despawn();
     }
 }
 pub fn update_basic_gun_health_bar(
@@ -571,21 +618,6 @@ pub fn update_basic_gun_health_bar(
                 fill_tf.translation.x = -full_width * (1.0 - ratio) * 0.5;
             }
         }
-    }
-}
-pub fn debug_damage_basic_gun(
-    keyboard: Res<ButtonInput<KeyCode>>,
-    mut gun_query: Query<&mut Health, With<BasicPracticeGun>>,
-) {
-    if !keyboard.just_pressed(KeyCode::KeyH) {
-        return;
-    }
-
-    for mut health in &mut gun_query {
-        health.current -= 10;
-        health.current = health.current.clamp(0, health.max);
-
-        println!("Basic gun HP: {}/{}", health.current, health.max);
     }
 }
 
@@ -780,24 +812,5 @@ pub fn update_minion_health_bar(
                 fill_tf.translation.x = -full_width * (1.0 - ratio) * 0.5;
             }
         }
-    }
-}
-pub fn debug_damage_minion_char(
-    keyboard: Res<ButtonInput<KeyCode>>,
-    mut minion_query: Query<&mut Health, With<GuardianClone>>,
-) {
-    if !keyboard.just_pressed(KeyCode::KeyJ) {
-        return;
-    }
-
-    for mut health in &mut minion_query {
-        health.current -= 10;
-        health.current = health.current.clamp(0, health.max);
-
-        println!(
-            "MinionChar HP: {}/{}",
-            health.current,
-            health.max,
-        );
     }
 }

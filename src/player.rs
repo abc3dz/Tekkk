@@ -18,6 +18,8 @@ impl Plugin for PlayerPlugin {
             .add_systems(Update, (
                 setup_player_animation_player,
                 player_movement,
+                player_jump_input,
+                player_jump_update,
                 player_combo_input,
                 player_dash_move,
                 spawn_player_dash_trail_during_dash,
@@ -31,6 +33,7 @@ impl Plugin for PlayerPlugin {
                 player_punch_minion_char_damage,
                 update_floating_damage_text,
                 update_basic_gun_defeat_particles,
+                player_return_after_hurt,
             ).chain()
         );
     }
@@ -62,7 +65,7 @@ fn spawn_player(
         parent.spawn((
             SceneRoot(
                 asset_server.load(
-                    GltfAssetLabel::Scene(0).from_asset("models/PlayerMoya.glb")
+                    GltfAssetLabel::Scene(0).from_asset("player/PlayerMoya.glb")
                 )
             ),
             Transform::from_xyz(0.0, -0.83, 0.0),
@@ -121,28 +124,43 @@ fn setup_player_animation_graph(
     let mut graph = AnimationGraph::new();
 
     let idle = graph.add_clip(
-        asset_server.load(GltfAssetLabel::Animation(1).from_asset("models/PlayerMoya.glb")),
+        asset_server.load(GltfAssetLabel::Animation(1).from_asset("player/PlayerMoya.glb")),
         1.0,
         graph.root,
     );
 
     let walk = graph.add_clip(
-        asset_server.load(GltfAssetLabel::Animation(4).from_asset("models/PlayerMoya.glb")),
+        asset_server.load(GltfAssetLabel::Animation(4).from_asset("player/PlayerMoya.glb")),
         1.0,
         graph.root,
     );
-    let punch_r = graph.add_clip(
-        asset_server.load(GltfAssetLabel::Animation(3).from_asset("models/PlayerMoya.glb")),
+    let slap_r = graph.add_clip(
+        asset_server.load(GltfAssetLabel::Animation(3).from_asset("player/PlayerMoya.glb")),
         1.0,
         graph.root,
     );
-    let punch_l = graph.add_clip(
-        asset_server.load(GltfAssetLabel::Animation(2).from_asset("models/PlayerMoya.glb")),
+    let slap_l = graph.add_clip(
+        asset_server.load(GltfAssetLabel::Animation(2).from_asset("player/PlayerMoya.glb")),
         1.0,
         graph.root,
     );
     let dash = graph.add_clip(
-        asset_server.load(GltfAssetLabel::Animation(0).from_asset("models/PlayerMoya.glb")),
+        asset_server.load(GltfAssetLabel::Animation(0).from_asset("player/PlayerMoya.glb")),
+        1.0,
+        graph.root,
+    );
+    let jump = graph.add_clip(
+        asset_server.load(GltfAssetLabel::Animation(6).from_asset("player/PlayerMoya.glb")),
+        1.0,
+        graph.root,
+    );
+    let hurt = graph.add_clip(
+        asset_server.load(GltfAssetLabel::Animation(7).from_asset("player/PlayerMoya.glb")),
+        1.0,
+        graph.root,
+    );
+    let slap_lr = graph.add_clip(
+        asset_server.load(GltfAssetLabel::Animation(5).from_asset("player/PlayerMoya.glb")),
         1.0,
         graph.root,
     );
@@ -153,9 +171,12 @@ fn setup_player_animation_graph(
         graph: graph_handle,
         idle,
         walk,
-        punch_r,
-        punch_l,
+        slap_r,
+        slap_l,
+        slap_lr,
         dash,
+        jump,
+        hurt,
     });
 }
 
@@ -269,6 +290,97 @@ pub fn player_dash_update(
         }
     }
 }
+pub fn player_jump_input(
+    mut commands: Commands,
+    keyboard: Res<ButtonInput<KeyCode>>,
+    anim_graph: Res<PlayerAnimationGraph>,
+    combo_query: Query<&PlayerCombo, With<Player>>,
+    mut player_query: Query<&mut LinearVelocity, With<Player>>,
+    mut anim_query: Query<
+        (Entity, &mut AnimationPlayer, &mut PlayerAnimState),
+        With<PlayerAnimationTarget>,
+    >,
+) {
+    if !keyboard.just_pressed(KeyCode::KeyK) {
+        return;
+    }
+
+    let Ok(combo) = combo_query.single() else {
+        return;
+    };
+
+    // ถ้ากำลัง combo อยู่ ไม่ให้ jump ทับ punch
+    if combo.current_index.is_some() {
+        return;
+    }
+
+    let Ok(mut velocity) = player_query.single_mut() else {
+        return;
+    };
+
+    let Ok((anim_entity, mut anim_player, mut anim_state)) = anim_query.single_mut() else {
+        return;
+    };
+
+    // กันกระโดดรัวกลางอากาศแบบง่าย ๆ
+    if velocity.y.abs() > 0.1 {
+        return;
+    }
+
+    velocity.y = 7.0;
+
+    anim_player.stop_all();
+    anim_player.play(anim_graph.jump);
+
+    *anim_state = PlayerAnimState::Jump;
+
+    commands.entity(anim_entity).insert(
+        PlayerJumpTimer(Timer::from_seconds(0.6, TimerMode::Once))
+    );
+
+    println!("Player jump");
+}
+pub fn player_jump_update(
+    mut commands: Commands,
+    time: Res<Time>,
+    anim_graph: Res<PlayerAnimationGraph>,
+    player_query: Query<&LinearVelocity, With<Player>>,
+    mut anim_query: Query<
+        (
+            Entity,
+            &mut AnimationPlayer,
+            &mut PlayerAnimState,
+            &mut PlayerJumpTimer,
+        ),
+        With<PlayerAnimationTarget>,
+    >,
+) {
+    let Ok(velocity) = player_query.single() else {
+        return;
+    };
+
+    let is_moving = velocity.x.abs() > 0.01 || velocity.z.abs() > 0.01;
+
+    for (entity, mut anim_player, mut anim_state, mut jump_timer) in &mut anim_query {
+        jump_timer.0.tick(time.delta());
+
+        if !jump_timer.0.is_finished() {
+            continue;
+        }
+
+        anim_player.stop_all();
+
+        if is_moving {
+            anim_player.play(anim_graph.walk).repeat();
+            *anim_state = PlayerAnimState::Walk;
+        } else {
+            anim_player.play(anim_graph.idle).repeat();
+            *anim_state = PlayerAnimState::Idle;
+        }
+
+        commands.entity(entity).remove::<PlayerJumpTimer>();
+    }
+}
 pub fn player_dash_move(
     mut commands: Commands,
     time: Res<Time>,
@@ -324,7 +436,7 @@ pub fn spawn_player_dash_trail_during_dash(
             },
             SceneRoot(
                 asset_server.load(
-                    GltfAssetLabel::Scene(0).from_asset("models/PlayerMoyaDash.glb")
+                    GltfAssetLabel::Scene(0).from_asset("player/PlayerMoyaDash.glb")
                 )
             ),
             Transform {
@@ -335,6 +447,81 @@ pub fn spawn_player_dash_trail_during_dash(
             GlobalTransform::default(),
         ));
     }
+}
+pub fn play_player_hurt_animation(
+    commands: &mut Commands,
+    player_entity: Entity,
+    anim_graph: &PlayerAnimationGraph,
+    anim_query: &mut Query<
+        (&mut AnimationPlayer, &mut PlayerAnimState),
+        With<PlayerAnimationTarget>,
+    >,
+) {
+    let Ok((mut anim_player, mut anim_state)) = anim_query.single_mut() else {
+        return;
+    };
+
+    // ถ้ากำลัง Hurt อยู่ ไม่ต้องเริ่มใหม่ทุกเฟรม
+    if *anim_state == PlayerAnimState::Hurt {
+        return;
+    }
+
+    anim_player.stop_all();
+    anim_player.play(anim_graph.hurt);
+
+    *anim_state = PlayerAnimState::Hurt;
+
+    commands.entity(player_entity).insert(
+        PlayerHurtTimer(Timer::from_seconds(
+            0.5,
+            TimerMode::Once,
+        )),
+    );
+}
+pub fn player_return_after_hurt(
+    mut commands: Commands,
+    anim_graph: Res<PlayerAnimationGraph>,
+
+    player_query: Query<
+        Entity,
+        (With<Player>, With<PlayerHurtTimer>),
+    >,
+
+    mut anim_query: Query<
+        (&mut AnimationPlayer, &mut PlayerAnimState),
+        With<PlayerAnimationTarget>,
+    >,
+) {
+    let Ok(player_entity) = player_query.single() else {
+        return;
+    };
+
+    let Ok((mut anim_player, mut anim_state)) =
+        anim_query.single_mut()
+    else {
+        return;
+    };
+
+    if *anim_state != PlayerAnimState::Hurt {
+        return;
+    }
+
+    let hurt_finished = anim_player
+        .animation(anim_graph.hurt)
+        .is_some_and(|animation| animation.is_finished());
+
+    if !hurt_finished {
+        return;
+    }
+
+    anim_player.stop_all();
+    anim_player.play(anim_graph.idle).repeat();
+
+    *anim_state = PlayerAnimState::Idle;
+
+    commands
+        .entity(player_entity)
+        .remove::<PlayerHurtTimer>();
 }
 
 pub fn player_combo_input(
@@ -357,6 +544,10 @@ pub fn player_combo_input(
     let Ok((mut anim_player, mut anim_state)) = anim_query.single_mut() else {
         return;
     };
+
+    if *anim_state == PlayerAnimState::Hurt {
+        return;
+    }
 
     if combo.current_index.is_none() {
         start_player_combo_attack(
@@ -461,7 +652,7 @@ fn update_player_animation(
     for (mut player, mut anim_state) in &mut anim_query {
         if matches!(
             *anim_state,
-            PlayerAnimState::PunchR | PlayerAnimState::PunchL | PlayerAnimState::Dash
+            PlayerAnimState::SlapR | PlayerAnimState::SlapL | PlayerAnimState::SlapLR | PlayerAnimState::Jump | PlayerAnimState::Hurt
         ) {
             continue;
         }
@@ -564,12 +755,13 @@ pub fn update_player_status_ui(
     }
 }
 
-const PLAYER_COMBO_COUNT: usize = 2;
+const PLAYER_COMBO_COUNT: usize = 3;
 
 fn combo_duration(index: usize) -> f32 {
     match index {
-        0 => 0.45, // punch_r
-        1 => 0.45, // punch_l
+        0 => 0.45, // SlapR
+        1 => 0.45, // SlapL
+        2 => 0.65, // SlapLR
         _ => 0.45,
     }
 }
@@ -579,17 +771,19 @@ fn combo_anim_node(
     index: usize,
 ) -> AnimationNodeIndex {
     match index {
-        0 => anim_graph.punch_r,
-        1 => anim_graph.punch_l,
-        _ => anim_graph.punch_r,
+        0 => anim_graph.slap_r,
+        1 => anim_graph.slap_l,
+        2 => anim_graph.slap_lr,
+        _ => anim_graph.slap_r,
     }
 }
 
 fn combo_anim_state(index: usize) -> PlayerAnimState {
     match index {
-        0 => PlayerAnimState::PunchR,
-        1 => PlayerAnimState::PunchL,
-        _ => PlayerAnimState::PunchR,
+        0 => PlayerAnimState::SlapR,
+        1 => PlayerAnimState::SlapL,
+        2 => PlayerAnimState::SlapLR,
+        _ => PlayerAnimState::SlapR,
     }
 }
 

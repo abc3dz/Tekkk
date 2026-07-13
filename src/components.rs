@@ -34,18 +34,24 @@ pub struct PlayerAnimationGraph {
     pub graph: Handle<AnimationGraph>,
     pub idle: AnimationNodeIndex,
     pub walk: AnimationNodeIndex,
-    pub punch_r: AnimationNodeIndex,
-    pub punch_l: AnimationNodeIndex,
+    pub slap_r: AnimationNodeIndex,
+    pub slap_l: AnimationNodeIndex,
+    pub slap_lr: AnimationNodeIndex,
     pub dash: AnimationNodeIndex,
+    pub jump: AnimationNodeIndex,
+    pub hurt: AnimationNodeIndex,
 }
 
 #[derive(Component, PartialEq, Eq, Clone, Copy)]
 pub enum PlayerAnimState {
     Idle,
     Walk,
-    PunchR,
-    PunchL,
+    SlapR,
+    SlapL,
+    SlapLR,
     Dash,
+    Jump,
+    Hurt,
 }
 
 #[derive(Component)]
@@ -82,6 +88,12 @@ pub struct PlayerDashEffect {
 
 #[derive(Component)]
 pub struct PlayerDashTrailTimer(pub Timer);
+
+#[derive(Component)]
+pub struct PlayerJumpTimer(pub Timer);
+
+#[derive(Component)]
+pub struct PlayerHurtTimer(pub Timer);
 
 //guardian
 
