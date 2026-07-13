@@ -137,6 +137,12 @@ pub struct BasicPracticeGun;
 #[derive(Component)]
 pub struct BasicGunHealthBarFill;
 
+#[derive(Resource, Default)]
+pub struct BasicPracticeActive(pub bool);
+
+#[derive(Resource)]
+pub struct BasicGunRespawnTimer(pub Timer);
+
 #[derive(Component)]
 pub struct BasicGunShootTimer(pub Timer);
 
@@ -144,7 +150,6 @@ pub struct BasicGunShootTimer(pub Timer);
 pub struct BasicPracticeProjectile {
     pub velocity: Vec3,
     pub hp_damage: i32,
-    pub mana_damage: i32,
 }
 
 #[derive(Component)]
@@ -159,8 +164,13 @@ pub struct MinionLifeDrainTimer(pub Timer);
 #[derive(Component)]
 pub struct MinionHealthBarFill;
 
-// scenes
+#[derive(Resource, Default)]
+pub struct AdvancedPracticeActive(pub bool);
 
+#[derive(Resource)]
+pub struct AdvancedMinionRespawnTimer(pub Timer);
+
+// scenes
 #[derive(Component)]
 pub struct CurrentScene;
 

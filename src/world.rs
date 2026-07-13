@@ -4,30 +4,7 @@ use bevy::prelude::*;
 use crate::components::*;
 use crate::biomes::{hub, desert};
 use crate::npc::guardian::{
-    setup_guardian_npc,
-    setup_guardian_animation_graph, 
-    setup_guardian_animation_player, 
-    check_guardian_interaction_area, 
-    check_guardian_interaction_area_exit,
-    show_guardian_dialog,
-    guardian_dialog_exit_input,
-    //basic practice
-    guardian_dialog_basic_input,
-    rotate_basic_practice_gun_to_player,
-    basic_practice_gun_shoot_projectile,
-    move_basic_practice_projectiles,
-    update_basic_gun_health_bar,
-    basic_projectile_hit_player,
-    debug_damage_basic_gun,
-    //advanced practice
-    guardian_dialog_advanced_input,
-    guardian_clone_chase_player,
-    minion_drain_player_life,
-    update_minion_health_bar,
-    debug_damage_minion_char,
-    //
-    cleanup_guardian_ui_when_player_leave,
-    despawn_hub_only_entities,
+    GuardianPlugin, basic_practice_gun_shoot_projectile, basic_projectile_hit_player, check_guardian_interaction_area, check_guardian_interaction_area_exit, cleanup_guardian_ui_when_player_leave, despawn_hub_only_entities, guardian_clone_chase_player, guardian_dialog_advanced_input, guardian_dialog_basic_input, guardian_dialog_exit_input, minion_drain_player_life, move_basic_practice_projectiles, rotate_basic_practice_gun_to_player, setup_guardian_animation_graph, setup_guardian_animation_player, setup_guardian_npc, show_guardian_dialog, update_basic_gun_health_bar, update_minion_health_bar,
     
 };
 
@@ -36,6 +13,7 @@ pub struct WorldPlugin;
 impl Plugin for WorldPlugin {
     fn build(&self, app: &mut App) {
         app.init_state::<GameScene>()
+            .add_plugins(GuardianPlugin)
             .add_systems(Startup, setup_guardian_animation_graph)
             .add_systems(OnEnter(GameScene::Hub), setup_guardian_npc)
             .add_systems(Update,setup_guardian_animation_player.run_if(in_state(GameScene::Hub))
@@ -62,7 +40,6 @@ impl Plugin for WorldPlugin {
                     basic_practice_gun_shoot_projectile,
                     move_basic_practice_projectiles,
                     basic_projectile_hit_player,
-                    debug_damage_basic_gun,
                     update_basic_gun_health_bar,
                 )
                 .run_if(in_state(GameScene::Hub))
@@ -74,7 +51,6 @@ impl Plugin for WorldPlugin {
                     guardian_clone_chase_player,
                     minion_drain_player_life,
                     update_minion_health_bar,
-                    debug_damage_minion_char,
                 )
                 .run_if(in_state(GameScene::Hub))
             )
