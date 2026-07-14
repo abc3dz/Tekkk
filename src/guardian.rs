@@ -7,6 +7,7 @@ use bevy::animation::AnimationPlayer;
 use rand::Rng;
 use crate::components::*;
 use crate::player::play_player_hurt_animation;
+use crate::combat::*;
 
 pub struct GuardianPlugin;
 
@@ -376,6 +377,8 @@ fn spawn_basic_practice_gun(
     let y = 0.0;
     let z = rng.random_range(-4.0..=10.0);
 
+    let base_stats = BaseStats::BASIC_PRACTICE_GUN;
+
     commands
         .spawn((
             HubOnly,
@@ -383,9 +386,19 @@ fn spawn_basic_practice_gun(
             BasicPracticeGun,
 
             Health {
-                current: 100,
-                max: 100,
+                current: base_stats.max_hp as i32,
+                max: base_stats.max_hp as i32,
             },
+             // ระบบสถานะใหม่
+            base_stats,
+            CombatStats::from(base_stats),
+
+            // หุ่นฝึกเป็น Neutral
+            AttackElement(Element::Neutral),
+            DefenseElement(Element::Neutral),
+
+            // EXP ที่ผู้เล่นได้รับเมื่อกำจัด
+            ElementExpReward::BASIC_PRACTICE_GUN,
 
             BasicGunShootTimer(
                 Timer::from_seconds(1.0, TimerMode::Repeating)
@@ -405,34 +418,7 @@ fn spawn_basic_practice_gun(
                 .time_of_day(TimeOfDay::Day)
                 .weather(Weather::Sunny)
                 .build(),
-        ))
-        .with_children(|parent| {
-            parent.spawn((
-                Mesh3d(meshes.add(Cuboid::new(1.3, 0.12, 0.05))),
-                MeshMaterial3d(materials.add(StandardMaterial {
-                    base_color: Color::srgb(0.1, 0.1, 0.1),
-                    ..default()
-                })),
-                Transform::from_xyz(0.0, 1.3, 0.0),
-                GlobalTransform::default(),
-            ));
-
-            parent.spawn((
-                BasicGunHealthBarFill,
-                Mesh3d(meshes.add(Cuboid::new(1.3, 0.14, 0.06))),
-                MeshMaterial3d(materials.add(StandardMaterial {
-                    base_color: Color::srgb(0.9, 0.1, 0.1),
-                    ..default()
-                })),
-                Transform::from_xyz(0.0, 1.3, 0.04),
-                GlobalTransform::default(),
-            ));
-        });
-
-    println!(
-        "Basic Practice Gun spawned at x: {:.2}, y: {:.2}, z: {:.2}",
-        x, y, z
-    );
+        ));
 }
 pub fn guardian_dialog_basic_input(
     mut commands: Commands,
@@ -693,7 +679,7 @@ pub fn respawn_basic_gun_when_defeated(
 }
 
 //Advanced practice
-fn spawn_guardian_clone(
+fn spawn_guardian_minion(
     commands: &mut Commands,
     asset_server: &Res<AssetServer>,
     meshes: &mut ResMut<Assets<Mesh>>,
@@ -705,6 +691,8 @@ fn spawn_guardian_clone(
     let y = 0.0;
     let z = rng.random_range(-4.0..=10.0);
 
+    let base_stats = BaseStats::ADVANCED_PRACTICE_MINION;
+
     commands
         .spawn((
             HubOnly,
@@ -712,9 +700,17 @@ fn spawn_guardian_clone(
             GuardianClone,
 
             Health {
-                current: 100,
-                max: 100,
+                current: base_stats.max_hp as i32,
+                max: base_stats.max_hp as i32,
             },
+
+            base_stats,
+            CombatStats::from(base_stats),
+
+            AttackElement(Element::Neutral),
+            DefenseElement(Element::Neutral),
+
+            ElementExpReward::ADVANCED_PRACTICE_MINION,
 
             MinionLifeDrainTimer(
                 Timer::from_seconds(0.5, TimerMode::Repeating)
@@ -739,34 +735,7 @@ fn spawn_guardian_clone(
                 .time_of_day(TimeOfDay::Day)
                 .weather(Weather::Sunny)
                 .build(),
-        ))
-        .with_children(|parent| {
-            parent.spawn((
-                Mesh3d(meshes.add(Cuboid::new(1.2, 0.10, 0.05))),
-                MeshMaterial3d(materials.add(StandardMaterial {
-                    base_color: Color::srgb(0.1, 0.1, 0.1),
-                    ..default()
-                })),
-                Transform::from_xyz(0.0, 2.2, 0.0),
-                GlobalTransform::default(),
-            ));
-
-            parent.spawn((
-                MinionHealthBarFill,
-                Mesh3d(meshes.add(Cuboid::new(1.2, 0.12, 0.06))),
-                MeshMaterial3d(materials.add(StandardMaterial {
-                    base_color: Color::srgb(0.9, 0.1, 0.1),
-                    ..default()
-                })),
-                Transform::from_xyz(0.0, 2.2, 0.04),
-                GlobalTransform::default(),
-            ));
-        });
-
-    println!(
-        "MinionChar spawned at x: {:.2}, y: {:.2}, z: {:.2}",
-        x, y, z
-    );
+        ));
 }
 pub fn guardian_dialog_advanced_input(
     mut commands: Commands,
@@ -801,7 +770,7 @@ pub fn guardian_dialog_advanced_input(
         commands.entity(entity).despawn();
     }
 
-    spawn_guardian_clone(
+    spawn_guardian_minion(
         &mut commands,
         &asset_server,
         &mut meshes,
@@ -957,7 +926,7 @@ pub fn respawn_advanced_minion_when_defeated(
         return;
     }
 
-    spawn_guardian_clone(
+    spawn_guardian_minion(
         &mut commands,
         &asset_server,
         &mut meshes,

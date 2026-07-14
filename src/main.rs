@@ -8,6 +8,7 @@ mod player;
 mod camera;
 mod world;
 mod components;
+mod combat;
 //mod fps;
 mod biomes;
 mod npc;

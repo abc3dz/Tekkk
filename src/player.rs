@@ -5,6 +5,7 @@ use bevy::animation::AnimationPlayer;
 use avian3d::prelude::*;
 use bevy_wind_waker_shader::prelude::*;
 use crate::components::*;
+use crate::combat::*;
 
 pub struct PlayerPlugin;
 
@@ -43,12 +44,26 @@ fn spawn_player(
     mut commands: Commands,
     asset_server: Res<AssetServer>,
 ) {
+    let base_stats = BaseStats {
+        max_hp: 300.0,
+        max_mp: 300.0,
+        attack: 15.0,
+        defense: 15.0,
+        critical_rate: 0.05,
+        critical_damage: 1.5,
+    };
+
     commands
     .spawn((
         Player,
         MoveSpeed(6.0),
         Health { current: 80, max: 100 },
         Mana { current: 70, max: 100 },
+        base_stats,
+        CombatStats::from(base_stats),
+        AttackElement(Element::Water),
+        DefenseElement(Element::Water),
+        ElementMastery::default(),
         PlayerCombo {
             current_index: None,
             queued_next: false,
