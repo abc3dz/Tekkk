@@ -1,4 +1,5 @@
 use bevy::prelude::*;
+use rand::Rng;
 
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq, Hash,)]
 pub enum Element {
@@ -100,6 +101,22 @@ pub struct ElementMastery {
     pub inw: ElementProgress,
 }
 
+impl ElementMastery {
+    pub fn get_mut(
+        &mut self,
+        element: Element,
+    ) -> Option<&mut ElementProgress> {
+        match element {
+            Element::Water => Some(&mut self.water),
+            Element::Fire => Some(&mut self.fire),
+            Element::Wind => Some(&mut self.wind),
+            Element::Earth => Some(&mut self.earth),
+            Element::Inw => Some(&mut self.inw),
+            Element::Neutral => None,
+        }
+    }
+}
+
 #[derive(Debug, Default, Clone, Copy)]
 pub struct ExpRange {
     pub min: u32,
@@ -122,6 +139,22 @@ pub struct ElementExpReward {
 }
 
 impl ElementExpReward {
+    pub fn for_element(
+        &self,
+        element: Element,
+    ) -> ExpRange {
+        match element {
+            Element::Water => self.water,
+            Element::Fire => self.fire,
+            Element::Wind => self.wind,
+            Element::Earth => self.earth,
+            Element::Inw => self.inw,
+            Element::Neutral => ExpRange::default(),
+        }
+    }
+}
+
+impl ElementExpReward {
     pub const BASIC_PRACTICE_GUN: Self = Self {
         water: ExpRange::new(2, 5),
         fire: ExpRange::new(2, 5),
@@ -137,4 +170,59 @@ impl ElementExpReward {
         earth: ExpRange::new(6, 9),
         inw: ExpRange::new(4, 7),
     };
+}
+
+#[derive(Component, Debug, Default)]
+pub struct CombatTarget;
+
+#[derive(Debug, Default, Clone, Copy)]
+pub struct ElementExpGain {
+    pub water: u32,
+    pub fire: u32,
+    pub wind: u32,
+    pub earth: u32,
+    pub inw: u32,
+}
+
+impl ExpRange {
+    pub fn roll(self, rng: &mut impl Rng) -> u32 {
+        if self.max < self.min {
+            return 0;
+        }
+
+        rng.random_range(self.min..=self.max)
+    }
+}
+
+impl ElementExpReward {
+    pub fn grant_all(
+        &self,
+        mastery: &mut ElementMastery,
+        rng: &mut impl Rng,
+    ) -> ElementExpGain {
+        let gain = ElementExpGain {
+            water: self.water.roll(rng),
+            fire: self.fire.roll(rng),
+            wind: self.wind.roll(rng),
+            earth: self.earth.roll(rng),
+            inw: self.inw.roll(rng),
+        };
+
+        mastery.water.exp =
+            mastery.water.exp.saturating_add(gain.water);
+
+        mastery.fire.exp =
+            mastery.fire.exp.saturating_add(gain.fire);
+
+        mastery.wind.exp =
+            mastery.wind.exp.saturating_add(gain.wind);
+
+        mastery.earth.exp =
+            mastery.earth.exp.saturating_add(gain.earth);
+
+        mastery.inw.exp =
+            mastery.inw.exp.saturating_add(gain.inw);
+
+        gain
+    }
 }

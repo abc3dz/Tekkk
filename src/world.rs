@@ -3,10 +3,7 @@ use bevy::prelude::*;
 
 use crate::components::*;
 use crate::biomes::{hub, desert};
-use crate::npc::guardian::{
-    GuardianPlugin, basic_practice_gun_shoot_projectile, basic_projectile_hit_player, check_guardian_interaction_area, check_guardian_interaction_area_exit, cleanup_guardian_ui_when_player_leave, despawn_hub_only_entities, guardian_clone_chase_player, guardian_dialog_advanced_input, guardian_dialog_basic_input, guardian_dialog_exit_input, minion_drain_player_life, move_basic_practice_projectiles, rotate_basic_practice_gun_to_player, setup_guardian_animation_graph, setup_guardian_animation_player, setup_guardian_npc, show_guardian_dialog, update_basic_gun_health_bar, update_minion_health_bar,
-    
-};
+use crate::npc::guardian::GuardianPlugin;
 
 pub struct WorldPlugin;
 
@@ -14,47 +11,6 @@ impl Plugin for WorldPlugin {
     fn build(&self, app: &mut App) {
         app.init_state::<GameScene>()
             .add_plugins(GuardianPlugin)
-            .add_systems(Startup, setup_guardian_animation_graph)
-            .add_systems(OnEnter(GameScene::Hub), setup_guardian_npc)
-            .add_systems(Update,setup_guardian_animation_player.run_if(in_state(GameScene::Hub))
-            )
-            .add_systems(
-                Update,
-                (
-                    check_guardian_interaction_area,
-                    check_guardian_interaction_area_exit,
-                    show_guardian_dialog,
-                    cleanup_guardian_ui_when_player_leave,
-                )
-                .run_if(in_state(GameScene::Hub))
-            )
-
-            .add_systems(Update, guardian_dialog_exit_input.run_if(in_state(GameScene::Hub)))
-            .add_systems(Update, guardian_dialog_basic_input.run_if(in_state(GameScene::Hub)))
-            .add_systems(Update, guardian_dialog_advanced_input.run_if(in_state(GameScene::Hub)))
-
-            .add_systems(
-                Update,
-                (
-                    rotate_basic_practice_gun_to_player,
-                    basic_practice_gun_shoot_projectile,
-                    move_basic_practice_projectiles,
-                    basic_projectile_hit_player,
-                    update_basic_gun_health_bar,
-                )
-                .run_if(in_state(GameScene::Hub))
-            )
-
-            .add_systems(
-                Update,
-                (
-                    guardian_clone_chase_player,
-                    minion_drain_player_life,
-                    update_minion_health_bar,
-                )
-                .run_if(in_state(GameScene::Hub))
-            )
-            .add_systems(OnExit(GameScene::Hub), despawn_hub_only_entities)
 
             .add_systems(OnEnter(GameScene::LoadingHub), spawn_loading_ui)
             .add_systems(Update, go_to_hub.run_if(in_state(GameScene::LoadingHub)))
@@ -120,12 +76,14 @@ fn go_to_hub(
     mut next_state: ResMut<NextState<GameScene>>,
 ) {
     next_state.set(GameScene::Hub);
+    print!("Hub");
 }
 
 fn go_to_desert(
     mut next_state: ResMut<NextState<GameScene>>,
 ) {
     next_state.set(GameScene::Desert);
+    print!("Desert");
 }
 
 fn check_warp_to_desert(

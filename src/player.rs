@@ -4,6 +4,7 @@ use bevy::animation::graph::AnimationGraph;
 use bevy::animation::AnimationPlayer;
 use avian3d::prelude::*;
 use bevy_wind_waker_shader::prelude::*;
+use rand::Rng;
 use crate::components::*;
 use crate::combat::*;
 
@@ -30,8 +31,7 @@ impl Plugin for PlayerPlugin {
                 update_player_dash_effect,
                 update_player_animation,
                 update_player_status_ui,
-                player_punch_basic_gun_damage,
-                player_punch_minion_char_damage,
+                player_punch_damage,
                 update_floating_damage_text,
                 update_basic_gun_defeat_particles,
                 player_return_after_hurt,
@@ -44,21 +44,20 @@ fn spawn_player(
     mut commands: Commands,
     asset_server: Res<AssetServer>,
 ) {
-    let base_stats = BaseStats {
-        max_hp: 300.0,
-        max_mp: 300.0,
-        attack: 15.0,
-        defense: 15.0,
-        critical_rate: 0.05,
-        critical_damage: 1.5,
-    };
+    let base_stats = BaseStats::PLAYER;
 
     commands
     .spawn((
         Player,
         MoveSpeed(6.0),
-        Health { current: 80, max: 100 },
-        Mana { current: 70, max: 100 },
+        Health {
+                current: base_stats.max_hp as i32,
+                max: base_stats.max_hp as i32,
+            },
+        Mana {
+            current: base_stats.max_mp as i32,
+            max: base_stats.max_mp as i32,
+        },
         base_stats,
         CombatStats::from(base_stats),
         AttackElement(Element::Water),
@@ -845,58 +844,7 @@ fn spawn_floating_damage_text(
         },
     ));
 }
-pub fn player_punch_basic_gun_damage(
-    mut commands: Commands,
-    keyboard: Res<ButtonInput<KeyCode>>,
-    time: Res<Time>,
-    mut meshes: ResMut<Assets<Mesh>>,
-    mut materials: ResMut<Assets<StandardMaterial>>,
-    player_query: Query<&Transform, (With<Player>, Without<BasicPracticeGun>)>,
-    mut gun_query: Query<
-        (Entity, &Transform, &mut Health),
-        (With<BasicPracticeGun>, Without<Player>),
-    >,
-) {
-    if !keyboard.just_pressed(KeyCode::KeyJ) {
-        return;
-    }
 
-    let Ok(player_tf) = player_query.single() else {
-        return;
-    };
-
-    for (gun_entity, gun_tf, mut gun_health) in &mut gun_query {
-        let distance = player_tf.translation.distance(gun_tf.translation);
-
-        if distance > 2.0 {
-            continue;
-        }
-
-        let damage = 10;
-
-        gun_health.current -= damage;
-        gun_health.current = gun_health.current.clamp(0, gun_health.max);
-
-        spawn_floating_damage_text(
-            &mut commands,
-            damage,
-            gun_tf.translation + Vec3::new(0.0, 2.0, 0.0),
-        );
-        if gun_health.current <= 0 {
-            println!("Basic Gun destroyed");
-
-            spawn_defeat_particles(
-                &mut commands,
-                &mut meshes,
-                &mut materials,
-                gun_tf.translation + Vec3::Y * 1.0,
-                time.elapsed_secs(),
-            );
-
-            commands.entity(gun_entity).despawn();
-        }
-    }
-}
 pub fn update_floating_damage_text(
     mut commands: Commands,
     time: Res<Time>,
@@ -929,66 +877,6 @@ pub fn update_floating_damage_text(
 
         node.left = Val::Px(screen_pos.x);
         node.top = Val::Px(screen_pos.y);
-    }
-}
-
-pub fn player_punch_minion_char_damage(
-    mut commands: Commands,
-    keyboard: Res<ButtonInput<KeyCode>>,
-    time: Res<Time>,
-    mut meshes: ResMut<Assets<Mesh>>,
-    mut materials: ResMut<Assets<StandardMaterial>>,
-    player_query: Query<&Transform, (With<Player>, Without<GuardianClone>)>,
-    mut minion_query: Query<
-        (Entity, &Transform, &mut Health),
-        (With<GuardianClone>, Without<Player>),
-    >,
-) {
-    if !keyboard.just_pressed(KeyCode::KeyJ) {
-        return;
-    }
-
-    let Ok(player_tf) = player_query.single() else {
-        return;
-    };
-
-    for (minion_entity, minion_tf, mut minion_health) in &mut minion_query {
-        let distance = player_tf.translation.distance(minion_tf.translation);
-
-        if distance > 2.0 {
-            continue;
-        }
-
-        let damage = 10;
-
-        minion_health.current -= damage;
-        minion_health.current = minion_health.current.clamp(0, minion_health.max);
-
-        println!(
-            "Player punched MinionChar! Minion HP: {}/{}",
-            minion_health.current,
-            minion_health.max,
-        );
-
-        spawn_floating_damage_text(
-            &mut commands,
-            damage,
-            minion_tf.translation + Vec3::new(0.0, 2.2, 0.0),
-        );
-
-        if minion_health.current <= 0 {
-            println!("MinionChar destroyed");
-
-            spawn_defeat_particles(
-                &mut commands,
-                &mut meshes,
-                &mut materials,
-                minion_tf.translation + Vec3::Y * 1.0,
-                time.elapsed_secs(),
-            );
-
-            commands.entity(minion_entity).despawn();
-        }
     }
 }
 
@@ -1051,5 +939,139 @@ pub fn update_basic_gun_defeat_particles(
         if particle.lifetime.is_finished() {
             commands.entity(entity).despawn();
         }
+    }
+}
+fn calculate_combat_damage(
+    attacker: &CombatStats,
+    defender: &CombatStats,
+) -> i32 {
+    let damage = attacker.attack
+        * 100.0
+        / (100.0 + defender.defense.max(0.0));
+
+    damage.round().max(1.0) as i32
+}
+pub fn player_punch_damage(
+    mut commands: Commands,
+    keyboard: Res<ButtonInput<KeyCode>>,
+    time: Res<Time>,
+
+    mut meshes: ResMut<Assets<Mesh>>,
+    mut materials: ResMut<Assets<StandardMaterial>>,
+
+    mut player_query: Query<
+        (
+            &Transform,
+            &CombatStats,
+            &mut ElementMastery,
+        ),
+        (
+            With<Player>,
+            Without<CombatTarget>,
+        ),
+    >,
+
+    mut target_query: Query<
+        (
+            Entity,
+            &Transform,
+            &mut Health,
+            &CombatStats,
+            Option<&ElementExpReward>,
+        ),
+        (
+            With<CombatTarget>,
+            Without<Player>,
+        ),
+    >,
+) {
+    if !keyboard.just_pressed(KeyCode::KeyJ) {
+        return;
+    }
+
+    let Ok((
+        player_transform,
+        player_stats,
+        mut element_mastery,
+    )) = player_query.single_mut()
+    else {
+        return;
+    };
+
+    let mut rng = rand::rng();
+
+    for (
+        target_entity,
+        target_transform,
+        mut target_health,
+        target_stats,
+        reward,
+    ) in &mut target_query
+    {
+        // กัน Entity ที่ถูก defeat แล้ว
+        if target_health.current <= 0 {
+            continue;
+        }
+
+        let distance = player_transform
+            .translation
+            .distance(target_transform.translation);
+
+        if distance > 2.0 {
+            continue;
+        }
+
+        let damage = calculate_combat_damage(
+            player_stats,
+            target_stats,
+        );
+
+        target_health.current -= damage;
+        target_health.current =
+            target_health.current.clamp(
+                0,
+                target_health.max,
+            );
+
+        spawn_floating_damage_text(
+            &mut commands,
+            damage,
+            target_transform.translation
+                + Vec3::new(0.0, 2.0, 0.0),
+        );
+
+        // ยังไม่ถูก defeat
+        if target_health.current > 0 {
+            continue;
+        }
+
+        println!("Combat target defeated");
+
+        // แจก Reward หาก Entity มี ElementExpReward
+        if let Some(reward) = reward {
+            let gain = reward.grant_all(
+                &mut element_mastery,
+                &mut rng,
+            );
+
+            println!(
+                "Element EXP: Water +{}, Fire +{}, Wind +{}, Earth +{}, Inw +{}",
+                gain.water,
+                gain.fire,
+                gain.wind,
+                gain.earth,
+                gain.inw,
+            );
+        }
+
+        spawn_defeat_particles(
+            &mut commands,
+            &mut meshes,
+            &mut materials,
+            target_transform.translation + Vec3::Y,
+            time.elapsed_secs(),
+        );
+
+        commands.entity(target_entity).despawn();
     }
 }

@@ -12,6 +12,7 @@ mod combat;
 //mod fps;
 mod biomes;
 mod npc;
+mod element_ui;
 
 fn main() {
     App::new()
@@ -36,7 +37,7 @@ fn main() {
             camera::CameraPlugin,
             //fps::FpsPlugin, 
             //enemy::EnemyPlugin,
-            //combat::CombatPlugin,
+            element_ui::ElementUiPlugin,
         ))
         .run();
 }
