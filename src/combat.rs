@@ -240,27 +240,34 @@ pub fn elemental_multiplier(
         _ => 1.0,
     }
 }
-fn calculate_combat_damage(
+pub fn calculate_combat_damage(
     attacker: &CombatStats,
     defender: &CombatStats,
-    attack_element: Element,
-    defense_element: Element,
-) -> i32 {
+    rng: &mut impl rand::Rng,
+) -> (i32, bool) {
     let damage_after_defense =
-        attacker.attack
-            * 100.0
+        attacker.attack * 100.0
             / (100.0 + defender.defense.max(0.0));
 
-    let element_multiplier =
-        elemental_multiplier(
-            attack_element,
-            defense_element,
-        );
+    // 0.05 หมายถึงโอกาส Critical 5%
+    let is_critical =
+        rng.random::<f32>()
+            < attacker.critical_rate.clamp(0.0, 1.0);
+
+    // ถ้าติด Critical จึงนำ Critical Damage มาคูณ
+    let critical_multiplier = if is_critical {
+        attacker.critical_damage.max(1.0)
+    } else {
+        1.0
+    };
 
     let final_damage =
-        damage_after_defense * element_multiplier;
+        damage_after_defense * critical_multiplier;
 
-    final_damage.round().max(1.0) as i32
+    let damage =
+        final_damage.round().max(1.0) as i32;
+
+    (damage, is_critical)
 }
 
 pub fn combat_stats_from_element_exp(

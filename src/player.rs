@@ -33,7 +33,6 @@ impl Plugin for PlayerPlugin {
                 update_player_status_ui,
                 player_punch_damage,
                 rebuild_player_combat_stats_from_exp,
-                update_player_status_ui,
                 update_floating_damage_text,
                 update_basic_gun_defeat_particles,
                 player_return_after_hurt,
@@ -942,16 +941,7 @@ pub fn update_basic_gun_defeat_particles(
         }
     }
 }
-fn calculate_combat_damage(
-    attacker: &CombatStats,
-    defender: &CombatStats,
-) -> i32 {
-    let damage = attacker.attack
-        * 100.0
-        / (100.0 + defender.defense.max(0.0));
 
-    damage.round().max(1.0) as i32
-}
 pub fn player_punch_damage(
     mut commands: Commands,
     keyboard: Res<ButtonInput<KeyCode>>,
@@ -1022,10 +1012,19 @@ pub fn player_punch_damage(
             continue;
         }
 
-        let damage = calculate_combat_damage(
+        // let damage = calculate_combat_damage(
+        //     player_stats,
+        //     target_stats,
+        // );
+        let (damage, is_critical) =
+        calculate_combat_damage(
             player_stats,
             target_stats,
+            &mut rng,
         );
+        if is_critical {
+            println!("CRITICAL HIT! Damage: {}", damage);
+        } 
 
         target_health.current -= damage;
         target_health.current =
