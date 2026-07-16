@@ -4,7 +4,7 @@ use bevy::animation::graph::AnimationGraph;
 use bevy::animation::AnimationPlayer;
 use avian3d::prelude::*;
 use bevy_wind_waker_shader::prelude::*;
-use rand::Rng;
+
 use crate::components::*;
 use crate::combat::*;
 
@@ -32,6 +32,8 @@ impl Plugin for PlayerPlugin {
                 update_player_animation,
                 update_player_status_ui,
                 player_punch_damage,
+                rebuild_player_combat_stats_from_exp,
+                update_player_status_ui,
                 update_floating_damage_text,
                 update_basic_gun_defeat_particles,
                 player_return_after_hurt,
@@ -60,8 +62,7 @@ fn spawn_player(
         },
         base_stats,
         CombatStats::from(base_stats),
-        AttackElement(Element::Water),
-        DefenseElement(Element::Water),
+        AtkAndDefElement(Element::Inw),
         ElementMastery::default(),
         PlayerCombo {
             current_index: None,
@@ -1073,5 +1074,48 @@ pub fn player_punch_damage(
         );
 
         commands.entity(target_entity).despawn();
+    }
+}
+pub fn rebuild_player_combat_stats_from_exp(
+    mut player_query: Query<
+        (
+            &BaseStats,
+            &ElementMastery,
+            &mut CombatStats,
+            &mut Health,
+            &mut Mana,
+        ),
+        (
+            With<Player>,
+            Changed<ElementMastery>,
+        ),
+    >,
+) {
+    for (
+        base,
+        mastery,
+        mut combat,
+        mut health,
+        mut mana,
+    ) in &mut player_query
+    {
+        let new_stats =
+            combat_stats_from_element_exp(base, mastery);
+
+        *combat = new_stats;
+
+        let new_hp_max =
+            new_stats.max_hp.round() as i32;
+
+        let new_mp_max =
+            new_stats.max_mp.round() as i32;
+
+        health.max = new_hp_max;
+        health.current =
+            health.current.clamp(0, new_hp_max);
+
+        mana.max = new_mp_max;
+        mana.current =
+            mana.current.clamp(0, new_mp_max);
     }
 }

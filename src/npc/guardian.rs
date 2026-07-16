@@ -433,8 +433,7 @@ fn spawn_basic_practice_gun(
             CombatStats::from(base_stats),
 
             // หุ่นฝึกเป็น Neutral
-            AttackElement(Element::Neutral),
-            DefenseElement(Element::Neutral),
+            AtkAndDefElement(Element::Neutral),
 
             // EXP ที่ผู้เล่นได้รับเมื่อกำจัด
             ElementExpReward::BASIC_PRACTICE_GUN,
@@ -737,9 +736,7 @@ fn spawn_advanced_minion(
             base_stats,
             CombatStats::from(base_stats),
 
-            AttackElement(Element::Neutral),
-            DefenseElement(Element::Neutral),
-
+            AtkAndDefElement(Element::Neutral),
             ElementExpReward::ADVANCED_PRACTICE_MINION,
 
             MinionLifeDrainTimer(

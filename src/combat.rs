@@ -13,10 +13,7 @@ pub enum Element {
 }
 
 #[derive(Component, Debug, Clone, Copy)]
-pub struct AttackElement(pub Element);
-
-#[derive(Component, Debug, Clone, Copy)]
-pub struct DefenseElement(pub Element);
+pub struct AtkAndDefElement(pub Element);
 
 #[derive(Component, Debug, Clone, Copy)]
 pub struct BaseStats {
@@ -82,14 +79,7 @@ impl BaseStats {
 
 #[derive(Debug, Default, Clone, Copy)]
 pub struct ElementProgress {
-    pub level: u16,
     pub exp: u32,
-}
-
-impl ElementProgress {
-    pub fn bonus_steps(&self) -> u16 {
-        self.level / 10
-    }
 }
 
 #[derive(Component, Debug, Default, Clone)]
@@ -224,5 +214,100 @@ impl ElementExpReward {
             mastery.inw.exp.saturating_add(gain.inw);
 
         gain
+    }
+}
+
+pub fn elemental_multiplier(
+    attacker: Element,
+    defender: Element,
+) -> f32 {
+    use Element::*;
+
+    match (attacker, defender) {
+        // ชนะทาง
+        (Water, Fire)
+        | (Fire, Wind)
+        | (Wind, Earth)
+        | (Earth, Water) => 1.5,
+
+        // แพ้ทาง
+        (Water, Earth)
+        | (Fire, Water)
+        | (Wind, Fire)
+        | (Earth, Wind) => 0.75,
+
+        // ธาตุเดียวกัน Neutral และ Inw
+        _ => 1.0,
+    }
+}
+fn calculate_combat_damage(
+    attacker: &CombatStats,
+    defender: &CombatStats,
+    attack_element: Element,
+    defense_element: Element,
+) -> i32 {
+    let damage_after_defense =
+        attacker.attack
+            * 100.0
+            / (100.0 + defender.defense.max(0.0));
+
+    let element_multiplier =
+        elemental_multiplier(
+            attack_element,
+            defense_element,
+        );
+
+    let final_damage =
+        damage_after_defense * element_multiplier;
+
+    final_damage.round().max(1.0) as i32
+}
+
+pub fn combat_stats_from_element_exp(
+    base: &BaseStats,
+    mastery: &ElementMastery,
+) -> CombatStats {
+    // ใช้ EXP / 10.0 โดยตรง
+    let water = mastery.water.exp as f32 / 10.0;
+    let fire = mastery.fire.exp as f32 / 10.0;
+    let wind = mastery.wind.exp as f32 / 10.0;
+    let earth = mastery.earth.exp as f32 / 10.0;
+    let inw = mastery.inw.exp as f32 / 10.0;
+
+    let hp_bonus =
+        earth * 8.0
+        + inw * 2.0;
+
+    let mp_bonus =
+        water * 10.0
+        + inw * 2.0;
+
+    let attack_bonus =
+        water * 0.2
+        + fire * 0.8
+        + inw * 0.15;
+
+    let defense_bonus =
+        earth * 0.6
+        + inw * 0.15;
+
+    let critical_rate_bonus =
+        wind * 0.005
+        + inw * 0.001;
+
+    let critical_damage_bonus =
+        fire * 0.02
+        + wind * 0.01
+        + inw * 0.005;
+
+    CombatStats {
+        max_hp: base.max_hp + hp_bonus,
+        max_mp: base.max_mp + mp_bonus,
+        attack: base.attack + attack_bonus,
+        defense: base.defense + defense_bonus,
+        critical_rate:
+            base.critical_rate + critical_rate_bonus,
+        critical_damage:
+            base.critical_damage + critical_damage_bonus,
     }
 }
