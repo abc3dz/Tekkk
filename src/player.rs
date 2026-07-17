@@ -816,26 +816,75 @@ fn start_player_combo_attack(
     combo.current_index = Some(index);
     combo.queued_next = false;
     combo.timer = Timer::from_seconds(combo_duration(index), TimerMode::Once);
-
-    //println!("Combo attack {}", index);
 }
-fn spawn_floating_damage_text(
+
+#[derive(Debug, Clone, Copy)]
+pub enum FloatingDamageKind {
+    EnemyNormal,
+    EnemyCritical,
+    PlayerHit,
+    PlayerDrain,
+}
+pub fn spawn_floating_damage_text(
     commands: &mut Commands,
     damage: i32,
     position: Vec3,
+    kind: FloatingDamageKind,
 ) {
+    let (text, font_size, color, velocity, lifetime) =
+        match kind {
+            // Player โจมตีศัตรูตามปกติ
+            FloatingDamageKind::EnemyNormal => (
+                format!("-{}", damage),
+                32.0,
+                Color::srgb(1.0, 0.35, 0.1),
+                Vec3::new(0.0, 1.5, 0.0),
+                0.8,
+            ),
+
+            // Player โจมตีติด Critical
+            FloatingDamageKind::EnemyCritical => (
+                format!("CRIT -{}", damage),
+                52.0,
+                Color::srgb(1.0, 0.85, 0.1),
+                Vec3::new(0.0, 2.0, 0.0),
+                1.1,
+            ),
+
+            // Projectile ยิงโดน Player
+            FloatingDamageKind::PlayerHit => (
+                format!("HP -{}", damage),
+                40.0,
+                Color::srgb(1.0, 0.05, 0.05),
+                Vec3::new(-0.5, 1.7, 0.0),
+                1.0,
+            ),
+
+            // Minion ดูดเลือด Player
+            FloatingDamageKind::PlayerDrain => (
+                format!("DRAIN -{}", damage),
+                40.0,
+                Color::srgb(0.85, 0.2, 1.0),
+                Vec3::new(0.5, 1.7, 0.0),
+                1.0,
+            ),
+        };
+
     commands.spawn((
         FloatingDamageText {
-            timer: Timer::from_seconds(0.8, TimerMode::Once),
+            timer: Timer::from_seconds(
+                lifetime,
+                TimerMode::Once,
+            ),
             world_position: position,
-            velocity: Vec3::new(0.0, 1.5, 0.0),
+            velocity,
         },
-        Text::new(format!("-{}", damage)),
+        Text::new(text),
         TextFont {
-            font_size: 32.0,
+            font_size,
             ..default()
         },
-        TextColor(Color::srgb(1.0, 0.2, 0.1)),
+        TextColor(color),
         Node {
             position_type: PositionType::Absolute,
             left: Val::Px(0.0),
@@ -1022,9 +1071,9 @@ pub fn player_punch_damage(
             target_stats,
             &mut rng,
         );
-        if is_critical {
-            println!("CRITICAL HIT! Damage: {}", damage);
-        } 
+        // if is_critical {
+        //     println!("CRITICAL HIT! Damage: {}", damage);
+        // } 
 
         target_health.current -= damage;
         target_health.current =
@@ -1033,11 +1082,18 @@ pub fn player_punch_damage(
                 target_health.max,
             );
 
+        let damage_kind = if is_critical {
+            FloatingDamageKind::EnemyCritical
+        } else {
+            FloatingDamageKind::EnemyNormal
+        };
+
         spawn_floating_damage_text(
             &mut commands,
             damage,
             target_transform.translation
                 + Vec3::new(0.0, 2.0, 0.0),
+            damage_kind,
         );
 
         // ยังไม่ถูก defeat

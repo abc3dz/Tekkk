@@ -6,7 +6,11 @@ use bevy::animation::graph::AnimationGraph;
 use bevy::animation::AnimationPlayer;
 use rand::Rng;
 use crate::components::*;
-use crate::player::play_player_hurt_animation;
+use crate::player::{
+    FloatingDamageKind,
+    play_player_hurt_animation,
+    spawn_floating_damage_text,
+};
 use crate::combat::*;
 
 pub struct GuardianPlugin;
@@ -18,10 +22,50 @@ impl Plugin for GuardianPlugin {
         .init_resource::<AdvancedPracticeActive>()
         .insert_resource(BasicGunRespawnTimer(Timer::from_seconds(1.0, TimerMode::Once)))
         .insert_resource(AdvancedMinionRespawnTimer(Timer::from_seconds(1.0, TimerMode::Once)))
+        .add_systems(Startup, setup_guardian_animation_graph)
+            .add_systems(OnEnter(GameScene::Hub), setup_guardian_npc)
+            .add_systems(Update,setup_guardian_animation_player.run_if(in_state(GameScene::Hub))
+            )
+            .add_systems(
+                Update,
+                (
+                    check_guardian_interaction_area,
+                    check_guardian_interaction_area_exit,
+                    show_guardian_dialog,
+                    cleanup_guardian_ui_when_player_leave,
+                )
+                .run_if(in_state(GameScene::Hub))
+            )
+
+            .add_systems(Update, guardian_dialog_exit_input.run_if(in_state(GameScene::Hub)))
+            .add_systems(Update, guardian_dialog_basic_input.run_if(in_state(GameScene::Hub)))
+            .add_systems(Update, guardian_dialog_advanced_input.run_if(in_state(GameScene::Hub)))
+
+            .add_systems(
+                Update,
+                (
+                    rotate_basic_practice_gun_to_player,
+                    basic_practice_gun_shoot_projectile,
+                    move_basic_practice_projectiles,
+                    basic_projectile_hit_player,
+                    update_basic_gun_health_bar,
+                )
+                .run_if(in_state(GameScene::Hub))
+            )
+        .add_systems(
+                Update,
+                (
+                    minion_chase_player,
+                    minion_drain_player_life,
+                    update_minion_health_bar,
+                )
+                .run_if(in_state(GameScene::Hub))
+            )
         .add_systems(Update, (
             respawn_basic_gun_when_defeated,
             respawn_advanced_minion_when_defeated.run_if(in_state(GameScene::Hub)),
-        ));
+        ))
+        .add_systems(OnExit(GameScene::Hub), despawn_hub_only_entities);
     }
 }
 
@@ -368,8 +412,6 @@ pub fn despawn_hub_only_entities(
 fn spawn_basic_practice_gun(
     commands: &mut Commands,
     asset_server: &Res<AssetServer>,
-    meshes: &mut ResMut<Assets<Mesh>>,
-    materials: &mut ResMut<Assets<StandardMaterial>>,
 ) {
     let mut rng = rand::rng();
 
@@ -384,6 +426,7 @@ fn spawn_basic_practice_gun(
             HubOnly,
             PracticeEntity,
             BasicPracticeGun,
+            CombatTarget,
 
             Health {
                 current: base_stats.max_hp as i32,
@@ -394,8 +437,7 @@ fn spawn_basic_practice_gun(
             CombatStats::from(base_stats),
 
             // หุ่นฝึกเป็น Neutral
-            AttackElement(Element::Neutral),
-            DefenseElement(Element::Neutral),
+            AtkAndDefElement(Element::Neutral),
 
             // EXP ที่ผู้เล่นได้รับเมื่อกำจัด
             ElementExpReward::BASIC_PRACTICE_GUN,
@@ -424,8 +466,6 @@ pub fn guardian_dialog_basic_input(
     mut commands: Commands,
     keyboard: Res<ButtonInput<KeyCode>>,
     asset_server: Res<AssetServer>,
-    mut meshes: ResMut<Assets<Mesh>>,
-    mut materials: ResMut<Assets<StandardMaterial>>,
 
     mut basic_practice_active: ResMut<BasicPracticeActive>,
     mut advanced_practice_active: ResMut<AdvancedPracticeActive>,
@@ -460,8 +500,6 @@ pub fn guardian_dialog_basic_input(
     spawn_basic_practice_gun(
         &mut commands,
         &asset_server,
-        &mut meshes,
-        &mut materials,
     );
 }
 pub fn rotate_basic_practice_gun_to_player(
@@ -601,10 +639,12 @@ pub fn basic_projectile_hit_player(
         health.current -= projectile.hp_damage;
         health.current = health.current.clamp(0, health.max);
 
-        println!(
-            "Projectile hit player! HP: {}/{}",
-            health.current,
-            health.max,
+        spawn_floating_damage_text(
+            &mut commands,
+            projectile.hp_damage,
+            player_tf.translation
+                + Vec3::new(0.0, 2.0, 0.0),
+            FloatingDamageKind::PlayerHit,
         );
 
         play_player_hurt_animation(
@@ -641,8 +681,6 @@ pub fn respawn_basic_gun_when_defeated(
     mut commands: Commands,
     time: Res<Time>,
     asset_server: Res<AssetServer>,
-    mut meshes: ResMut<Assets<Mesh>>,
-    mut materials: ResMut<Assets<StandardMaterial>>,
 
     basic_practice_active: Res<BasicPracticeActive>,
     mut respawn_timer: ResMut<BasicGunRespawnTimer>,
@@ -671,19 +709,15 @@ pub fn respawn_basic_gun_when_defeated(
     spawn_basic_practice_gun(
         &mut commands,
         &asset_server,
-        &mut meshes,
-        &mut materials,
     );
 
     respawn_timer.0.reset();
 }
 
 //Advanced practice
-fn spawn_guardian_minion(
+fn spawn_advanced_minion(
     commands: &mut Commands,
     asset_server: &Res<AssetServer>,
-    meshes: &mut ResMut<Assets<Mesh>>,
-    materials: &mut ResMut<Assets<StandardMaterial>>,
 ) {
     let mut rng = rand::rng();
 
@@ -698,6 +732,7 @@ fn spawn_guardian_minion(
             HubOnly,
             PracticeEntity,
             GuardianClone,
+            CombatTarget,
 
             Health {
                 current: base_stats.max_hp as i32,
@@ -707,9 +742,7 @@ fn spawn_guardian_minion(
             base_stats,
             CombatStats::from(base_stats),
 
-            AttackElement(Element::Neutral),
-            DefenseElement(Element::Neutral),
-
+            AtkAndDefElement(Element::Neutral),
             ElementExpReward::ADVANCED_PRACTICE_MINION,
 
             MinionLifeDrainTimer(
@@ -741,8 +774,6 @@ pub fn guardian_dialog_advanced_input(
     mut commands: Commands,
     keyboard: Res<ButtonInput<KeyCode>>,
     asset_server: Res<AssetServer>,
-    mut meshes: ResMut<Assets<Mesh>>,
-    mut materials: ResMut<Assets<StandardMaterial>>,
 
     mut basic_practice_active: ResMut<BasicPracticeActive>,
     mut advanced_practice_active: ResMut<AdvancedPracticeActive>,
@@ -770,18 +801,16 @@ pub fn guardian_dialog_advanced_input(
         commands.entity(entity).despawn();
     }
 
-    spawn_guardian_minion(
+    spawn_advanced_minion(
         &mut commands,
         &asset_server,
-        &mut meshes,
-        &mut materials,
     );
 
     if let Ok(mut player_tf) = player_query.single_mut() {
         player_tf.translation = Vec3 { x: 0.0, y: 0.0, z: 0.0 };
     }
 }
-pub fn guardian_clone_chase_player(
+pub fn minion_chase_player(
     time: Res<Time>,
     player_query: Query<&Transform, (With<Player>, Without<GuardianClone>)>,
     mut clone_query: Query<&mut Transform, (With<GuardianClone>, Without<Player>)>,
@@ -856,6 +885,14 @@ pub fn minion_drain_player_life(
         player_health.current =
             player_health.current.clamp(0, player_health.max);
 
+        spawn_floating_damage_text(
+            &mut commands,
+            drain_amount,
+            player_tf.translation
+                + Vec3::new(0.0, 2.0, 0.0),
+            FloatingDamageKind::PlayerDrain,
+        );
+
         minion_health.current += drain_amount;
         minion_health.current =
             minion_health.current.clamp(0, minion_health.max);
@@ -865,14 +902,6 @@ pub fn minion_drain_player_life(
             player_entity,
             &anim_graph,
             &mut anim_query,
-        );
-
-        println!(
-            "Minion drains life! Player HP: {}/{} | Minion HP: {}/{}",
-            player_health.current,
-            player_health.max,
-            minion_health.current,
-            minion_health.max,
         );
     }
 }
@@ -900,8 +929,6 @@ pub fn respawn_advanced_minion_when_defeated(
     mut commands: Commands,
     time: Res<Time>,
     asset_server: Res<AssetServer>,
-    mut meshes: ResMut<Assets<Mesh>>,
-    mut materials: ResMut<Assets<StandardMaterial>>,
 
     advanced_practice_active: Res<AdvancedPracticeActive>,
     mut respawn_timer: ResMut<AdvancedMinionRespawnTimer>,
@@ -926,11 +953,9 @@ pub fn respawn_advanced_minion_when_defeated(
         return;
     }
 
-    spawn_guardian_minion(
+    spawn_advanced_minion(
         &mut commands,
         &asset_server,
-        &mut meshes,
-        &mut materials,
     );
 
     respawn_timer.0.reset();
