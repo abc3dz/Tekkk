@@ -107,7 +107,7 @@ pub fn spawn_guardian_npc(
             GuardianInteractArea,
             Sensor,
             CollisionEventsEnabled,
-            Collider::cuboid(2.0, 2.0, 2.0),
+            Collider::cuboid(1.4, 2.0, 1.4),
             Transform::from_xyz(0.0, 0.0, 1.5),
         ));
     });
@@ -346,7 +346,7 @@ pub fn show_guardian_dialog(
 
                 parent.spawn((
                     Text::new(
-                        "Guardian:\nWhat kind of practice do you want?\n\n1. Basic Practice\n2. Advanced Practice\n3. Full HP / Mana\nEsc. Stop Practice"
+                        "Guardian: What kind of practice do you want?\n1 / A: Basic Practice\n2 / X: Advanced Practice\n3 / Y: Full HP / Mana\nEsc / B: Stop Practice"
                     ),
                     TextFont {
                         font_size: 26.0,
@@ -360,33 +360,88 @@ pub fn show_guardian_dialog(
 pub fn guardian_dialog_exit_input(
     mut commands: Commands,
     keyboard: Res<ButtonInput<KeyCode>>,
-    dialog_query: Query<Entity, With<GuardianDialogUI>>,
-    practice_query: Query<Entity, With<PracticeEntity>>,
-    mut player_query: Query<(&mut Health, &mut Mana, &mut Transform), With<Player>>,
-    mut basic_practice_active: ResMut<BasicPracticeActive>,
-    mut advanced_practice_active: ResMut<AdvancedPracticeActive>,
+    gamepads: Query<&Gamepad>,
+
+    dialog_query: Query<
+        Entity,
+        With<GuardianDialogUI>,
+    >,
+
+    practice_query: Query<
+        Entity,
+        With<PracticeEntity>,
+    >,
+
+    mut player_query: Query<
+        (
+            &mut Health,
+            &mut Mana,
+            &mut Transform,
+        ),
+        With<Player>,
+    >,
+
+    mut basic_practice_active:
+        ResMut<BasicPracticeActive>,
+
+    mut advanced_practice_active:
+        ResMut<AdvancedPracticeActive>,
 ) {
     if dialog_query.is_empty() {
         return;
     }
 
-    let Ok((mut health, mut mana, mut transform)) = player_query.single_mut() else {
+    let Ok((
+        mut health,
+        mut mana,
+        mut transform,
+    )) = player_query.single_mut()
+    else {
         return;
     };
 
-    if keyboard.just_pressed(KeyCode::Digit3) {
+    let gamepad_full_pressed =
+        gamepads.iter().any(|gamepad| {
+            gamepad.just_pressed(
+                GamepadButton::North,
+            )
+        });
+
+    let full_pressed =
+        keyboard.just_pressed(KeyCode::Digit3)
+            || gamepad_full_pressed;
+
+    if full_pressed {
         health.current = health.max;
         mana.current = mana.max;
+
+        println!("Player HP / Mana restored");
     }
 
-    if keyboard.just_pressed(KeyCode::Escape) {
-        for entity in &practice_query {
-            commands.entity(entity).despawn();
-        }
-        transform.translation.z += 3.5;
-        basic_practice_active.0 = false;
-        advanced_practice_active.0 = false;
+    let gamepad_stop_pressed =
+        gamepads.iter().any(|gamepad| {
+            gamepad.just_pressed(
+                GamepadButton::East,
+            )
+        });
+
+    let stop_pressed =
+        keyboard.just_pressed(KeyCode::Escape)
+            || gamepad_stop_pressed;
+
+    if !stop_pressed {
+        return;
     }
+
+    for entity in &practice_query {
+        commands.entity(entity).despawn();
+    }
+
+    // ขยับ Player ออกจากพื้นที่สนทนา
+    transform.translation.z += 3.5;
+
+    basic_practice_active.0 = false;
+    advanced_practice_active.0 = false;
 }
 
 pub fn cleanup_guardian_ui_when_player_leave(
@@ -520,6 +575,7 @@ fn spawn_basic_practice_gun(
 pub fn guardian_dialog_basic_input(
     mut commands: Commands,
     keyboard: Res<ButtonInput<KeyCode>>,
+    gamepads: Query<&Gamepad>,
     asset_server: Res<AssetServer>,
 
     mut basic_practice_active: ResMut<BasicPracticeActive>,
@@ -534,7 +590,18 @@ pub fn guardian_dialog_basic_input(
         return;
     }
 
-    if !keyboard.just_pressed(KeyCode::Digit1) {
+    let gamepad_basic_pressed =
+        gamepads.iter().any(|gamepad| {
+            gamepad.just_pressed(
+                GamepadButton::South,
+            )
+        });
+
+    let basic_pressed =
+        keyboard.just_pressed(KeyCode::Digit1)
+            || gamepad_basic_pressed;
+
+    if !basic_pressed {
         return;
     }
 
@@ -548,8 +615,11 @@ pub fn guardian_dialog_basic_input(
         commands.entity(entity).despawn();
     }
 
-    if let Ok(mut transform) = player_query.single_mut() {
-        transform.translation = Vec3::new(0.0, 0.0, 0.0);
+    if let Ok(mut transform) =
+        player_query.single_mut()
+    {
+        transform.translation =
+            Vec3::new(0.0, 0.0, 0.0);
     }
 
     spawn_basic_practice_gun(
@@ -817,6 +887,7 @@ fn spawn_advanced_minion(
 pub fn guardian_dialog_advanced_input(
     mut commands: Commands,
     keyboard: Res<ButtonInput<KeyCode>>,
+    gamepads: Query<&Gamepad>,
     asset_server: Res<AssetServer>,
 
     mut basic_practice_active: ResMut<BasicPracticeActive>,
@@ -831,7 +902,18 @@ pub fn guardian_dialog_advanced_input(
         return;
     }
 
-    if !keyboard.just_pressed(KeyCode::Digit2) {
+    let gamepad_advanced_pressed =
+        gamepads.iter().any(|gamepad| {
+            gamepad.just_pressed(
+                GamepadButton::West,
+            )
+        });
+
+    let advanced_pressed =
+        keyboard.just_pressed(KeyCode::Digit2)
+            || gamepad_advanced_pressed;
+
+    if !advanced_pressed {
         return;
     }
 
@@ -850,8 +932,11 @@ pub fn guardian_dialog_advanced_input(
         &asset_server,
     );
 
-    if let Ok(mut player_tf) = player_query.single_mut() {
-        player_tf.translation = Vec3 { x: 0.0, y: 0.0, z: 0.0 };
+    if let Ok(mut player_tf) =
+        player_query.single_mut()
+    {
+        player_tf.translation =
+            Vec3::new(0.0, 0.0, 0.0);
     }
 }
 pub fn minion_chase_player(

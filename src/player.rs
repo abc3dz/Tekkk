@@ -91,39 +91,149 @@ fn spawn_player(
     });
 }
 
+const GAMEPAD_DEADZONE: f32 = 0.20;
+
+fn apply_gamepad_deadzone(
+    input: Vec2,
+    deadzone: f32,
+) -> Vec2 {
+    let length = input.length();
+
+    if length <= deadzone {
+        return Vec2::ZERO;
+    }
+
+    let adjusted_length =
+        ((length - deadzone) / (1.0 - deadzone))
+            .clamp(0.0, 1.0);
+
+    input.normalize() * adjusted_length
+}
+
 fn player_movement(
     keyboard: Res<ButtonInput<KeyCode>>,
-    mut query: Query<(
-        &MoveSpeed,
-        &mut LinearVelocity,
-        &mut Transform,
-    ), With<Player>>,
+    gamepads: Query<&Gamepad>,
+
+    mut player_query: Query<
+        (
+            &MoveSpeed,
+            &mut LinearVelocity,
+            &mut Transform,
+        ),
+        With<Player>,
+    >,
+    dialog_query: Query<
+        (),
+        With<GuardianDialogUI>,
+    >,
 ) {
-    let Ok((speed, mut velocity, mut transform)) = query.single_mut() else {
+
+    let Ok((
+        speed,
+        mut velocity,
+        mut transform,
+    )) = player_query.single_mut()
+    else {
         return;
     };
+    if !dialog_query.is_empty() {
+        velocity.x = 0.0;
+        velocity.z = 0.0;
+        return;
+    }
+    /*
+        Vec2:
+        x = ซ้าย/ขวา
+        y = หน้า/หลัง
+    */
+    let mut movement_input = Vec2::ZERO;
 
-    let mut dir = Vec3::ZERO;
+    // Keyboard
+    if keyboard.pressed(KeyCode::KeyW) {
+        movement_input.y += 1.0;
+    }
 
-    if keyboard.pressed(KeyCode::KeyW) { dir.z -= 1.0; }
-    if keyboard.pressed(KeyCode::KeyS) { dir.z += 1.0; }
-    if keyboard.pressed(KeyCode::KeyA) { dir.x -= 1.0; }
-    if keyboard.pressed(KeyCode::KeyD) { dir.x += 1.0; }
+    if keyboard.pressed(KeyCode::KeyS) {
+        movement_input.y -= 1.0;
+    }
 
-    if dir.length_squared() > 0.0 {
-        dir = dir.normalize();
+    if keyboard.pressed(KeyCode::KeyA) {
+        movement_input.x -= 1.0;
+    }
 
-        velocity.x = dir.x * speed.0;
-        velocity.z = dir.z * speed.0;
+    if keyboard.pressed(KeyCode::KeyD) {
+        movement_input.x += 1.0;
+    }
 
-        transform.rotation = Quat::from_rotation_y(dir.x.atan2(dir.z));
+    // ใช้ Gamepad ตัวแรกที่เชื่อมต่อ
+    if let Some(gamepad) = gamepads.iter().next() {
+        let left_stick =
+            apply_gamepad_deadzone(
+                gamepad.left_stick(),
+                GAMEPAD_DEADZONE,
+            );
+
+        let dpad = gamepad.dpad();
+
+        // ใช้อนาล็อกก่อน ถ้าไม่ได้ดันจึงใช้ D-pad
+        let gamepad_input =
+            if left_stick.length_squared() > 0.0 {
+                left_stick
+            } else {
+                dpad
+            };
+
+        movement_input += gamepad_input;
+    }
+
+    // ป้องกันการเดินทแยงเร็วเกินไป
+    if movement_input.length_squared() > 1.0 {
+        movement_input =
+            movement_input.normalize();
+    }
+
+    /*
+        แปลง Vec2 เป็นโลก 3D
+
+        stick ขึ้น  = -Z
+        stick ลง    = +Z
+        stickขวา    = +X
+        stickซ้าย   = -X
+    */
+    let direction = Vec3::new(
+        movement_input.x,
+        0.0,
+        -movement_input.y,
+    );
+
+    if direction.length_squared() > 0.0001 {
+        /*
+            ไม่ normalize direction ตรงนี้
+            เพื่อรักษาระดับความแรงของอนาล็อก
+
+            ดันครึ่งหนึ่ง = เดินครึ่งความเร็ว
+            ดันสุด       = เดินเต็มความเร็ว
+        */
+        velocity.x =
+            direction.x * speed.0;
+
+        velocity.z =
+            direction.z * speed.0;
+
+        transform.rotation =
+            Quat::from_rotation_y(
+                direction.x.atan2(direction.z),
+            );
     } else {
         velocity.x = 0.0;
         velocity.z = 0.0;
     }
 
+    // ตกฉากแล้วกลับจุดเริ่มต้น
     if transform.translation.y < -5.0 {
-        transform.translation = Vec3::new(0.0, 2.0, 0.0);
+        transform.translation =
+            Vec3::new(0.0, 2.0, 0.0);
+
         velocity.x = 0.0;
         velocity.y = 0.0;
         velocity.z = 0.0;
@@ -240,8 +350,25 @@ pub fn player_dash_input(
         (Entity, &mut AnimationPlayer, &mut PlayerAnimState),
         With<PlayerAnimationTarget>,
     >,
+    gamepads: Query<&Gamepad>,
+    dialog_query: Query<
+        (),
+        With<GuardianDialogUI>,
+    >,
 ) {
-    if !keyboard.just_pressed(KeyCode::KeyL) {
+    if !dialog_query.is_empty() {
+        return;
+    }
+
+    let dash_pressed =
+        keyboard.just_pressed(KeyCode::KeyL)
+            || gamepads.iter().any(|gamepad| {
+                gamepad.just_pressed(
+                    GamepadButton::East,
+                )
+            });
+
+    if !dash_pressed {
         return;
     }
 
@@ -314,8 +441,25 @@ pub fn player_jump_input(
         (Entity, &mut AnimationPlayer, &mut PlayerAnimState),
         With<PlayerAnimationTarget>,
     >,
+    gamepads: Query<&Gamepad>,
+    dialog_query: Query<
+        (),
+        With<GuardianDialogUI>,
+    >,
 ) {
-    if !keyboard.just_pressed(KeyCode::KeyK) {
+    if !dialog_query.is_empty() {
+        return;
+    }
+
+    let jump_pressed =
+        keyboard.just_pressed(KeyCode::KeyK)
+            || gamepads.iter().any(|gamepad| {
+                gamepad.just_pressed(
+                    GamepadButton::South,
+                )
+            });
+
+    if !jump_pressed {
         return;
     }
 
@@ -546,8 +690,24 @@ pub fn player_combo_input(
         (&mut AnimationPlayer, &mut PlayerAnimState),
         With<PlayerAnimationTarget>,
     >,
+    gamepads: Query<&Gamepad>,
+    dialog_query: Query<
+        (),
+        With<GuardianDialogUI>,
+    >,
 ) {
-    if !keyboard.just_pressed(KeyCode::KeyJ) {
+    if !dialog_query.is_empty() {
+        return;
+    }
+    let attack_pressed =
+        keyboard.just_pressed(KeyCode::KeyJ)
+            || gamepads.iter().any(|gamepad| {
+                gamepad.just_pressed(
+                    GamepadButton::West,
+                )
+            });
+
+    if !attack_pressed {
         return;
     }
 
@@ -1024,8 +1184,24 @@ pub fn player_punch_damage(
             Without<Player>,
         ),
     >,
+    gamepads: Query<&Gamepad>,
+    dialog_query: Query<
+        (),
+        With<GuardianDialogUI>,
+    >,
 ) {
-    if !keyboard.just_pressed(KeyCode::KeyJ) {
+    if !dialog_query.is_empty() {
+        return;
+    }
+    let attack_pressed =
+        keyboard.just_pressed(KeyCode::KeyJ)
+            || gamepads.iter().any(|gamepad| {
+                gamepad.just_pressed(
+                    GamepadButton::West,
+                )
+            });
+
+    if !attack_pressed {
         return;
     }
 
