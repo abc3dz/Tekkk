@@ -133,9 +133,6 @@ pub struct PracticeEntity;
 #[derive(Component)]
 pub struct BasicPracticeGun;
 
-#[derive(Component)]
-pub struct BasicGunHealthBarFill;
-
 #[derive(Resource, Default)]
 pub struct BasicPracticeActive(pub bool);
 
@@ -160,14 +157,19 @@ pub struct GuardianClone;
 #[derive(Component)]
 pub struct MinionLifeDrainTimer(pub Timer);
 
-#[derive(Component)]
-pub struct MinionHealthBarFill;
-
 #[derive(Resource, Default)]
 pub struct AdvancedPracticeActive(pub bool);
 
 #[derive(Resource)]
 pub struct AdvancedMinionRespawnTimer(pub Timer);
+
+#[derive(Component)]
+pub struct EnemyHealthBar {
+    pub target: Entity,
+}
+
+#[derive(Component)]
+pub struct EnemyHealthBarFill;
 
 // scenes
 #[derive(Component)]

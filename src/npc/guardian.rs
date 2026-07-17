@@ -6,7 +6,11 @@ use bevy::animation::graph::AnimationGraph;
 use bevy::animation::AnimationPlayer;
 use rand::Rng;
 use crate::components::*;
-use crate::player::play_player_hurt_animation;
+use crate::player::{
+    FloatingDamageKind,
+    play_player_hurt_animation,
+    spawn_floating_damage_text,
+};
 use crate::combat::*;
 
 pub struct GuardianPlugin;
@@ -19,41 +23,39 @@ impl Plugin for GuardianPlugin {
         .insert_resource(BasicGunRespawnTimer(Timer::from_seconds(1.0, TimerMode::Once)))
         .insert_resource(AdvancedMinionRespawnTimer(Timer::from_seconds(1.0, TimerMode::Once)))
         .add_systems(Startup, setup_guardian_animation_graph)
-            .add_systems(OnEnter(GameScene::Hub), setup_guardian_npc)
-            .add_systems(Update,setup_guardian_animation_player.run_if(in_state(GameScene::Hub))
+        .add_systems(OnEnter(GameScene::Hub), setup_guardian_npc)
+        .add_systems(Update,setup_guardian_animation_player.run_if(in_state(GameScene::Hub))
+        )
+        .add_systems(
+            Update,
+            (
+                check_guardian_interaction_area,
+                check_guardian_interaction_area_exit,
+                show_guardian_dialog,
+                cleanup_guardian_ui_when_player_leave,
             )
-            .add_systems(
-                Update,
-                (
-                    check_guardian_interaction_area,
-                    check_guardian_interaction_area_exit,
-                    show_guardian_dialog,
-                    cleanup_guardian_ui_when_player_leave,
-                )
-                .run_if(in_state(GameScene::Hub))
-            )
+            .run_if(in_state(GameScene::Hub))
+        )
 
-            .add_systems(Update, guardian_dialog_exit_input.run_if(in_state(GameScene::Hub)))
-            .add_systems(Update, guardian_dialog_basic_input.run_if(in_state(GameScene::Hub)))
-            .add_systems(Update, guardian_dialog_advanced_input.run_if(in_state(GameScene::Hub)))
+        .add_systems(Update, guardian_dialog_exit_input.run_if(in_state(GameScene::Hub)))
+        .add_systems(Update, guardian_dialog_basic_input.run_if(in_state(GameScene::Hub)))
+        .add_systems(Update, guardian_dialog_advanced_input.run_if(in_state(GameScene::Hub)))
 
-            .add_systems(
-                Update,
-                (
-                    rotate_basic_practice_gun_to_player,
-                    basic_practice_gun_shoot_projectile,
-                    move_basic_practice_projectiles,
-                    basic_projectile_hit_player,
-                    update_basic_gun_health_bar,
-                )
-                .run_if(in_state(GameScene::Hub))
+        .add_systems(
+            Update,
+            (
+                rotate_basic_practice_gun_to_player,
+                basic_practice_gun_shoot_projectile,
+                move_basic_practice_projectiles,
+                basic_projectile_hit_player,
             )
+            .run_if(in_state(GameScene::Hub))
+        )
         .add_systems(
                 Update,
                 (
-                    guardian_clone_chase_player,
+                    minion_chase_player,
                     minion_drain_player_life,
-                    update_minion_health_bar,
                 )
                 .run_if(in_state(GameScene::Hub))
             )
@@ -61,6 +63,11 @@ impl Plugin for GuardianPlugin {
             respawn_basic_gun_when_defeated,
             respawn_advanced_minion_when_defeated.run_if(in_state(GameScene::Hub)),
         ))
+        .add_systems(
+            Update,
+            update_enemy_health_bars
+                .run_if(in_state(GameScene::Hub)),
+        )
         .add_systems(OnExit(GameScene::Hub), despawn_hub_only_entities);
     }
 }
@@ -405,6 +412,51 @@ pub fn despawn_hub_only_entities(
 }
 
 // Basic practice
+const ENEMY_HEALTH_BAR_WIDTH: f32 = 76.0;
+const ENEMY_HEALTH_BAR_SHOW_DISTANCE: f32 = 10.0;
+
+fn spawn_enemy_health_bar(
+    commands: &mut Commands,
+    target: Entity,
+) {
+    commands
+        .spawn((
+            EnemyHealthBar { target },
+
+            Node {
+                position_type: PositionType::Absolute,
+
+                width: Val::Px(ENEMY_HEALTH_BAR_WIDTH),
+                height: Val::Px(10.0),
+
+                // ทำขอบสีดำรอบหลอดเลือด
+                padding: UiRect::all(Val::Px(2.0)),
+
+                // เริ่มต้นซ่อนก่อน
+                display: Display::None,
+
+                ..default()
+            },
+
+            BackgroundColor(
+                Color::srgb(0.02, 0.02, 0.02),
+            ),
+        ))
+        .with_child((
+            EnemyHealthBarFill,
+
+            Node {
+                width: Val::Percent(100.0),
+                height: Val::Percent(100.0),
+                ..default()
+            },
+
+            // HP สีแดง
+            BackgroundColor(
+                Color::srgb(0.9, 0.02, 0.04),
+            ),
+        ));
+}
 fn spawn_basic_practice_gun(
     commands: &mut Commands,
     asset_server: &Res<AssetServer>,
@@ -416,8 +468,7 @@ fn spawn_basic_practice_gun(
     let z = rng.random_range(-4.0..=10.0);
 
     let base_stats = BaseStats::BASIC_PRACTICE_GUN;
-
-    commands
+    let gun_entity = commands
         .spawn((
             HubOnly,
             PracticeEntity,
@@ -428,25 +479,27 @@ fn spawn_basic_practice_gun(
                 current: base_stats.max_hp as i32,
                 max: base_stats.max_hp as i32,
             },
-             // ระบบสถานะใหม่
+
             base_stats,
             CombatStats::from(base_stats),
 
-            // หุ่นฝึกเป็น Neutral
             AtkAndDefElement(Element::Neutral),
-
-            // EXP ที่ผู้เล่นได้รับเมื่อกำจัด
             ElementExpReward::BASIC_PRACTICE_GUN,
 
             BasicGunShootTimer(
-                Timer::from_seconds(1.0, TimerMode::Repeating)
+                Timer::from_seconds(
+                    1.0,
+                    TimerMode::Repeating,
+                ),
             ),
 
             SceneRoot(
                 asset_server.load(
                     GltfAssetLabel::Scene(0)
-                        .from_asset("npc/BasicPracticeGun.glb")
-                )
+                        .from_asset(
+                            "npc/BasicPracticeGun.glb",
+                        ),
+                ),
             ),
 
             Transform::from_xyz(x, y, z),
@@ -456,7 +509,13 @@ fn spawn_basic_practice_gun(
                 .time_of_day(TimeOfDay::Day)
                 .weather(Weather::Sunny)
                 .build(),
-        ));
+        ))
+        .id();
+
+    spawn_enemy_health_bar(
+        commands,
+        gun_entity,
+    );
 }
 pub fn guardian_dialog_basic_input(
     mut commands: Commands,
@@ -635,10 +694,12 @@ pub fn basic_projectile_hit_player(
         health.current -= projectile.hp_damage;
         health.current = health.current.clamp(0, health.max);
 
-        println!(
-            "Projectile hit player! HP: {}/{}",
-            health.current,
-            health.max,
+        spawn_floating_damage_text(
+            &mut commands,
+            projectile.hp_damage,
+            player_tf.translation
+                + Vec3::new(0.0, 2.0, 0.0),
+            FloatingDamageKind::PlayerHit,
         );
 
         play_player_hurt_animation(
@@ -651,26 +712,7 @@ pub fn basic_projectile_hit_player(
         commands.entity(projectile_entity).despawn();
     }
 }
-pub fn update_basic_gun_health_bar(
-    gun_query: Query<(&Health, &Children), With<BasicPracticeGun>>,
-    mut fill_query: Query<&mut Transform, With<BasicGunHealthBarFill>>,
-) {
-    let full_width = 1.3;
 
-    for (health, children) in &gun_query {
-        let ratio = health.current as f32 / health.max as f32;
-        let ratio = ratio.clamp(0.0, 1.0);
-
-        for child in children.iter() {
-            if let Ok(mut fill_tf) = fill_query.get_mut(child) {
-                fill_tf.scale.x = ratio;
-
-                // Keep the left side fixed while shrinking
-                fill_tf.translation.x = -full_width * (1.0 - ratio) * 0.5;
-            }
-        }
-    }
-}
 pub fn respawn_basic_gun_when_defeated(
     mut commands: Commands,
     time: Res<Time>,
@@ -720,8 +762,7 @@ fn spawn_advanced_minion(
     let z = rng.random_range(-4.0..=10.0);
 
     let base_stats = BaseStats::ADVANCED_PRACTICE_MINION;
-
-    commands
+    let minion_entity = commands
         .spawn((
             HubOnly,
             PracticeEntity,
@@ -740,14 +781,17 @@ fn spawn_advanced_minion(
             ElementExpReward::ADVANCED_PRACTICE_MINION,
 
             MinionLifeDrainTimer(
-                Timer::from_seconds(0.5, TimerMode::Repeating)
+                Timer::from_seconds(
+                    0.5,
+                    TimerMode::Repeating,
+                ),
             ),
 
             SceneRoot(
                 asset_server.load(
                     GltfAssetLabel::Scene(0)
-                        .from_asset("npc/MinionChar.glb")
-                )
+                        .from_asset("npc/MinionChar.glb"),
+                ),
             ),
 
             Transform {
@@ -762,7 +806,13 @@ fn spawn_advanced_minion(
                 .time_of_day(TimeOfDay::Day)
                 .weather(Weather::Sunny)
                 .build(),
-        ));
+        ))
+        .id();
+
+    spawn_enemy_health_bar(
+        commands,
+        minion_entity,
+    );
 }
 pub fn guardian_dialog_advanced_input(
     mut commands: Commands,
@@ -804,7 +854,7 @@ pub fn guardian_dialog_advanced_input(
         player_tf.translation = Vec3 { x: 0.0, y: 0.0, z: 0.0 };
     }
 }
-pub fn guardian_clone_chase_player(
+pub fn minion_chase_player(
     time: Res<Time>,
     player_query: Query<&Transform, (With<Player>, Without<GuardianClone>)>,
     mut clone_query: Query<&mut Transform, (With<GuardianClone>, Without<Player>)>,
@@ -879,6 +929,14 @@ pub fn minion_drain_player_life(
         player_health.current =
             player_health.current.clamp(0, player_health.max);
 
+        spawn_floating_damage_text(
+            &mut commands,
+            drain_amount,
+            player_tf.translation
+                + Vec3::new(0.0, 2.0, 0.0),
+            FloatingDamageKind::PlayerDrain,
+        );
+
         minion_health.current += drain_amount;
         minion_health.current =
             minion_health.current.clamp(0, minion_health.max);
@@ -889,36 +947,9 @@ pub fn minion_drain_player_life(
             &anim_graph,
             &mut anim_query,
         );
-
-        println!(
-            "Minion drains life! Player HP: {}/{} | Minion HP: {}/{}",
-            player_health.current,
-            player_health.max,
-            minion_health.current,
-            minion_health.max,
-        );
     }
 }
-pub fn update_minion_health_bar(
-    minion_query: Query<(&Health, &Children), With<GuardianClone>>,
-    mut fill_query: Query<&mut Transform, With<MinionHealthBarFill>>,
-) {
-    let full_width = 1.2;
 
-    for (health, children) in &minion_query {
-        let ratio = health.current as f32 / health.max as f32;
-        let ratio = ratio.clamp(0.0, 1.0);
-
-        for child in children.iter() {
-            if let Ok(mut fill_tf) = fill_query.get_mut(child) {
-                fill_tf.scale.x = ratio;
-
-                // ให้แถบเลือดหดจากขวาไปซ้าย
-                fill_tf.translation.x = -full_width * (1.0 - ratio) * 0.5;
-            }
-        }
-    }
-}
 pub fn respawn_advanced_minion_when_defeated(
     mut commands: Commands,
     time: Res<Time>,
@@ -953,4 +984,134 @@ pub fn respawn_advanced_minion_when_defeated(
     );
 
     respawn_timer.0.reset();
+}
+pub fn update_enemy_health_bars(
+    mut commands: Commands,
+
+    camera_query: Query<
+        (&Camera, &GlobalTransform),
+        With<Camera3d>,
+    >,
+
+    player_query: Query<
+        &GlobalTransform,
+        With<Player>,
+    >,
+
+    target_query: Query<
+        (&GlobalTransform, &Health),
+        With<CombatTarget>,
+    >,
+
+    mut bar_query: Query<
+        (
+            Entity,
+            &EnemyHealthBar,
+            &Children,
+            &mut Node,
+        ),
+        (
+            With<EnemyHealthBar>,
+            Without<EnemyHealthBarFill>,
+        ),
+    >,
+
+    mut fill_query: Query<
+        &mut Node,
+        (
+            With<EnemyHealthBarFill>,
+            Without<EnemyHealthBar>,
+        ),
+    >,
+) {
+    let Ok((camera, camera_transform)) =
+        camera_query.single()
+    else {
+        return;
+    };
+
+    let Ok(player_transform) =
+        player_query.single()
+    else {
+        return;
+    };
+
+    let player_position =
+        player_transform.translation();
+
+    for (
+        bar_entity,
+        health_bar,
+        children,
+        mut bar_node,
+    ) in &mut bar_query
+    {
+        let Ok((target_transform, health)) =
+            target_query.get(health_bar.target)
+        else {
+            // ศัตรูถูก despawn แล้ว ให้ลบเกจตามไปด้วย
+            commands.entity(bar_entity).despawn();
+            continue;
+        };
+
+        let target_position =
+            target_transform.translation();
+
+        // ตรวจระยะเฉพาะแกนพื้น XZ
+        let offset = target_position - player_position;
+
+        let distance = Vec2::new(
+            offset.x,
+            offset.z,
+        )
+        .length();
+
+        // อยู่ไกล Player ให้ซ่อน
+        if distance > ENEMY_HEALTH_BAR_SHOW_DISTANCE {
+            bar_node.display = Display::None;
+            continue;
+        }
+
+        // ตำแหน่งเหนือหัวศัตรู
+        let world_position =
+            target_position + Vec3::Y * 2.0;
+
+        let Ok(screen_position) =
+            camera.world_to_viewport(
+                camera_transform,
+                world_position,
+            )
+        else {
+            bar_node.display = Display::None;
+            continue;
+        };
+
+        bar_node.display = Display::Flex;
+
+        // จัดให้กึ่งกลางหลอดอยู่เหนือศัตรู
+        bar_node.left = Val::Px(
+            screen_position.x
+                - ENEMY_HEALTH_BAR_WIDTH * 0.5,
+        );
+
+        bar_node.top = Val::Px(
+            screen_position.y - 5.0,
+        );
+
+        let hp_ratio =
+            health.current as f32
+                / health.max.max(1) as f32;
+
+        let hp_percent =
+            hp_ratio.clamp(0.0, 1.0) * 100.0;
+
+        for child in children.iter() {
+            if let Ok(mut fill_node) =
+                fill_query.get_mut(child)
+            {
+                fill_node.width =
+                    Val::Percent(hp_percent);
+            }
+        }
+    }
 }
