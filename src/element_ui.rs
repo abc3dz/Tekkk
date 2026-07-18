@@ -11,6 +11,7 @@ use crate::components::{
     Health,
     Mana,
     Player,
+    GuardianDialogUI
 };
 
 pub struct ElementUiPlugin;
@@ -24,7 +25,7 @@ impl Plugin for ElementUiPlugin {
         .add_systems(
             Update,
             (
-                toggle_element_status_ui,
+                pause_and_status_input,
                 update_element_status_ui,
             )
                 .chain(),
@@ -34,6 +35,7 @@ impl Plugin for ElementUiPlugin {
 
 #[derive(Component)]
 struct ElementStatusUi;
+
 
 #[derive(Component, Clone, Copy)]
 enum PlayerStatusValueText {
@@ -83,7 +85,7 @@ fn setup_element_status_ui(
                 ..default()
             },
             BackgroundColor(
-                Color::srgba(0.0, 0.0, 0.0, 0.55),
+                Color::srgba(0.0, 0.0, 0.0, 0.72),
             ),
         ))
         .with_children(|root| {
@@ -104,6 +106,33 @@ fn setup_element_status_ui(
                 ),
             ))
             .with_children(|panel| {
+                panel.spawn((
+                    Text::new("PAUSED"),
+
+                    TextFont {
+                        font_size: 38.0,
+                        ..default()
+                    },
+
+                    TextColor(
+                        Color::srgb(
+                            1.0,
+                            0.82,
+                            0.20,
+                        ),
+                    ),
+
+                    Node {
+                        width: Val::Percent(100.0),
+
+                        margin: UiRect {
+                            bottom: Val::Px(18.0),
+                            ..default()
+                        },
+
+                        ..default()
+                    },
+                ));
                 panel.spawn((
                     Text::new("PLAYER STATUS"),
                     TextFont {
@@ -245,14 +274,27 @@ fn setup_element_status_ui(
                 }
 
                 panel.spawn((
-                    Text::new("Press U to close"),
+
+                    Text::new("Esc: Resume"),
+
                     TextFont {
                         font_size: 21.0,
                         ..default()
                     },
-                    TextColor(Color::WHITE),
+
+                    TextColor(
+                        Color::srgb(
+                            0.75,
+                            0.75,
+                            0.80,
+                        ),
+                    ),
+
                     Node {
-                        margin: UiRect::top(Val::Px(18.0)),
+                        margin: UiRect::top(
+                            Val::Px(18.0),
+                        ),
+
                         ..default()
                     },
                 ));
@@ -260,30 +302,72 @@ fn setup_element_status_ui(
         });
 }
 
-fn toggle_element_status_ui(
+fn pause_and_status_input(
     keyboard: Res<ButtonInput<KeyCode>>,
+    gamepads: Query<&Gamepad>,
+
+    // ป้องกัน Pause UI ซ้อนกับ Guardian Dialog
+    dialog_query: Query<
+        (),
+        With<GuardianDialogUI>,
+    >,
+
     mut ui_query: Query<
         &mut Node,
         With<ElementStatusUi>,
     >,
+
+    mut virtual_time: ResMut<Time<Virtual>>,
 ) {
-    if !keyboard.just_pressed(KeyCode::KeyU) {
+    /*
+        ขณะ Guardian Dialog เปิด:
+
+        Esc และ B/Circle
+        ให้ Guardian Dialog ใช้งาน
+
+        จึงไม่เปิด Pause ซ้อนกัน
+    */
+    if !dialog_query.is_empty() {
         return;
     }
 
-    let Ok(mut ui_node) = ui_query.single_mut()
+    let keyboard_pause_pressed =
+        keyboard.just_pressed(
+            KeyCode::Escape,
+        );
+
+    let gamepad_pause_pressed =
+        gamepads.iter().any(|gamepad| {
+            gamepad.just_pressed(
+                GamepadButton::Start,
+            )
+        });
+
+    if !keyboard_pause_pressed
+        && !gamepad_pause_pressed
+    {
+        return;
+    }
+
+    let Ok(mut ui_node) =
+        ui_query.single_mut()
     else {
         return;
     };
 
-    ui_node.display = if matches!(
-        ui_node.display,
-        Display::None
-    ) {
-        Display::Flex
+    if virtual_time.is_paused() {
+        // Resume
+        virtual_time.unpause();
+        ui_node.display = Display::None;
+
+        println!("Game resumed");
     } else {
-        Display::None
-    };
+        // Pause และแสดง Player Status
+        virtual_time.pause();
+        ui_node.display = Display::Flex;
+
+        println!("Game paused");
+    }
 }
 
 fn update_element_status_ui(
