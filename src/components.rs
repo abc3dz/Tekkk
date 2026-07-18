@@ -94,6 +94,9 @@ pub struct PlayerJumpTimer(pub Timer);
 #[derive(Component)]
 pub struct PlayerHurtTimer(pub Timer);
 
+#[derive(Component)]
+pub struct PlayerFootstepSound;
+
 //guardian
 
 #[derive(Resource)]

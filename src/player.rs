@@ -20,6 +20,7 @@ impl Plugin for PlayerPlugin {
             .add_systems(Update, (
                 setup_player_animation_player,
                 player_movement,
+                player_footstep_sound,
                 player_jump_input,
                 player_jump_update,
                 player_combo_input,
@@ -238,6 +239,59 @@ fn player_movement(
         velocity.y = 0.0;
         velocity.z = 0.0;
     }
+}
+
+pub fn player_footstep_sound(
+    mut commands: Commands,
+    asset_server: Res<AssetServer>,
+
+    player_query: Query<
+        &LinearVelocity,
+        With<Player>,
+    >,
+
+    playing_sound_query: Query<
+        (),
+        With<PlayerFootstepSound>,
+    >,
+) {
+    let Ok(velocity) = player_query.single()
+    else {
+        return;
+    };
+
+    let is_moving =
+        velocity.x.abs() > 0.05
+            || velocity.z.abs() > 0.05;
+
+    // Player หยุดเดิน
+    if !is_moving {
+        return;
+    }
+
+    /*
+        มีเสียงเดินที่ยังเล่นไม่จบอยู่แล้ว
+        ห้าม Spawn เสียงใหม่มาทับ
+    */
+    if !playing_sound_query.is_empty() {
+        return;
+    }
+
+    commands.spawn((
+        PlayerFootstepSound,
+
+        AudioPlayer::new(
+            asset_server.load(
+                "sounds/sfx_walk.ogg",
+            ),
+        ),
+
+        /*
+            เล่นครั้งเดียว และลบ Entity
+            เมื่อเสียงเล่นจนจบ
+        */
+        PlaybackSettings::DESPAWN,
+    ));
 }
 
 fn setup_player_animation_graph(
