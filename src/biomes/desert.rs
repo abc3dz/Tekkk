@@ -30,6 +30,13 @@ pub fn spawn_desert(
         Transform::from_xyz(0.0, 0.0, 0.0),
     ));
 
+    commands.spawn((
+        CurrentScene,
+        WarpToHub,
+        Transform::from_xyz(0.0, 0.5, -8.0),
+        GlobalTransform::default(),
+    ));
+
     if let Ok(mut player_tf) = player_query.single_mut() {
         player_tf.translation = Vec3::new(0.0, 2.0, 0.0);
     }

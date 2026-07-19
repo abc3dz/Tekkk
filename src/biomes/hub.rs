@@ -4,6 +4,7 @@ use avian3d::prelude::*;
 use bevy_wind_waker_shader::prelude::*;
 
 use crate::components::*;
+//use crate::npc::guardian::spawn_guardian_npc;
 
 pub fn spawn_hub(
     mut commands: Commands,
@@ -28,6 +29,12 @@ pub fn spawn_hub(
         Collider::cuboid(36.0, 0.1, 39.0),
         Transform::from_xyz(0.0, 0.0, 0.0),
     ));
+    //wall
+    commands.spawn((
+        RigidBody::Static,
+        Collider::cuboid(32.0, 3.0, 0.3),
+        Transform::from_xyz(0.0, 1.0, -15.5),
+    ));
     //gate
     commands.spawn((
         WarpToDesert,
@@ -35,5 +42,13 @@ pub fn spawn_hub(
         Sensor,
         Collider::cuboid(2.0, 2.0, 2.0),
         Transform::from_xyz(0.0, 1.0, -15.0),
+    ));
+    commands.spawn((
+        AudioPlayer::new(asset_server.load("sounds/BGM_StartScene.ogg")),
+        PlaybackSettings{
+            mode: bevy::audio::PlaybackMode::Loop,
+            volume:  bevy::audio::Volume::Linear(0.3),
+            ..default()
+        },
     ));
 }
