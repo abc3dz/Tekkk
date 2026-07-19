@@ -729,7 +729,7 @@ pub fn move_basic_practice_projectiles(
 }
 pub fn basic_projectile_hit_player(
     mut commands: Commands,
-
+    asset_server: Res<AssetServer>,
     projectile_query: Query<
         (Entity, &Transform, &BasicPracticeProjectile),
         (With<BasicPracticeProjectile>, Without<Player>),
@@ -763,6 +763,8 @@ pub fn basic_projectile_hit_player(
 
         health.current -= projectile.hp_damage;
         health.current = health.current.clamp(0, health.max);
+
+        commands.spawn(AudioPlayer::new(asset_server.load("sounds/331935__pyro13djt__hit_hurt.ogg")));
 
         spawn_floating_damage_text(
             &mut commands,
@@ -1008,7 +1010,7 @@ pub fn minion_drain_player_life(
             continue;
         }
 
-        let drain_amount = 2;
+        let drain_amount = 5;
 
         player_health.current -= drain_amount;
         player_health.current =

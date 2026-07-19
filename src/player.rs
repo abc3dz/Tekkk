@@ -37,6 +37,7 @@ impl Plugin for PlayerPlugin {
                 update_floating_damage_text,
                 update_basic_gun_defeat_particles,
                 player_return_after_hurt,
+                respawn_player_when_defeated,
             ).chain()
         );
     }
@@ -127,6 +128,8 @@ fn player_movement(
         (),
         With<GuardianDialogUI>,
     >,
+    mut commands: Commands,
+    asset_server: Res<AssetServer>,
 ) {
 
     let Ok((
@@ -193,14 +196,6 @@ fn player_movement(
             movement_input.normalize();
     }
 
-    /*
-        แปลง Vec2 เป็นโลก 3D
-
-        stick ขึ้น  = -Z
-        stick ลง    = +Z
-        stickขวา    = +X
-        stickซ้าย   = -X
-    */
     let direction = Vec3::new(
         movement_input.x,
         0.0,
@@ -208,13 +203,7 @@ fn player_movement(
     );
 
     if direction.length_squared() > 0.0001 {
-        /*
-            ไม่ normalize direction ตรงนี้
-            เพื่อรักษาระดับความแรงของอนาล็อก
-
-            ดันครึ่งหนึ่ง = เดินครึ่งความเร็ว
-            ดันสุด       = เดินเต็มความเร็ว
-        */
+        
         velocity.x =
             direction.x * speed.0;
 
@@ -232,8 +221,8 @@ fn player_movement(
 
     // ตกฉากแล้วกลับจุดเริ่มต้น
     if transform.translation.y < -5.0 {
-        transform.translation =
-            Vec3::new(0.0, 2.0, 0.0);
+        transform.translation = Vec3::new(0.0, 2.0, 0.0);
+        commands.spawn(AudioPlayer::new(asset_server.load("sounds/sfx_fall.ogg")));
 
         velocity.x = 0.0;
         velocity.y = 0.0;
@@ -500,6 +489,7 @@ pub fn player_jump_input(
         (),
         With<GuardianDialogUI>,
     >,
+    asset_server: Res<AssetServer>
 ) {
     if !dialog_query.is_empty() {
         return;
@@ -549,8 +539,7 @@ pub fn player_jump_input(
     commands.entity(anim_entity).insert(
         PlayerJumpTimer(Timer::from_seconds(0.6, TimerMode::Once))
     );
-
-    println!("Player jump");
+    commands.spawn(AudioPlayer::new(asset_server.load("sounds/sfx_jump.ogg")));
 }
 pub fn player_jump_update(
     mut commands: Commands,
@@ -658,6 +647,7 @@ pub fn spawn_player_dash_trail_during_dash(
             },
             GlobalTransform::default(),
         ));
+        commands.spawn(AudioPlayer::new(asset_server.load("sounds/742717__artix0__dash-sound-effect.ogg")));
     }
 }
 pub fn play_player_hurt_animation(
@@ -749,6 +739,8 @@ pub fn player_combo_input(
         (),
         With<GuardianDialogUI>,
     >,
+    mut commands: Commands,
+    asset_server: Res<AssetServer>,
 ) {
     if !dialog_query.is_empty() {
         return;
@@ -784,6 +776,8 @@ pub fn player_combo_input(
             &mut anim_player,
             &mut anim_state,
             &mut combo,
+            &mut commands,
+            &asset_server,
         );
     } else {
         combo.queued_next = true;
@@ -799,6 +793,8 @@ pub fn player_combo_update(
         (&mut AnimationPlayer, &mut PlayerAnimState),
         With<PlayerAnimationTarget>,
     >,
+    mut commands: Commands,
+    asset_server: Res<AssetServer>,
 ) {
     let Ok(mut combo) = combo_query.single_mut() else {
         return;
@@ -827,6 +823,8 @@ pub fn player_combo_update(
             &mut anim_player,
             &mut anim_state,
             &mut combo,
+            &mut commands,
+            &asset_server,
         );
     } else {
         anim_player.stop_all();
@@ -993,6 +991,14 @@ fn combo_duration(index: usize) -> f32 {
         _ => 0.45,
     }
 }
+fn combo_hit_sound(index: usize) -> &'static str {
+    match index {
+        0 => "sounds/hit1.ogg",
+        1 => "sounds/hit2.ogg",
+        2 => "sounds/hit3.ogg",
+        _ => "sounds/hit1.ogg",
+    }
+}
 
 fn combo_anim_node(
     anim_graph: &PlayerAnimationGraph,
@@ -1021,15 +1027,37 @@ fn start_player_combo_attack(
     anim_player: &mut AnimationPlayer,
     anim_state: &mut PlayerAnimState,
     combo: &mut PlayerCombo,
+    commands: &mut Commands,
+    asset_server: &AssetServer,
 ) {
     anim_player.stop_all();
-    anim_player.play(combo_anim_node(anim_graph, index));
 
-    *anim_state = combo_anim_state(index);
+    anim_player.play(
+        combo_anim_node(
+            anim_graph,
+            index,
+        ),
+    );
+
+    *anim_state =
+        combo_anim_state(index);
 
     combo.current_index = Some(index);
     combo.queued_next = false;
-    combo.timer = Timer::from_seconds(combo_duration(index), TimerMode::Once);
+
+    combo.timer = Timer::from_seconds(
+        combo_duration(index),
+        TimerMode::Once,
+    );
+
+    commands.spawn((
+        AudioPlayer::new(
+            asset_server.load(
+                combo_hit_sound(index),
+            ),
+        ),
+        PlaybackSettings::DESPAWN,
+    ));
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -1291,19 +1319,12 @@ pub fn player_punch_damage(
             continue;
         }
 
-        // let damage = calculate_combat_damage(
-        //     player_stats,
-        //     target_stats,
-        // );
         let (damage, is_critical) =
         calculate_combat_damage(
             player_stats,
             target_stats,
             &mut rng,
         );
-        // if is_critical {
-        //     println!("CRITICAL HIT! Damage: {}", damage);
-        // } 
 
         target_health.current -= damage;
         target_health.current =
@@ -1403,4 +1424,40 @@ pub fn rebuild_player_combat_stats_from_exp(
         mana.current =
             mana.current.clamp(0, new_mp_max);
     }
+}
+pub fn respawn_player_when_defeated(
+    mut player_query: Query<
+        (
+            &mut Health,
+            &mut Transform,
+            &mut LinearVelocity,
+        ),
+        With<Player>,
+    >,
+    mut commands: Commands,
+    asset_server: Res<AssetServer>,
+) {
+    let Ok((
+        mut health,
+        mut transform,
+        mut velocity,
+    )) = player_query.single_mut()
+    else {
+        return;
+    };
+
+    if health.current > 0 {
+        return;
+    }
+
+    transform.translation =
+        Vec3::new(0.0, 2.0, 0.0);
+
+    velocity.x = 0.0;
+    velocity.y = 0.0;
+    velocity.z = 0.0;
+
+    // ไม่ให้ตรวจเจอ HP <= 0 ซ้ำทุกเฟรม
+    health.current = health.max;
+    commands.spawn(AudioPlayer::new(asset_server.load("sounds/sfx_game_over.ogg")));
 }
