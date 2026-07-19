@@ -241,7 +241,6 @@ pub fn check_guardian_interaction_area(
 
 pub fn check_guardian_interaction_area_exit(
     mut commands: Commands,
-    asset_server: Res<AssetServer>,
     mut collision_events: MessageReader<CollisionEnd>,
     guardian_area_query: Query<Entity, With<GuardianInteractArea>>,
     player_query: Query<Entity, With<Player>>,
@@ -277,7 +276,6 @@ pub fn check_guardian_interaction_area_exit(
             };
 
         if let Some(player_entity) = player_entity {
-            commands.spawn(AudioPlayer::new(asset_server.load("sounds/npc/exit_pt.ogg")));
             commands.entity(player_entity).remove::<PlayerInGuardianArea>();
 
             for mut anim_player in &mut guardian_anim_query {
@@ -418,6 +416,7 @@ pub fn guardian_dialog_exit_input(
         mana.current = mana.max;
 
         commands.spawn(AudioPlayer::new(asset_server.load("sounds/npc/fullhpmp.ogg")));
+        transform.translation.z += 3.5;
     }
 
     let gamepad_stop_pressed =
@@ -439,7 +438,7 @@ pub fn guardian_dialog_exit_input(
         commands.entity(entity).despawn();
     }
 
-    // ขยับ Player ออกจากพื้นที่สนทนา
+    commands.spawn(AudioPlayer::new(asset_server.load("sounds/npc/exit_pt.ogg")));
     transform.translation.z += 3.5;
 
     basic_practice_active.0 = false;
