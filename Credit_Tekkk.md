@@ -24,6 +24,10 @@ https://freesound.org/people/ArTiX.0/sounds/742717/
 Licensed under Creative Commons Zero (CC0)
 Converted from WAV to OGG to reduce file size.
 
+https://freesound.org/people/metrostock99/sounds/514479/
+licensed under CC BY 4.0.
+Edited and partially used.
+
 # Tools
 
 Blender, Krita, LMMS, VSC
