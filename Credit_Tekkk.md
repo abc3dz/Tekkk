@@ -1,0 +1,33 @@
+# Third Party Assets
+
+bevy_wind_waker_shader by Jan Hohenheim.
+Source: https://github.com/janhohenheim/bevy_wind_waker_shader
+
+bevy_edge_detection_outline by Mediocre-AI
+Source: https://github.com/Mediocre-AI/bevy_edge_detection_outline
+
+Licensed under MIT OR Apache-2.0.
+
+# Rigging
+
+Mixamo
+
+# Sound
+
+https://sfbgames.itch.io/chiptone
+
+https://freesound.org/people/pyro13djt/sounds/331935/
+licensed under CC BY 3.0. 
+Edited and partially used.
+
+https://freesound.org/people/ArTiX.0/sounds/742717/
+Licensed under Creative Commons Zero (CC0)
+Converted from WAV to OGG to reduce file size.
+
+# Tools
+
+Blender, Krita, LMMS, VSC
+
+# Engine
+
+Bevy Game Engine
