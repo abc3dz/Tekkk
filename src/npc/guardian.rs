@@ -241,6 +241,7 @@ pub fn check_guardian_interaction_area(
 
 pub fn check_guardian_interaction_area_exit(
     mut commands: Commands,
+    asset_server: Res<AssetServer>,
     mut collision_events: MessageReader<CollisionEnd>,
     guardian_area_query: Query<Entity, With<GuardianInteractArea>>,
     player_query: Query<Entity, With<Player>>,
@@ -276,7 +277,7 @@ pub fn check_guardian_interaction_area_exit(
             };
 
         if let Some(player_entity) = player_entity {
-            println!("Player left Guardian area");
+            commands.spawn(AudioPlayer::new(asset_server.load("sounds/npc/exit_pt.ogg")));
             commands.entity(player_entity).remove::<PlayerInGuardianArea>();
 
             for mut anim_player in &mut guardian_anim_query {
@@ -359,6 +360,7 @@ pub fn show_guardian_dialog(
 }
 pub fn guardian_dialog_exit_input(
     mut commands: Commands,
+    asset_server: Res<AssetServer>,
     keyboard: Res<ButtonInput<KeyCode>>,
     gamepads: Query<&Gamepad>,
 
@@ -415,7 +417,7 @@ pub fn guardian_dialog_exit_input(
         health.current = health.max;
         mana.current = mana.max;
 
-        println!("Player HP / Mana restored");
+        commands.spawn(AudioPlayer::new(asset_server.load("sounds/npc/fullhpmp.ogg")));
     }
 
     let gamepad_stop_pressed =
@@ -605,7 +607,7 @@ pub fn guardian_dialog_basic_input(
         return;
     }
 
-    println!("Basic Practice selected");
+    commands.spawn(AudioPlayer::new(asset_server.load("sounds/npc/basic_pt.ogg")));
 
     basic_practice_active.0 = true;
     advanced_practice_active.0 = false;
@@ -703,6 +705,7 @@ pub fn basic_practice_gun_shoot_projectile(
                 scale: Vec3::splat(1.0),
                 ..default()
             },
+            AudioPlayer::new(asset_server.load("sounds/npc/shoot.ogg")),
             GlobalTransform::default(),
         ));
     }
@@ -919,7 +922,7 @@ pub fn guardian_dialog_advanced_input(
         return;
     }
 
-    println!("Advanced Practice selected");
+    commands.spawn(AudioPlayer::new(asset_server.load("sounds/npc/advance_pt.ogg")));
 
     basic_practice_active.0 = false;
     advanced_practice_active.0 = true;
@@ -975,6 +978,7 @@ pub fn minion_chase_player(
 }
 pub fn minion_drain_player_life(
     mut commands: Commands,
+    asset_server: Res<AssetServer>,
     time: Res<Time>,
 
     anim_graph: Res<PlayerAnimationGraph>,
@@ -1034,6 +1038,7 @@ pub fn minion_drain_player_life(
             &anim_graph,
             &mut anim_query,
         );
+        commands.spawn(AudioPlayer::new(asset_server.load("sounds/npc/514479__metrostock99__blllllllup-and-you-suck-ad-libs.ogg")));
     }
 }
 
