@@ -1,6 +1,10 @@
 # Tekkk
 A 3D action-adventure prototype game built with Bevy Engine.
 
+# Playtest
+https://abc3dz.github.io/Tekkk/
+
+# Screenshot
 Basic & Advanced Practice 
 
 <img src="https://github.com/abc3dz/Tekkk/blob/main/gif/20260710Basic_0001-0120-ezgif.com-video-to-gif-converter.gif">
@@ -9,3 +13,4 @@ Basic & Advanced Practice
 Normal & CRITICAL hit
 
 <img src="https://github.com/abc3dz/Tekkk/blob/main/gif/20260716TekkkPlayerState_0001-0110-ezgif.com-video-to-gif-converter.gif">
+
