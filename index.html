@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8"/>
+    <title>Tekkk</title>
+    <style>
+      body {
+        margin: 0;
+        background: #283480;
+      }
+
+      canvas {
+        display: block;
+        margin: auto;
+      }
+
+      #start-screen {
+        position: fixed;
+        width: 100%;
+        height: 100%;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 20px;
+        background: #283480;
+        z-index: 999;
+        color: white;
+        font-family: sans-serif;
+      }
+
+      #start-btn {
+        font-size: 32px;
+        padding: 20px 48px;
+        cursor: pointer;
+        background: #4af;
+        border: none;
+        border-radius: 12px;
+        color: white;
+      }
+
+      #progress-wrap {
+        width: min(70vw, 520px);
+      }
+
+      #progress-bar-bg {
+        width: 100%;
+        height: 28px;
+        background: rgba(255, 255, 255, 0.25);
+        border-radius: 999px;
+        overflow: hidden;
+      }
+
+      #progress-bar {
+        width: 0%;
+        height: 100%;
+        background: white;
+        border-radius: 999px;
+        transition: width 0.15s ease;
+      }
+
+      #progress-text {
+        margin-top: 12px;
+        font-size: 24px;
+        text-align: center;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="start-screen">
+      <div id="progress-wrap">
+        <div id="progress-bar-bg">
+          <div id="progress-bar"></div>
+        </div>
+        <div id="progress-text">0%</div>
+      </div>
+      <button id="start-btn" style="display:none;">▶ Start Game</button>
+    </div>
+
+    <script type="module">
+      import init from './tekkk.js';
+
+      const progressWrap = document.getElementById('progress-wrap');
+      const progressBar = document.getElementById('progress-bar');
+      const progressText = document.getElementById('progress-text');
+      const startBtn = document.getElementById('start-btn');
+
+      function setProgress(percent) {
+        const value = Math.max(0, Math.min(100, percent));
+        progressBar.style.width = value + '%';
+        progressText.textContent = value + '%';
+      }
+
+      async function loadWithProgress(url) {
+        const response = await fetch(url);
+        const total = parseInt(response.headers.get('content-length'), 10);
+        let loaded = 0;
+
+        const reader = response.body.getReader();
+        const chunks = [];
+
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+
+          chunks.push(value);
+          loaded += value.length;
+
+          if (total) {
+            setProgress(Math.round((loaded / total) * 100));
+          }
+        }
+
+        setProgress(100);
+        return new Blob(chunks).arrayBuffer();
+      }
+
+      const wasmBytes = await loadWithProgress('./tekkk_bg.wasm');
+
+      progressWrap.style.display = 'none';
+      startBtn.style.display = 'block';
+
+      startBtn.addEventListener('click', async () => {
+        document.getElementById('start-screen').style.display = 'none';
+        await init(wasmBytes);
+      });
+    </script>
+  </body>
+</html>
