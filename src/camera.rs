@@ -1,6 +1,5 @@
 use bevy::prelude::*;
 use crate::components::Player;
-use bevy_edge_detection_outline::{EdgeDetection, EdgeOperator};
 
 pub struct CameraPlugin;
 
@@ -20,12 +19,6 @@ fn spawn_camera(mut commands: Commands) {
         Camera3d::default(),
         MainCamera,
         Transform::from_xyz(0.0, 2.0, 3.0).looking_at(Vec3::ZERO, Vec3::Y),
-        EdgeDetection {
-            operator: EdgeOperator::RobertsCross,
-            depth_thickness: 0.45,
-            normal_thickness: 0.45,
-            ..default()
-        }
     ));
 }
 

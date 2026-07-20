@@ -2,7 +2,6 @@ use bevy::window::PresentMode;
 use bevy::prelude::*;
 use avian3d::prelude::*;
 use bevy_wind_waker_shader::prelude::*;
-use bevy_edge_detection_outline::EdgeDetectionPlugin;
 
 mod player;
 mod camera;
@@ -26,9 +25,8 @@ fn main() {
                 ..default()
             }),
             PhysicsPlugins::default(),
-            PhysicsDebugPlugin,
+            //PhysicsDebugPlugin,
             WindWakerShaderPlugin::default(),
-            EdgeDetectionPlugin::default(),
             
         ))
         .add_plugins((
