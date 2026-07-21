@@ -3,9 +3,6 @@
 bevy_wind_waker_shader by Jan Hohenheim.
 Source: https://github.com/janhohenheim/bevy_wind_waker_shader
 
-bevy_edge_detection_outline by Mediocre-AI
-Source: https://github.com/Mediocre-AI/bevy_edge_detection_outline
-
 Licensed under MIT OR Apache-2.0.
 
 # Rigging
