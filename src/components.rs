@@ -98,7 +98,6 @@ pub struct PlayerHurtTimer(pub Timer);
 pub struct PlayerFootstepSound;
 
 //guardian
-
 #[derive(Resource)]
 pub struct GuardianAnimationGraph {
     pub graph: Handle<AnimationGraph>,

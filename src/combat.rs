@@ -179,7 +179,6 @@ impl ExpRange {
         if self.max < self.min {
             return 0;
         }
-
         rng.random_range(self.min..=self.max)
     }
 }
@@ -198,20 +197,11 @@ impl ElementExpReward {
             inw: self.inw.roll(rng),
         };
 
-        mastery.water.exp =
-            mastery.water.exp.saturating_add(gain.water);
-
-        mastery.fire.exp =
-            mastery.fire.exp.saturating_add(gain.fire);
-
-        mastery.wind.exp =
-            mastery.wind.exp.saturating_add(gain.wind);
-
-        mastery.earth.exp =
-            mastery.earth.exp.saturating_add(gain.earth);
-
-        mastery.inw.exp =
-            mastery.inw.exp.saturating_add(gain.inw);
+        mastery.water.exp = mastery.water.exp.saturating_add(gain.water);
+        mastery.fire.exp = mastery.fire.exp.saturating_add(gain.fire);
+        mastery.wind.exp = mastery.wind.exp.saturating_add(gain.wind);
+        mastery.earth.exp = mastery.earth.exp.saturating_add(gain.earth);
+        mastery.inw.exp = mastery.inw.exp.saturating_add(gain.inw);
 
         gain
     }
@@ -245,28 +235,12 @@ pub fn calculate_combat_damage(
     defender: &CombatStats,
     rng: &mut impl rand::Rng,
 ) -> (i32, bool) {
-    let damage_after_defense =
-        attacker.attack * 100.0
-            / (100.0 + defender.defense.max(0.0));
-
-    // 0.05 หมายถึงโอกาส Critical 5%
-    let is_critical =
-        rng.random::<f32>()
-            < attacker.critical_rate.clamp(0.0, 1.0);
-
-    // ถ้าติด Critical จึงนำ Critical Damage มาคูณ
-    let critical_multiplier = if is_critical {
-        attacker.critical_damage.max(1.0)
-    } else {
-        1.0
-    };
-
-    let final_damage =
-        damage_after_defense * critical_multiplier;
-
-    let damage =
-        final_damage.round().max(1.0) as i32;
-
+    let damage_after_defense = attacker.attack * 100.0 / (100.0 + defender.defense.max(0.0));
+    let is_critical = rng.random::<f32>() < attacker.critical_rate.clamp(0.0, 1.0);
+    let critical_multiplier = if is_critical { attacker.critical_damage.max(1.0) } 
+    else { 1.0 };
+    let final_damage = damage_after_defense * critical_multiplier;
+    let damage = final_damage.round().max(1.0) as i32;
     (damage, is_critical)
 }
 
@@ -274,47 +248,25 @@ pub fn combat_stats_from_element_exp(
     base: &BaseStats,
     mastery: &ElementMastery,
 ) -> CombatStats {
-    // ใช้ EXP / 10.0 โดยตรง
     let water = mastery.water.exp as f32 / 10.0;
     let fire = mastery.fire.exp as f32 / 10.0;
     let wind = mastery.wind.exp as f32 / 10.0;
     let earth = mastery.earth.exp as f32 / 10.0;
     let inw = mastery.inw.exp as f32 / 10.0;
 
-    let hp_bonus =
-        earth * 8.0
-        + inw * 2.0;
-
-    let mp_bonus =
-        water * 10.0
-        + inw * 2.0;
-
-    let attack_bonus =
-        water * 0.2
-        + fire * 0.8
-        + inw * 0.15;
-
-    let defense_bonus =
-        earth * 0.6
-        + inw * 0.15;
-
-    let critical_rate_bonus =
-        wind * 0.005
-        + inw * 0.001;
-
-    let critical_damage_bonus =
-        fire * 0.02
-        + wind * 0.01
-        + inw * 0.005;
+    let hp_bonus = earth * 8.0 + inw * 2.0;
+    let mp_bonus = water * 10.0 + inw * 2.0;
+    let attack_bonus = water * 0.2 + fire * 0.8 + inw * 0.15;
+    let defense_bonus =earth * 0.6 + inw * 0.15;
+    let critical_rate_bonus = wind * 0.005 + inw * 0.001;
+    let critical_damage_bonus = fire * 0.02 + wind * 0.01 + inw * 0.005;
 
     CombatStats {
         max_hp: base.max_hp + hp_bonus,
         max_mp: base.max_mp + mp_bonus,
         attack: base.attack + attack_bonus,
         defense: base.defense + defense_bonus,
-        critical_rate:
-            base.critical_rate + critical_rate_bonus,
-        critical_damage:
-            base.critical_damage + critical_damage_bonus,
+        critical_rate: base.critical_rate + critical_rate_bonus,
+        critical_damage: base.critical_damage + critical_damage_bonus,
     }
 }

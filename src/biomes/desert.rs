@@ -11,15 +11,8 @@ pub fn spawn_desert(
     mut player_query: Query<&mut Transform, With<Player>>,
 ) {
     commands.spawn((
-        SceneRoot(
-            asset_server.load(
-                GltfAssetLabel::Scene(0).from_asset("maps/EvrmDesert.glb")
-            )
-        ),
-        WindWakerShaderBuilder::default()
-            .time_of_day(TimeOfDay::Day)
-            .weather(Weather::Sunny)
-            .build(),
+        SceneRoot(asset_server.load(GltfAssetLabel::Scene(0).from_asset("maps/EvrmDesert.glb"))),
+        WindWakerShaderBuilder::default().time_of_day(TimeOfDay::Day).weather(Weather::Sunny).build(),
         Transform::default(),
         CurrentScene,
     ));

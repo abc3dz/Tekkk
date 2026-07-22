@@ -53,14 +53,8 @@ fn spawn_player(
     .spawn((
         Player,
         MoveSpeed(6.0),
-        Health {
-                current: base_stats.max_hp as i32,
-                max: base_stats.max_hp as i32,
-            },
-        Mana {
-            current: base_stats.max_mp as i32,
-            max: base_stats.max_mp as i32,
-        },
+        Health {current: base_stats.max_hp as i32, max: base_stats.max_hp as i32},
+        Mana {current: base_stats.max_mp as i32, max: base_stats.max_mp as i32},
         base_stats,
         CombatStats::from(base_stats),
         AtkAndDefElement(Element::Inw),
@@ -75,20 +69,10 @@ fn spawn_player(
         Collider::capsule(0.28, 1.0),
         LockedAxes::ROTATION_LOCKED,
         LinearVelocity::ZERO,
-        
-    ))
-    .with_children(|parent| {
-        parent.spawn((
-            SceneRoot(
-                asset_server.load(
-                    GltfAssetLabel::Scene(0).from_asset("player/PlayerMoya.glb")
-                )
-            ),
+    )).with_children(|parent| {
+        parent.spawn((SceneRoot(asset_server.load(GltfAssetLabel::Scene(0).from_asset("player/PlayerMoya.glb"))),
             Transform::from_xyz(0.0, -0.83, 0.0),
-            WindWakerShaderBuilder::default()
-            .time_of_day(TimeOfDay::Day)
-            .weather(Weather::Sunny)
-            .build(),
+            WindWakerShaderBuilder::default().time_of_day(TimeOfDay::Day).weather(Weather::Sunny).build(),
         ));
     });
 }
@@ -105,9 +89,7 @@ fn apply_gamepad_deadzone(
         return Vec2::ZERO;
     }
 
-    let adjusted_length =
-        ((length - deadzone) / (1.0 - deadzone))
-            .clamp(0.0, 1.0);
+    let adjusted_length =((length - deadzone) / (1.0 - deadzone)).clamp(0.0, 1.0);
 
     input.normalize() * adjusted_length
 }
@@ -115,41 +97,20 @@ fn apply_gamepad_deadzone(
 fn player_movement(
     keyboard: Res<ButtonInput<KeyCode>>,
     gamepads: Query<&Gamepad>,
-
-    mut player_query: Query<
-        (
-            &MoveSpeed,
-            &mut LinearVelocity,
-            &mut Transform,
-        ),
-        With<Player>,
-    >,
-    dialog_query: Query<
-        (),
-        With<GuardianDialogUI>,
-    >,
+    mut player_query: Query<(&MoveSpeed, &mut LinearVelocity, &mut Transform), With<Player>>,
+    dialog_query: Query<(), With<GuardianDialogUI>>,
     mut commands: Commands,
     asset_server: Res<AssetServer>,
 ) {
 
-    let Ok((
-        speed,
-        mut velocity,
-        mut transform,
-    )) = player_query.single_mut()
-    else {
-        return;
-    };
+    let Ok((speed, mut velocity, mut transform)) = player_query.single_mut()
+    else { return };
     if !dialog_query.is_empty() {
         velocity.x = 0.0;
         velocity.z = 0.0;
         return;
     }
-    /*
-        Vec2:
-        x = ซ้าย/ขวา
-        y = หน้า/หลัง
-    */
+
     let mut movement_input = Vec2::ZERO;
 
     // Keyboard
@@ -169,17 +130,9 @@ fn player_movement(
         movement_input.x += 1.0;
     }
 
-    // ใช้ Gamepad ตัวแรกที่เชื่อมต่อ
     if let Some(gamepad) = gamepads.iter().next() {
-        let left_stick =
-            apply_gamepad_deadzone(
-                gamepad.left_stick(),
-                GAMEPAD_DEADZONE,
-            );
-
+        let left_stick = apply_gamepad_deadzone(gamepad.left_stick(), GAMEPAD_DEADZONE,);
         let dpad = gamepad.dpad();
-
-        // ใช้อนาล็อกก่อน ถ้าไม่ได้ดันจึงใช้ D-pad
         let gamepad_input =
             if left_stick.length_squared() > 0.0 {
                 left_stick
@@ -190,40 +143,24 @@ fn player_movement(
         movement_input += gamepad_input;
     }
 
-    // ป้องกันการเดินทแยงเร็วเกินไป
     if movement_input.length_squared() > 1.0 {
-        movement_input =
-            movement_input.normalize();
+        movement_input = movement_input.normalize();
     }
 
-    let direction = Vec3::new(
-        movement_input.x,
-        0.0,
-        -movement_input.y,
-    );
+    let direction = Vec3::new(movement_input.x, 0.0, -movement_input.y);
 
     if direction.length_squared() > 0.0001 {
-        
-        velocity.x =
-            direction.x * speed.0;
-
-        velocity.z =
-            direction.z * speed.0;
-
-        transform.rotation =
-            Quat::from_rotation_y(
-                direction.x.atan2(direction.z),
-            );
+        velocity.x = direction.x * speed.0;
+        velocity.z = direction.z * speed.0;
+        transform.rotation = Quat::from_rotation_y(direction.x.atan2(direction.z));
     } else {
         velocity.x = 0.0;
         velocity.z = 0.0;
     }
 
-    // ตกฉากแล้วกลับจุดเริ่มต้น
     if transform.translation.y < -5.0 {
         transform.translation = Vec3::new(0.0, 2.0, 0.0);
         commands.spawn(AudioPlayer::new(asset_server.load("sounds/sfx_fall.ogg")));
-
         velocity.x = 0.0;
         velocity.y = 0.0;
         velocity.z = 0.0;
@@ -233,52 +170,24 @@ fn player_movement(
 pub fn player_footstep_sound(
     mut commands: Commands,
     asset_server: Res<AssetServer>,
-
-    player_query: Query<
-        &LinearVelocity,
-        With<Player>,
-    >,
-
-    playing_sound_query: Query<
-        (),
-        With<PlayerFootstepSound>,
-    >,
+    player_query: Query<&LinearVelocity, With<Player>>,
+    playing_sound_query: Query<(), With<PlayerFootstepSound>>,
 ) {
     let Ok(velocity) = player_query.single()
-    else {
-        return;
-    };
+    else { return };
 
-    let is_moving =
-        velocity.x.abs() > 0.05
-            || velocity.z.abs() > 0.05;
-
-    // Player หยุดเดิน
+    let is_moving = velocity.x.abs() > 0.05 || velocity.z.abs() > 0.05;
     if !is_moving {
         return;
     }
 
-    /*
-        มีเสียงเดินที่ยังเล่นไม่จบอยู่แล้ว
-        ห้าม Spawn เสียงใหม่มาทับ
-    */
     if !playing_sound_query.is_empty() {
         return;
     }
 
     commands.spawn((
         PlayerFootstepSound,
-
-        AudioPlayer::new(
-            asset_server.load(
-                "sounds/sfx_walk.ogg",
-            ),
-        ),
-
-        /*
-            เล่นครั้งเดียว และลบ Entity
-            เมื่อเสียงเล่นจนจบ
-        */
+        AudioPlayer::new(asset_server.load("sounds/sfx_walk.ogg")),
         PlaybackSettings::DESPAWN,
     ));
 }
@@ -354,9 +263,8 @@ fn setup_player_animation_player(
     children_query: Query<&Children>,
     mut anim_query: Query<(Entity, &mut AnimationPlayer), Added<AnimationPlayer>>,
 ) {
-    let Ok(player_children) = player_root_query.single() else {
-        return;
-    };
+    let Ok(player_children) = player_root_query.single() 
+    else { return };
 
     let mut player_anim_entity: Option<Entity> = None;
 
@@ -389,15 +297,9 @@ pub fn player_dash_input(
     keyboard: Res<ButtonInput<KeyCode>>,
     anim_graph: Res<PlayerAnimationGraph>,
     player_query: Query<(Entity, &Transform, &PlayerCombo), With<Player>>,
-    mut anim_query: Query<
-        (Entity, &mut AnimationPlayer, &mut PlayerAnimState),
-        With<PlayerAnimationTarget>,
-    >,
+    mut anim_query: Query<(Entity, &mut AnimationPlayer, &mut PlayerAnimState), With<PlayerAnimationTarget>>,
     gamepads: Query<&Gamepad>,
-    dialog_query: Query<
-        (),
-        With<GuardianDialogUI>,
-    >,
+    dialog_query: Query<(), With<GuardianDialogUI>>,
 ) {
     if !dialog_query.is_empty() {
         return;
@@ -415,25 +317,19 @@ pub fn player_dash_input(
         return;
     }
 
-    let Ok((player_entity, player_tf, combo)) = player_query.single() else {
-        return;
-    };
+    let Ok((player_entity, player_tf, combo)) = player_query.single() 
+    else { return };
 
     if combo.current_index.is_some() {
         return;
     }
 
-    let Ok((entity, mut anim_player, mut anim_state)) = anim_query.single_mut() else {
-        return;
-    };
-
-    println!("Player dash");
+    let Ok((entity, mut anim_player, mut anim_state)) = anim_query.single_mut() 
+    else { return };
 
     anim_player.stop_all();
     anim_player.play(anim_graph.dash);
-
     *anim_state = PlayerAnimState::Dash;
-
 
     commands.entity(entity).insert(
         PlayerDashTimer(Timer::from_seconds(0.45, TimerMode::Once))
@@ -447,19 +343,15 @@ pub fn player_dash_input(
             direction: dash_direction.normalize(),
             speed: 14.0,
         },
-        PlayerDashTrailTimer(
-            Timer::from_seconds(0.05, TimerMode::Repeating)
-        ),
+        PlayerDashTrailTimer(Timer::from_seconds(0.05, TimerMode::Repeating)),
     ));
 }
+
 pub fn player_dash_update(
     mut commands: Commands,
     time: Res<Time>,
     anim_graph: Res<PlayerAnimationGraph>,
-    mut anim_query: Query<
-        (Entity, &mut AnimationPlayer, &mut PlayerAnimState, &mut PlayerDashTimer),
-        With<PlayerAnimationTarget>,
-    >,
+    mut anim_query: Query<(Entity, &mut AnimationPlayer, &mut PlayerAnimState, &mut PlayerDashTimer), With<PlayerAnimationTarget>>,
 ) {
     for (entity, mut anim_player, mut anim_state, mut dash_timer) in &mut anim_query {
         dash_timer.0.tick(time.delta());
@@ -474,21 +366,16 @@ pub fn player_dash_update(
         }
     }
 }
+
 pub fn player_jump_input(
     mut commands: Commands,
     keyboard: Res<ButtonInput<KeyCode>>,
     anim_graph: Res<PlayerAnimationGraph>,
     combo_query: Query<&PlayerCombo, With<Player>>,
     mut player_query: Query<&mut LinearVelocity, With<Player>>,
-    mut anim_query: Query<
-        (Entity, &mut AnimationPlayer, &mut PlayerAnimState),
-        With<PlayerAnimationTarget>,
-    >,
+    mut anim_query: Query<(Entity, &mut AnimationPlayer, &mut PlayerAnimState), With<PlayerAnimationTarget>,>,
     gamepads: Query<&Gamepad>,
-    dialog_query: Query<
-        (),
-        With<GuardianDialogUI>,
-    >,
+    dialog_query: Query<(), With<GuardianDialogUI>,>,
     asset_server: Res<AssetServer>
 ) {
     if !dialog_query.is_empty() {
@@ -507,33 +394,26 @@ pub fn player_jump_input(
         return;
     }
 
-    let Ok(combo) = combo_query.single() else {
-        return;
-    };
+    let Ok(combo) = combo_query.single() 
+    else { return };
 
-    // ถ้ากำลัง combo อยู่ ไม่ให้ jump ทับ punch
     if combo.current_index.is_some() {
         return;
     }
 
-    let Ok(mut velocity) = player_query.single_mut() else {
-        return;
-    };
+    let Ok(mut velocity) = player_query.single_mut() 
+    else { return };
 
-    let Ok((anim_entity, mut anim_player, mut anim_state)) = anim_query.single_mut() else {
-        return;
-    };
+    let Ok((anim_entity, mut anim_player, mut anim_state)) = anim_query.single_mut() 
+    else { return };
 
-    // กันกระโดดรัวกลางอากาศแบบง่าย ๆ
     if velocity.y.abs() > 0.1 {
         return;
     }
 
     velocity.y = 7.0;
-
     anim_player.stop_all();
     anim_player.play(anim_graph.jump);
-
     *anim_state = PlayerAnimState::Jump;
 
     commands.entity(anim_entity).insert(
@@ -541,33 +421,22 @@ pub fn player_jump_input(
     );
     commands.spawn(AudioPlayer::new(asset_server.load("sounds/sfx_jump.ogg")));
 }
+
 pub fn player_jump_update(
     mut commands: Commands,
     time: Res<Time>,
     anim_graph: Res<PlayerAnimationGraph>,
     player_query: Query<&LinearVelocity, With<Player>>,
-    mut anim_query: Query<
-        (
-            Entity,
-            &mut AnimationPlayer,
-            &mut PlayerAnimState,
-            &mut PlayerJumpTimer,
-        ),
-        With<PlayerAnimationTarget>,
-    >,
+    mut anim_query: Query<(Entity, &mut AnimationPlayer, &mut PlayerAnimState, &mut PlayerJumpTimer), With<PlayerAnimationTarget>>,
 ) {
-    let Ok(velocity) = player_query.single() else {
-        return;
-    };
-
+    let Ok(velocity) = player_query.single() 
+    else { return };
     let is_moving = velocity.x.abs() > 0.01 || velocity.z.abs() > 0.01;
 
     for (entity, mut anim_player, mut anim_state, mut jump_timer) in &mut anim_query {
         jump_timer.0.tick(time.delta());
 
-        if !jump_timer.0.is_finished() {
-            continue;
-        }
+        if !jump_timer.0.is_finished() { continue }
 
         anim_player.stop_all();
 
@@ -578,10 +447,10 @@ pub fn player_jump_update(
             anim_player.play(anim_graph.idle).repeat();
             *anim_state = PlayerAnimState::Idle;
         }
-
         commands.entity(entity).remove::<PlayerJumpTimer>();
     }
 }
+
 pub fn player_dash_move(
     mut commands: Commands,
     time: Res<Time>,
@@ -589,19 +458,18 @@ pub fn player_dash_move(
 ) {
     for (entity, mut velocity, mut dash_move) in &mut player_query {
         dash_move.timer.tick(time.delta());
-
         velocity.x = dash_move.direction.x * dash_move.speed;
         velocity.z = dash_move.direction.z * dash_move.speed;
 
         if dash_move.timer.is_finished() {
             commands.entity(entity).remove::<PlayerDashMove>();
             commands.entity(entity).remove::<PlayerDashTrailTimer>();
-
             velocity.x = 0.0;
             velocity.z = 0.0;
         }
     }
 }
+
 pub fn update_player_dash_effect(
     mut commands: Commands,
     time: Res<Time>,
@@ -609,20 +477,17 @@ pub fn update_player_dash_effect(
 ) {
     for (entity, mut effect) in &mut effect_query {
         effect.timer.tick(time.delta());
-
         if effect.timer.is_finished() {
             commands.entity(entity).despawn();
         }
     }
 }
+
 pub fn spawn_player_dash_trail_during_dash(
     mut commands: Commands,
     time: Res<Time>,
     asset_server: Res<AssetServer>,
-    mut player_query: Query<
-        (&Transform, &mut PlayerDashTrailTimer),
-        With<PlayerDashMove>,
-    >,
+    mut player_query: Query<(&Transform, &mut PlayerDashTrailTimer), With<PlayerDashMove>>,
 ) {
     for (player_tf, mut trail_timer) in &mut player_query {
         trail_timer.0.tick(time.delta());
@@ -632,14 +497,8 @@ pub fn spawn_player_dash_trail_during_dash(
         }
 
         commands.spawn((
-            PlayerDashEffect {
-                timer: Timer::from_seconds(0.35, TimerMode::Once),
-            },
-            SceneRoot(
-                asset_server.load(
-                    GltfAssetLabel::Scene(0).from_asset("player/PlayerMoyaDash.glb")
-                )
-            ),
+            PlayerDashEffect {timer: Timer::from_seconds(0.35, TimerMode::Once),},
+            SceneRoot(asset_server.load(GltfAssetLabel::Scene(0).from_asset("player/PlayerMoyaDash.glb"))),
             Transform {
                 translation: player_tf.translation + Vec3::Y * -1.0,
                 rotation: player_tf.rotation,
@@ -650,29 +509,21 @@ pub fn spawn_player_dash_trail_during_dash(
         commands.spawn(AudioPlayer::new(asset_server.load("sounds/742717__artix0__dash-sound-effect.ogg")));
     }
 }
+
 pub fn play_player_hurt_animation(
     commands: &mut Commands,
     player_entity: Entity,
     anim_graph: &PlayerAnimationGraph,
-    anim_query: &mut Query<
-        (&mut AnimationPlayer, &mut PlayerAnimState),
-        With<PlayerAnimationTarget>,
-    >,
+    anim_query: &mut Query<(&mut AnimationPlayer, &mut PlayerAnimState), With<PlayerAnimationTarget>>,
 ) {
-    let Ok((mut anim_player, mut anim_state)) = anim_query.single_mut() else {
-        return;
-    };
-
-    // ถ้ากำลัง Hurt อยู่ ไม่ต้องเริ่มใหม่ทุกเฟรม
+    let Ok((mut anim_player, mut anim_state)) = anim_query.single_mut() 
+    else { return };
     if *anim_state == PlayerAnimState::Hurt {
         return;
     }
-
     anim_player.stop_all();
     anim_player.play(anim_graph.hurt);
-
     *anim_state = PlayerAnimState::Hurt;
-
     commands.entity(player_entity).insert(
         PlayerHurtTimer(Timer::from_seconds(
             0.5,
@@ -680,29 +531,18 @@ pub fn play_player_hurt_animation(
         )),
     );
 }
+
 pub fn player_return_after_hurt(
     mut commands: Commands,
     anim_graph: Res<PlayerAnimationGraph>,
-
-    player_query: Query<
-        Entity,
-        (With<Player>, With<PlayerHurtTimer>),
-    >,
-
-    mut anim_query: Query<
-        (&mut AnimationPlayer, &mut PlayerAnimState),
-        With<PlayerAnimationTarget>,
-    >,
+    player_query: Query<Entity, (With<Player>, With<PlayerHurtTimer>)>,
+    mut anim_query: Query<(&mut AnimationPlayer, &mut PlayerAnimState), With<PlayerAnimationTarget>>,
 ) {
-    let Ok(player_entity) = player_query.single() else {
-        return;
-    };
+    let Ok(player_entity) = player_query.single() 
+    else { return };
 
-    let Ok((mut anim_player, mut anim_state)) =
-        anim_query.single_mut()
-    else {
-        return;
-    };
+    let Ok((mut anim_player, mut anim_state)) =anim_query.single_mut()
+    else { return };
 
     if *anim_state != PlayerAnimState::Hurt {
         return;
@@ -718,27 +558,18 @@ pub fn player_return_after_hurt(
 
     anim_player.stop_all();
     anim_player.play(anim_graph.idle).repeat();
-
     *anim_state = PlayerAnimState::Idle;
 
-    commands
-        .entity(player_entity)
-        .remove::<PlayerHurtTimer>();
+    commands.entity(player_entity).remove::<PlayerHurtTimer>();
 }
 
 pub fn player_combo_input(
     keyboard: Res<ButtonInput<KeyCode>>,
     anim_graph: Res<PlayerAnimationGraph>,
     mut combo_query: Query<&mut PlayerCombo, With<Player>>,
-    mut anim_query: Query<
-        (&mut AnimationPlayer, &mut PlayerAnimState),
-        With<PlayerAnimationTarget>,
-    >,
+    mut anim_query: Query<(&mut AnimationPlayer, &mut PlayerAnimState), With<PlayerAnimationTarget>>,
     gamepads: Query<&Gamepad>,
-    dialog_query: Query<
-        (),
-        With<GuardianDialogUI>,
-    >,
+    dialog_query: Query<(), With<GuardianDialogUI>>,
     mut commands: Commands,
     asset_server: Res<AssetServer>,
 ) {
@@ -752,18 +583,12 @@ pub fn player_combo_input(
                     GamepadButton::West,
                 )
             });
-
     if !attack_pressed {
         return;
     }
 
-    let Ok(mut combo) = combo_query.single_mut() else {
-        return;
-    };
-
-    let Ok((mut anim_player, mut anim_state)) = anim_query.single_mut() else {
-        return;
-    };
+    let Ok(mut combo) = combo_query.single_mut() else { return };
+    let Ok((mut anim_player, mut anim_state)) = anim_query.single_mut() else { return };
 
     if *anim_state == PlayerAnimState::Hurt {
         return;
@@ -781,7 +606,6 @@ pub fn player_combo_input(
         );
     } else {
         combo.queued_next = true;
-        println!("Queue next combo");
     }
 }
 
@@ -789,33 +613,19 @@ pub fn player_combo_update(
     time: Res<Time>,
     anim_graph: Res<PlayerAnimationGraph>,
     mut combo_query: Query<&mut PlayerCombo, With<Player>>,
-    mut anim_query: Query<
-        (&mut AnimationPlayer, &mut PlayerAnimState),
-        With<PlayerAnimationTarget>,
-    >,
+    mut anim_query: Query<(&mut AnimationPlayer, &mut PlayerAnimState), With<PlayerAnimationTarget>>,
     mut commands: Commands,
     asset_server: Res<AssetServer>,
 ) {
-    let Ok(mut combo) = combo_query.single_mut() else {
-        return;
-    };
-
-    let Some(current_index) = combo.current_index else {
-        return;
-    };
-
+    let Ok(mut combo) = combo_query.single_mut() else { return };
+    let Some(current_index) = combo.current_index else { return };
     combo.timer.tick(time.delta());
-
     if !combo.timer.is_finished() {
         return;
     }
 
-    let Ok((mut anim_player, mut anim_state)) = anim_query.single_mut() else {
-        return;
-    };
-
+    let Ok((mut anim_player, mut anim_state)) = anim_query.single_mut() else { return };
     let next_index = current_index + 1;
-
     if combo.queued_next && next_index < PLAYER_COMBO_COUNT {
         start_player_combo_attack(
             next_index,
@@ -829,13 +639,9 @@ pub fn player_combo_update(
     } else {
         anim_player.stop_all();
         anim_player.play(anim_graph.idle).repeat();
-
         *anim_state = PlayerAnimState::Idle;
-
         combo.current_index = None;
         combo.queued_next = false;
-
-        println!("Combo finished");
     }
 }
 
@@ -864,15 +670,9 @@ fn find_animation_player_recursive(
 fn update_player_animation(
     anim_graph: Res<PlayerAnimationGraph>,
     player_query: Query<&LinearVelocity, With<Player>>,
-    mut anim_query: Query<
-        (&mut AnimationPlayer, &mut PlayerAnimState),
-        With<PlayerAnimationTarget>,
-    >,
+    mut anim_query: Query<(&mut AnimationPlayer, &mut PlayerAnimState), With<PlayerAnimationTarget>>,
 ) {
-    let Ok(velocity) = player_query.single() else {
-        return;
-    };
-
+    let Ok(velocity) = player_query.single() else {return};
     let is_moving = velocity.x.abs() > 0.01 || velocity.z.abs() > 0.01;
 
     for (mut player, mut anim_state) in &mut anim_query {
@@ -900,8 +700,7 @@ fn update_player_animation(
 }
 
 pub fn setup_player_status_ui(mut commands: Commands) {
-    commands
-        .spawn((
+    commands.spawn((
             PlayerStatusUI,
             Node {
                 position_type: PositionType::Absolute,
@@ -912,19 +711,16 @@ pub fn setup_player_status_ui(mut commands: Commands) {
                 flex_direction: FlexDirection::Column,
                 row_gap: Val::Px(10.0),
                 ..default()
-            },
-        ))
-        .with_children(|parent| {
-            // Health bar background
-            parent
-                .spawn((
-                    Node {
-                        width: Val::Px(240.0),
-                        height: Val::Px(24.0),
-                        ..default()
-                    },
-                    BackgroundColor(Color::srgba(0.1, 0.1, 0.1, 0.8)),
-                ))
+                },
+            )).with_children(|parent| {
+                    parent.spawn((
+                        Node {
+                            width: Val::Px(240.0),
+                            height: Val::Px(24.0),
+                            ..default()
+                        },
+                        BackgroundColor(Color::srgba(0.1, 0.1, 0.1, 0.8)),
+                    ))
                 .with_children(|bar| {
                     bar.spawn((
                         HealthBarFill,
@@ -936,17 +732,14 @@ pub fn setup_player_status_ui(mut commands: Commands) {
                         BackgroundColor(Color::srgb(0.8, 0.1, 0.1)),
                     ));
                 });
-
-            // Mana bar background
-            parent
-                .spawn((
-                    Node {
-                        width: Val::Px(240.0),
-                        height: Val::Px(24.0),
-                        ..default()
-                    },
-                    BackgroundColor(Color::srgba(0.1, 0.1, 0.1, 0.8)),
-                ))
+                    parent.spawn((
+                            Node {
+                                width: Val::Px(240.0),
+                                height: Val::Px(24.0),
+                                ..default()
+                            },
+                            BackgroundColor(Color::srgba(0.1, 0.1, 0.1, 0.8)),
+                        ))
                 .with_children(|bar| {
                     bar.spawn((
                         ManaBarFill,
@@ -960,15 +753,13 @@ pub fn setup_player_status_ui(mut commands: Commands) {
                 });
         });
 }
+
 pub fn update_player_status_ui(
     player_query: Query<(&Health, &Mana), With<Player>>,
     mut health_bar_query: Query<&mut Node, (With<HealthBarFill>, Without<ManaBarFill>)>,
     mut mana_bar_query: Query<&mut Node, (With<ManaBarFill>, Without<HealthBarFill>)>,
 ) {
-    let Ok((health, mana)) = player_query.single() else {
-        return;
-    };
-
+    let Ok((health, mana)) = player_query.single() else {return;};
     let health_percent = health.current as f32 / health.max as f32 * 100.0;
     let mana_percent = mana.current as f32 / mana.max as f32 * 100.0;
 
@@ -1039,12 +830,9 @@ fn start_player_combo_attack(
         ),
     );
 
-    *anim_state =
-        combo_anim_state(index);
-
+    *anim_state = combo_anim_state(index);
     combo.current_index = Some(index);
     combo.queued_next = false;
-
     combo.timer = Timer::from_seconds(
         combo_duration(index),
         TimerMode::Once,
@@ -1067,6 +855,7 @@ pub enum FloatingDamageKind {
     PlayerHit,
     PlayerDrain,
 }
+
 pub fn spawn_floating_damage_text(
     commands: &mut Commands,
     damage: i32,
@@ -1075,7 +864,6 @@ pub fn spawn_floating_damage_text(
 ) {
     let (text, font_size, color, velocity, lifetime) =
         match kind {
-            // Player โจมตีศัตรูตามปกติ
             FloatingDamageKind::EnemyNormal => (
                 format!("-{}", damage),
                 32.0,
@@ -1084,7 +872,6 @@ pub fn spawn_floating_damage_text(
                 0.8,
             ),
 
-            // Player โจมตีติด Critical
             FloatingDamageKind::EnemyCritical => (
                 format!("CRIT -{}", damage),
                 52.0,
@@ -1093,7 +880,6 @@ pub fn spawn_floating_damage_text(
                 1.1,
             ),
 
-            // Projectile ยิงโดน Player
             FloatingDamageKind::PlayerHit => (
                 format!("HP -{}", damage),
                 40.0,
@@ -1102,7 +888,6 @@ pub fn spawn_floating_damage_text(
                 1.0,
             ),
 
-            // Minion ดูดเลือด Player
             FloatingDamageKind::PlayerDrain => (
                 format!("DRAIN -{}", damage),
                 40.0,
@@ -1122,10 +907,7 @@ pub fn spawn_floating_damage_text(
             velocity,
         },
         Text::new(text),
-        TextFont {
-            font_size,
-            ..default()
-        },
+        TextFont {font_size, ..default()},
         TextColor(color),
         Node {
             position_type: PositionType::Absolute,
@@ -1142,30 +924,19 @@ pub fn update_floating_damage_text(
     camera_query: Query<(&Camera, &GlobalTransform), With<Camera3d>>,
     mut text_query: Query<(Entity, &mut Node, &mut FloatingDamageText)>,
 ) {
-    let Ok((camera, camera_transform)) = camera_query.single() else {
-        return;
-    };
+    let Ok((camera, camera_transform)) = camera_query.single() else {return};
 
     for (entity, mut node, mut floating_text) in &mut text_query {
         floating_text.timer.tick(time.delta());
-
         let velocity = floating_text.velocity;
         let delta_seconds = time.delta_secs();
-
         floating_text.world_position += velocity * delta_seconds;
-
         if floating_text.timer.is_finished() {
             commands.entity(entity).despawn();
             continue;
         }
-
-        let Ok(screen_pos) = camera.world_to_viewport(
-            camera_transform,
-            floating_text.world_position,
-        ) else {
-            continue;
-        };
-
+        let Ok(screen_pos) = camera.world_to_viewport(camera_transform,floating_text.world_position,
+        ) else {continue};
         node.left = Val::Px(screen_pos.x);
         node.top = Val::Px(screen_pos.y);
     }
@@ -1186,15 +957,12 @@ fn spawn_defeat_particles(
         let r1 = pseudo_random(seed + i as f32 * 1.37);
         let r2 = pseudo_random(seed + i as f32 * 2.11);
         let r3 = pseudo_random(seed + i as f32 * 3.73);
-
         let size = 0.08 + r1 * 0.22;
-
         let offset = Vec3::new(
             (r2 - 0.5) * 1.2,
             0.3 + r1 * 0.4,
             (r3 - 0.5) * 1.2,
         );
-
         let velocity = Vec3::new(
             (r2 - 0.5) * 0.6,
             1.2 + r1 * 1.4,
@@ -1217,6 +985,7 @@ fn spawn_defeat_particles(
         ));
     }
 }
+
 pub fn update_basic_gun_defeat_particles(
     mut commands: Commands,
     time: Res<Time>,
@@ -1224,9 +993,7 @@ pub fn update_basic_gun_defeat_particles(
 ) {
     for (entity, mut transform, mut particle) in &mut particle_query {
         particle.lifetime.tick(time.delta());
-
         transform.translation += particle.velocity * time.delta_secs();
-
         if particle.lifetime.is_finished() {
             commands.entity(entity).despawn();
         }
@@ -1237,40 +1004,12 @@ pub fn player_punch_damage(
     mut commands: Commands,
     keyboard: Res<ButtonInput<KeyCode>>,
     time: Res<Time>,
-
     mut meshes: ResMut<Assets<Mesh>>,
     mut materials: ResMut<Assets<StandardMaterial>>,
-
-    mut player_query: Query<
-        (
-            &Transform,
-            &CombatStats,
-            &mut ElementMastery,
-        ),
-        (
-            With<Player>,
-            Without<CombatTarget>,
-        ),
-    >,
-
-    mut target_query: Query<
-        (
-            Entity,
-            &Transform,
-            &mut Health,
-            &CombatStats,
-            Option<&ElementExpReward>,
-        ),
-        (
-            With<CombatTarget>,
-            Without<Player>,
-        ),
-    >,
+    mut player_query: Query<(&Transform, &CombatStats, &mut ElementMastery),(With<Player>, Without<CombatTarget>)>,
+    mut target_query: Query<(Entity, &Transform, &mut Health, &CombatStats, Option<&ElementExpReward>,),(With<CombatTarget>,Without<Player>)>,
     gamepads: Query<&Gamepad>,
-    dialog_query: Query<
-        (),
-        With<GuardianDialogUI>,
-    >,
+    dialog_query: Query<(), With<GuardianDialogUI>>,
 ) {
     if !dialog_query.is_empty() {
         return;
@@ -1287,33 +1026,16 @@ pub fn player_punch_damage(
         return;
     }
 
-    let Ok((
-        player_transform,
-        player_stats,
-        mut element_mastery,
-    )) = player_query.single_mut()
-    else {
-        return;
-    };
-
+    let Ok((player_transform,player_stats, mut element_mastery,)) = player_query.single_mut() else { return };
     let mut rng = rand::rng();
 
-    for (
-        target_entity,
-        target_transform,
-        mut target_health,
-        target_stats,
-        reward,
-    ) in &mut target_query
+    for (target_entity, target_transform, mut target_health, target_stats, reward) in &mut target_query
     {
-        // กัน Entity ที่ถูก defeat แล้ว
         if target_health.current <= 0 {
             continue;
         }
 
-        let distance = player_transform
-            .translation
-            .distance(target_transform.translation);
+        let distance = player_transform.translation.distance(target_transform.translation);
 
         if distance > 2.0 {
             continue;
@@ -1327,11 +1049,7 @@ pub fn player_punch_damage(
         );
 
         target_health.current -= damage;
-        target_health.current =
-            target_health.current.clamp(
-                0,
-                target_health.max,
-            );
+        target_health.current = target_health.current.clamp(0, target_health.max);
 
         let damage_kind = if is_critical {
             FloatingDamageKind::EnemyCritical
@@ -1347,14 +1065,10 @@ pub fn player_punch_damage(
             damage_kind,
         );
 
-        // ยังไม่ถูก defeat
         if target_health.current > 0 {
             continue;
         }
 
-        println!("Combat target defeated");
-
-        // แจก Reward หาก Entity มี ElementExpReward
         if let Some(reward) = reward {
             let gain = reward.grant_all(
                 &mut element_mastery,
@@ -1383,81 +1097,35 @@ pub fn player_punch_damage(
     }
 }
 pub fn rebuild_player_combat_stats_from_exp(
-    mut player_query: Query<
-        (
-            &BaseStats,
-            &ElementMastery,
-            &mut CombatStats,
-            &mut Health,
-            &mut Mana,
-        ),
-        (
-            With<Player>,
-            Changed<ElementMastery>,
-        ),
-    >,
+    mut player_query: Query<(&BaseStats,&ElementMastery,&mut CombatStats,&mut Health,&mut Mana),(With<Player>,Changed<ElementMastery>,)>,
 ) {
-    for (
-        base,
-        mastery,
-        mut combat,
-        mut health,
-        mut mana,
-    ) in &mut player_query
-    {
-        let new_stats =
-            combat_stats_from_element_exp(base, mastery);
-
+    for (base,mastery,mut combat,mut health,mut mana) in &mut player_query{
+        let new_stats = combat_stats_from_element_exp(base, mastery);
         *combat = new_stats;
-
-        let new_hp_max =
-            new_stats.max_hp.round() as i32;
-
-        let new_mp_max =
-            new_stats.max_mp.round() as i32;
-
+        let new_hp_max = new_stats.max_hp.round() as i32;
+        let new_mp_max = new_stats.max_mp.round() as i32;
         health.max = new_hp_max;
-        health.current =
-            health.current.clamp(0, new_hp_max);
-
+        health.current = health.current.clamp(0, new_hp_max);
         mana.max = new_mp_max;
-        mana.current =
-            mana.current.clamp(0, new_mp_max);
+        mana.current = mana.current.clamp(0, new_mp_max);
     }
 }
+
 pub fn respawn_player_when_defeated(
-    mut player_query: Query<
-        (
-            &mut Health,
-            &mut Transform,
-            &mut LinearVelocity,
-        ),
-        With<Player>,
-    >,
+    mut player_query: Query<(&mut Health,&mut Transform,&mut LinearVelocity),With<Player>>,
     mut commands: Commands,
     asset_server: Res<AssetServer>,
 ) {
-    let Ok((
-        mut health,
-        mut transform,
-        mut velocity,
-    )) = player_query.single_mut()
-    else {
-        return;
-    };
+    let Ok((mut health,mut transform,mut velocity)) = player_query.single_mut() else { return };
 
     if health.current > 0 {
         return;
     }
 
-    transform.translation =
-        Vec3::new(0.0, 2.0, 0.0);
-
+    transform.translation = Vec3::new(0.0, 2.0, 0.0);
     velocity.x = 0.0;
     velocity.y = 0.0;
     velocity.z = 0.0;
-
-    // ไม่ให้ตรวจเจอ HP <= 0 ซ้ำทุกเฟรม
     health.current = health.max;
     commands.spawn(AudioPlayer::new(asset_server.load("sounds/sfx_game_over.ogg")));
 }
