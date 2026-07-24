@@ -218,3 +218,12 @@ pub enum EnemyState {
     Hurt,
     Dead,
 }
+
+#[derive(Resource)]
+pub struct EnemyMuamuaAnimationGraph {
+    pub graph: Handle<AnimationGraph>,
+    pub idle: AnimationNodeIndex,
+}
+
+#[derive(Component)]
+pub struct EnemyMuamuaAnimationTarget;

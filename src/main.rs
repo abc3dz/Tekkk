@@ -12,6 +12,7 @@ mod combat;
 mod biomes;
 mod npc;
 mod element_ui;
+mod enemy;
 
 fn main() {
     App::new()
@@ -25,7 +26,7 @@ fn main() {
                 ..default()
             }),
             PhysicsPlugins::default(),
-            //PhysicsDebugPlugin,
+            PhysicsDebugPlugin,
             WindWakerShaderPlugin::default(),
             
         ))
