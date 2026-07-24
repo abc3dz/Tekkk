@@ -3,6 +3,7 @@ use bevy::prelude::*;
 use crate::components::*;
 use crate::biomes::{hub, desert};
 use crate::npc::guardian::GuardianPlugin;
+use crate::enemy::enemy_muamua::*;
 
 pub struct WorldPlugin;
 
@@ -10,7 +11,8 @@ impl Plugin for WorldPlugin {
     fn build(&self, app: &mut App) {
         app.init_state::<GameScene>()
             .add_plugins(GuardianPlugin)
-
+            .add_plugins(EnemyMuamuaPlugin)
+            
             .add_systems(OnEnter(GameScene::LoadingHub), spawn_loading_ui)
             .add_systems(Update, go_to_hub.run_if(in_state(GameScene::LoadingHub)))
             .add_systems(OnExit(GameScene::LoadingHub), cleanup_loading_ui)

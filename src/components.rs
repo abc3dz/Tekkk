@@ -204,3 +204,17 @@ pub struct BasicGunDefeatParticle {
     pub velocity: Vec3,
     pub lifetime: Timer,
 }
+
+//Enemy
+#[derive(Component, Debug)]
+pub struct Enemy;
+
+#[derive(Component, Debug, Default, Clone, Copy)]
+pub enum EnemyState {
+    #[default]
+    Idle,
+    Chase,
+    Attack,
+    Hurt,
+    Dead,
+}

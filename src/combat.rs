@@ -75,6 +75,15 @@ impl BaseStats {
         critical_rate: 0.0,
         critical_damage: 1.0,
     };
+
+    pub const MUAMUA: Self = Self {
+        max_hp: 100.0,
+        max_mp: 0.0,
+        attack: 14.0,
+        defense: 8.0,
+        critical_rate: 0.0,
+        critical_damage: 1.0,
+    };
 }
 
 #[derive(Debug, Default, Clone, Copy)]
@@ -159,6 +168,14 @@ impl ElementExpReward {
         wind: ExpRange::new(6, 9),
         earth: ExpRange::new(6, 9),
         inw: ExpRange::new(4, 7),
+    };
+
+    pub const MUAMUA: Self = Self {
+        water: ExpRange::new(5, 5),
+        fire: ExpRange::new(0, 0),
+        wind: ExpRange::new(0, 0),
+        earth: ExpRange::new(20, 20),
+        inw: ExpRange::new(1, 1),
     };
 }
 
