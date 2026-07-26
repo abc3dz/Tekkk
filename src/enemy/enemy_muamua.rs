@@ -10,6 +10,7 @@ use crate::{
         AtkAndDefElement,
         BaseStats,
         CombatStats,
+        CombatTarget,
         Element,
         ElementExpReward,
     },
@@ -18,10 +19,13 @@ use crate::{
         EnemyState,
         GameScene,
         Health,
+        Player,
         EnemyMuamuaAnimationGraph,
         EnemyMuamuaAnimationTarget,
+        EnemyMuamuaAnimState
     },
 };
+use crate::npc::practice_common::spawn_enemy_health_bar;
 
 #[derive(Component, Debug)]
 pub struct EnemyMuamua;
@@ -41,9 +45,12 @@ impl Plugin for EnemyMuamuaPlugin {
             Update,
             (
                 setup_enemy_muamua_animation_player,
+                enemy_muamua_chase_player,
+                update_enemy_muamua_animation,
                 debug_enemy_muamua_spawn,
             )
-                .run_if(in_state(GameScene::Desert)),
+            .chain()
+            .run_if(in_state(GameScene::Desert)),
         );
     }
 }
@@ -52,55 +59,52 @@ fn spawn_enemy_muamua(
     mut commands: Commands,
     asset_server: Res<AssetServer>,
 ) {
-    let muamua_scene = asset_server.load(
-        GltfAssetLabel::Scene(0)
-            .from_asset("enemy/EnemyMuamua.glb"),
+    let muamua_scene = asset_server.load(GltfAssetLabel::Scene(0).from_asset("enemy/EnemyMuamua.glb"));
+    let spawn_positions = Vec3::new(5.0, 0.0, 5.0);
+    const MUAMUA_BODY_Y: f32 = 1.0;
+    let base_stats = BaseStats::MUAMUA;
+    let enemy_muamua = commands.spawn((
+        Name::new("Enemy Muamua"),
+
+        // Marker
+        Enemy,
+        EnemyMuamua,
+        EnemyState::Idle,
+
+        Health {
+            current: base_stats.max_hp as i32,
+            max: base_stats.max_hp as i32,
+        },
+
+        base_stats,
+        CombatStats::from(base_stats),
+        AtkAndDefElement(Element::Earth),
+        ElementExpReward::MUAMUA,
+
+        // Physics
+        RigidBody::Dynamic,
+        Collider::capsule(0.45, 1.0),
+        LockedAxes::ROTATION_LOCKED,
+        LinearVelocity::ZERO,
+
+        Transform::from_translation(
+            spawn_positions + Vec3::Y * MUAMUA_BODY_Y,
+        ),
+        
+        // ออกจาก Desert แล้วลบ Muamua
+        DespawnOnExit(GameScene::Desert),
+    )).with_children(|parent| {
+            parent.spawn((SceneRoot(muamua_scene.clone()),
+                Transform::from_xyz(0.0,-MUAMUA_BODY_Y,0.0,),
+                WindWakerShaderBuilder::default().time_of_day(TimeOfDay::Day).weather(Weather::Sunny).build(),
+            ));
+        }).id();
+
+    commands.entity(enemy_muamua).insert(CombatTarget);
+    spawn_enemy_health_bar(
+        &mut commands,
+        enemy_muamua,
     );
-
-    let spawn_positions = [
-        Vec3::new(5.0, 0.0, 5.0),
-    ];
-
-    for position in spawn_positions {
-        let base_stats = BaseStats::MUAMUA;
-        commands.spawn((
-            Name::new("Enemy Muamua"),
-
-            // Marker
-            Enemy,
-            EnemyMuamua,
-            EnemyState::Idle,
-
-            Health {
-                current: base_stats.max_hp as i32,
-                max: base_stats.max_hp as i32,
-            },
-
-            base_stats,
-            CombatStats::from(base_stats),
-
-            AtkAndDefElement(Element::Earth),
-            ElementExpReward::MUAMUA,
-
-            // Physics
-            RigidBody::Kinematic,
-            // Collider::capsule(0.45, 1.0),
-            Collider::capsule_endpoints(
-                0.45,
-                Vec3::new(0.0, 0.45, 0.0),
-                Vec3::new(0.0, 1.65, 0.0),
-            ),
-
-
-            // Model
-            SceneRoot(muamua_scene.clone()),
-            Transform::from_translation(position),
-            WindWakerShaderBuilder::default().time_of_day(TimeOfDay::Day).weather(Weather::Sunny).build(),
-
-            // ออกจาก Desert แล้วลบ Muamua
-            DespawnOnExit(GameScene::Desert),
-        ));
-    }
 }
 
 fn debug_enemy_muamua_spawn(
@@ -159,10 +163,19 @@ fn setup_enemy_muamua_animation_graph(
         1.0,
         graph.root,
     );
+    let chase = graph.add_clip(
+        asset_server.load(
+            GltfAssetLabel::Animation(4)
+                .from_asset("enemy/EnemyMuamua.glb"),
+        ),
+        1.0,
+        graph.root,
+    );
 
     commands.insert_resource(EnemyMuamuaAnimationGraph {
         graph: graphs.add(graph),
         idle,
+        chase,
     });
 }
 
@@ -179,17 +192,22 @@ fn setup_enemy_muamua_animation_player(
     muamua_query: Query<(), With<EnemyMuamua>>,
 ) {
     for (animation_entity, mut player) in &mut animation_players {
-        if !belongs_to_enemy_muamua(
+        let Some(muamua_root) = find_enemy_muamua_root(
             animation_entity,
             &child_of_query,
             &muamua_query,
-        ) {
+        ) else {
             continue;
-        }
+        };
 
         commands.entity(animation_entity).insert((
             AnimationGraphHandle(animation_graph.graph.clone()),
-            EnemyMuamuaAnimationTarget,
+
+            EnemyMuamuaAnimationTarget {
+                root: muamua_root,
+            },
+
+            EnemyMuamuaAnimState::Idle,
         ));
 
         player.stop_all();
@@ -197,22 +215,159 @@ fn setup_enemy_muamua_animation_player(
     }
 }
 
-fn belongs_to_enemy_muamua(
+fn find_enemy_muamua_root(
     entity: Entity,
     child_of_query: &Query<&ChildOf>,
     muamua_query: &Query<(), With<EnemyMuamua>>,
-) -> bool {
+) -> Option<Entity> {
     let mut current = entity;
 
     loop {
         if muamua_query.get(current).is_ok() {
-            return true;
+            return Some(current);
         }
 
         let Ok(child_of) = child_of_query.get(current) else {
-            return false;
+            return None;
         };
 
         current = child_of.parent();
+    }
+}
+
+const MUAMUA_CHASE_RANGE: f32 = 10.0;
+const MUAMUA_STOP_DISTANCE: f32 = 1.5;
+const MUAMUA_MOVE_SPEED: f32 = 3.0;
+
+fn enemy_muamua_chase_player(
+    player_query: Query<
+        &Transform,
+        (With<Player>, Without<EnemyMuamua>),
+    >,
+
+    mut muamua_query: Query<
+        (
+            &mut Transform,
+            &mut LinearVelocity,
+            &mut EnemyState,
+        ),
+        (With<EnemyMuamua>, Without<Player>),
+    >,
+) {
+    let Ok(player_transform) = player_query.single() else {
+        return;
+    };
+
+    for (
+        mut muamua_transform,
+        mut velocity,
+        mut enemy_state,
+    ) in &mut muamua_query
+    {
+        let to_player =
+            player_transform.translation
+                - muamua_transform.translation;
+
+        // ไม่สนแกน Y เพราะเดินอยู่บนพื้น
+        let flat_direction = Vec3::new(
+            to_player.x,
+            0.0,
+            to_player.z,
+        );
+
+        let distance = flat_direction.length();
+
+        // Player อยู่นอกระยะตรวจจับ
+        if distance > MUAMUA_CHASE_RANGE {
+            velocity.x = 0.0;
+            velocity.z = 0.0;
+
+            *enemy_state = EnemyState::Idle;
+            continue;
+        }
+
+        // เข้าใกล้ Player แล้ว ให้หยุดก่อน
+        // ภายหลังตรงนี้ค่อยเปลี่ยนเป็น Attack
+        if distance <= MUAMUA_STOP_DISTANCE {
+            velocity.x = 0.0;
+            velocity.z = 0.0;
+
+            *enemy_state = EnemyState::Idle;
+            continue;
+        }
+
+        let direction = flat_direction.normalize();
+
+        velocity.x = direction.x * MUAMUA_MOVE_SPEED;
+        velocity.z = direction.z * MUAMUA_MOVE_SPEED;
+
+        // หันหน้าเข้าหา Player
+        muamua_transform.rotation =
+            Quat::from_rotation_y(
+                direction.x.atan2(direction.z),
+            );
+
+        *enemy_state = EnemyState::Chase;
+    }
+}
+
+fn update_enemy_muamua_animation(
+    animation_graph: Res<EnemyMuamuaAnimationGraph>,
+
+    muamua_query: Query<
+        &EnemyState,
+        With<EnemyMuamua>,
+    >,
+
+    mut animation_query: Query<
+        (
+            &EnemyMuamuaAnimationTarget,
+            &mut AnimationPlayer,
+            &mut EnemyMuamuaAnimState,
+        ),
+    >,
+) {
+    for (
+        animation_target,
+        mut animation_player,
+        mut current_animation,
+    ) in &mut animation_query
+    {
+        let Ok(enemy_state) =
+            muamua_query.get(animation_target.root)
+        else {
+            continue;
+        };
+
+        let wanted_animation = match enemy_state {
+            EnemyState::Chase => {
+                EnemyMuamuaAnimState::Chase
+            }
+
+            _ => EnemyMuamuaAnimState::Idle,
+        };
+
+        // Animation เดิมกำลังเล่นอยู่ ไม่ต้องเริ่มใหม่ทุก Frame
+        if *current_animation == wanted_animation {
+            continue;
+        }
+
+        animation_player.stop_all();
+
+        match wanted_animation {
+            EnemyMuamuaAnimState::Idle => {
+                animation_player
+                    .play(animation_graph.idle)
+                    .repeat();
+            }
+
+            EnemyMuamuaAnimState::Chase => {
+                animation_player
+                    .play(animation_graph.chase)
+                    .repeat();
+            }
+        }
+
+        *current_animation = wanted_animation;
     }
 }

@@ -231,22 +231,46 @@ pub fn elemental_multiplier(
     use Element::*;
 
     match (attacker, defender) {
-        // ชนะทาง
-        (Water, Fire)
-        | (Fire, Wind)
-        | (Wind, Earth)
-        | (Earth, Water) => 1.5,
+        // Water
+        (Water, Water) => 1.0,
+        (Water, Earth) => 1.0,
+        (Water, Wind) => 0.5,
+        (Water, Fire) => 2.0,
+        (Water, Inw) => 0.5,
 
-        // แพ้ทาง
-        (Water, Earth)
-        | (Fire, Water)
-        | (Wind, Fire)
-        | (Earth, Wind) => 0.75,
+        // Earth
+        (Earth, Water) => 2.0,
+        (Earth, Earth) => 1.0,
+        (Earth, Wind) => 1.0,
+        (Earth, Fire) => 0.5,
+        (Earth, Inw) => 0.5,
 
-        // ธาตุเดียวกัน Neutral และ Inw
+        // Wind
+        (Wind, Water) => 1.0,
+        (Wind, Earth) => 2.0,
+        (Wind, Wind) => 1.0,
+        (Wind, Fire) => 0.5,
+        (Wind, Inw) => 0.5,
+
+        // Fire
+        (Fire, Water) => 0.5,
+        (Fire, Earth) => 1.0,
+        (Fire, Wind) => 2.0,
+        (Fire, Fire) => 1.0,
+        (Fire, Inw) => 0.5,
+
+        // Inw
+        (Inw, Water) => 2.0,
+        (Inw, Earth) => 2.0,
+        (Inw, Wind) => 2.0,
+        (Inw, Fire) => 2.0,
+        (Inw, Inw) => 1.0,
+
+        // Neutral ไม่ได้เปรียบเสียเปรียบ
         _ => 1.0,
     }
 }
+
 pub fn calculate_combat_damage(
     attacker: &CombatStats,
     defender: &CombatStats,
@@ -274,7 +298,7 @@ pub fn combat_stats_from_element_exp(
     let hp_bonus = earth * 8.0 + inw * 2.0;
     let mp_bonus = water * 10.0 + inw * 2.0;
     let attack_bonus = water * 0.2 + fire * 0.8 + inw * 0.15;
-    let defense_bonus =earth * 0.6 + inw * 0.15;
+    let defense_bonus = earth * 0.6 + inw * 0.15;
     let critical_rate_bonus = wind * 0.005 + inw * 0.001;
     let critical_damage_bonus = fire * 0.02 + wind * 0.01 + inw * 0.005;
 

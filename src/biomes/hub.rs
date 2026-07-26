@@ -4,7 +4,6 @@ use avian3d::prelude::*;
 use bevy_wind_waker_shader::prelude::*;
 
 use crate::components::*;
-//use crate::npc::guardian::spawn_guardian_npc;
 
 pub fn spawn_hub(
     mut commands: Commands,

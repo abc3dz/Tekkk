@@ -11,34 +11,48 @@ use crate::combat::*;
 pub struct PlayerPlugin;
 
 impl Plugin for PlayerPlugin {
-    fn build(&self, app: &mut App) {
-        app.add_systems(Startup, (
+    fn build(&self, app: &mut App) {app
+        .add_systems(Startup, (
             setup_player_animation_graph, 
             spawn_player,
             setup_player_status_ui
         ))
-            .add_systems(Update, (
-                setup_player_animation_player,
-                player_movement,
-                player_footstep_sound,
-                player_jump_input,
-                player_jump_update,
-                player_combo_input,
-                player_dash_move,
-                spawn_player_dash_trail_during_dash,
-                player_combo_update,
-                player_dash_input,
-                player_dash_update,
-                update_player_dash_effect,
-                update_player_animation,
-                update_player_status_ui,
-                player_punch_damage,
-                rebuild_player_combat_stats_from_exp,
-                update_floating_damage_text,
-                update_basic_gun_defeat_particles,
-                player_return_after_hurt,
-                respawn_player_when_defeated,
+        .add_systems(Update, (
+            setup_player_animation_player,
+            player_movement,
+            player_footstep_sound,
+            player_jump_input,
+            player_jump_update,
+            player_combo_input,
+            player_dash_move,
+            spawn_player_dash_trail_during_dash,
+            player_combo_update,
+            player_dash_input,
+            player_dash_update,
+            update_player_dash_effect,
+            update_player_animation,
+            update_player_status_ui,
+            rebuild_player_combat_stats_from_exp,
+            update_floating_damage_text,
+            update_basic_gun_defeat_particles,
+            player_return_after_hurt,
+            respawn_player_when_defeated,
             ).chain()
+        )
+        .add_systems(Update,(
+                tag_player_hand_bones,
+                spawn_requested_player_punch_hitboxes,
+                update_player_punch_hitbox_lifetime,
+            ).chain()
+        )
+        .add_systems(
+            Update,
+            (
+                spawn_player_slap_hitbox,
+                player_slap_hit_enemy,
+                despawn_player_slap_hitbox,
+            )
+                .chain(),
         );
     }
 }
@@ -566,7 +580,7 @@ pub fn player_return_after_hurt(
 pub fn player_combo_input(
     keyboard: Res<ButtonInput<KeyCode>>,
     anim_graph: Res<PlayerAnimationGraph>,
-    mut combo_query: Query<&mut PlayerCombo, With<Player>>,
+    mut combo_query: Query<(Entity, &mut PlayerCombo), With<Player>>,
     mut anim_query: Query<(&mut AnimationPlayer, &mut PlayerAnimState), With<PlayerAnimationTarget>>,
     gamepads: Query<&Gamepad>,
     dialog_query: Query<(), With<GuardianDialogUI>>,
@@ -587,7 +601,11 @@ pub fn player_combo_input(
         return;
     }
 
-    let Ok(mut combo) = combo_query.single_mut() else { return };
+    let Ok((player_entity, mut combo)) =
+        combo_query.single_mut()
+    else {
+        return;
+    };
     let Ok((mut anim_player, mut anim_state)) = anim_query.single_mut() else { return };
 
     if *anim_state == PlayerAnimState::Hurt {
@@ -596,6 +614,7 @@ pub fn player_combo_input(
 
     if combo.current_index.is_none() {
         start_player_combo_attack(
+            player_entity,
             0,
             &anim_graph,
             &mut anim_player,
@@ -612,12 +631,16 @@ pub fn player_combo_input(
 pub fn player_combo_update(
     time: Res<Time>,
     anim_graph: Res<PlayerAnimationGraph>,
-    mut combo_query: Query<&mut PlayerCombo, With<Player>>,
+    mut combo_query: Query<(Entity, &mut PlayerCombo), With<Player>>,
     mut anim_query: Query<(&mut AnimationPlayer, &mut PlayerAnimState), With<PlayerAnimationTarget>>,
     mut commands: Commands,
     asset_server: Res<AssetServer>,
 ) {
-    let Ok(mut combo) = combo_query.single_mut() else { return };
+    let Ok((player_entity, mut combo)) =
+        combo_query.single_mut()
+    else {
+        return;
+    };
     let Some(current_index) = combo.current_index else { return };
     combo.timer.tick(time.delta());
     if !combo.timer.is_finished() {
@@ -628,6 +651,7 @@ pub fn player_combo_update(
     let next_index = current_index + 1;
     if combo.queued_next && next_index < PLAYER_COMBO_COUNT {
         start_player_combo_attack(
+            player_entity,
             next_index,
             &anim_graph,
             &mut anim_player,
@@ -813,6 +837,7 @@ fn combo_anim_state(index: usize) -> PlayerAnimState {
 }
 
 fn start_player_combo_attack(
+    player_entity: Entity,
     index: usize,
     anim_graph: &PlayerAnimationGraph,
     anim_player: &mut AnimationPlayer,
@@ -846,14 +871,163 @@ fn start_player_combo_attack(
         ),
         PlaybackSettings::DESPAWN,
     ));
+
+    match index {
+        // SlapR
+        0 => {
+            queue_player_punch_hitbox(
+                commands,
+                player_entity,
+                PlayerHand::Right,
+                0.18,
+                0.12,
+            );
+        }
+
+        // SlapL
+        1 => {
+            queue_player_punch_hitbox(
+                commands,
+                player_entity,
+                PlayerHand::Left,
+                0.18,
+                0.12,
+            );
+        }
+
+        // SlapLR
+        2 => {
+            queue_player_punch_hitbox(
+                commands,
+                player_entity,
+                PlayerHand::Right,
+                0.14,
+                0.12,
+            );
+
+            queue_player_punch_hitbox(
+                commands,
+                player_entity,
+                PlayerHand::Left,
+                0.36,
+                0.12,
+            );
+        }
+
+        _ => {}
+    }
 }
 
-#[derive(Debug, Clone, Copy)]
-pub enum FloatingDamageKind {
-    EnemyNormal,
-    EnemyCritical,
-    PlayerHit,
-    PlayerDrain,
+fn queue_player_punch_hitbox(
+    commands: &mut Commands,
+    owner: Entity,
+    hand: PlayerHand,
+    delay: f32,
+    lifetime: f32,
+) {
+    commands.spawn(PunchHitboxRequest {
+        owner,
+        hand,
+        delay: Timer::from_seconds(
+            delay,
+            TimerMode::Once,
+        ),
+        lifetime,
+    });
+}
+
+fn spawn_requested_player_punch_hitboxes(
+    mut commands: Commands,
+    time: Res<Time>,
+
+    mut request_query: Query<
+        (Entity, &mut PunchHitboxRequest),
+    >,
+
+    hand_query: Query<
+        (Entity, &PlayerHandBone),
+    >,
+) {
+    for (request_entity, mut request) in &mut request_query {
+        request.delay.tick(time.delta());
+
+        if !request.delay.is_finished() {
+            continue;
+        }
+
+        let Some((hand_entity, _)) = hand_query
+            .iter()
+            .find(|(_, hand)| hand.0 == request.hand)
+        else {
+            warn!("Player hand bone not found");
+
+            commands
+                .entity(request_entity)
+                .despawn();
+
+            continue;
+        };
+
+        commands
+            .entity(hand_entity)
+            .with_children(|parent| {
+                parent.spawn((
+                    Name::new("Player Punch Hitbox"),
+
+                    PlayerPunchHitbox {
+                        owner: request.owner,
+                        already_hit: Vec::new(),
+                    },
+
+                    PlayerPunchHitboxLifetime(
+                        Timer::from_seconds(
+                            request.lifetime,
+                            TimerMode::Once,
+                        ),
+                    ),
+
+                    // ขนาดหมัด
+                    Collider::sphere(0.22),
+
+                    // ตรวจชนอย่างเดียว ไม่ผลักศัตรู
+                    Sensor,
+
+                    // อ่านรายชื่อ Entity ที่กำลังชน
+                    CollidingEntities::default(),
+
+                    // Offset จากจุด origin ของ Bone
+                    Transform::from_xyz(
+                        0.0,
+                        0.08,
+                        0.0,
+                    ),
+                ));
+            });
+
+        commands
+            .entity(request_entity)
+            .despawn();
+    }
+}
+
+fn update_player_punch_hitbox_lifetime(
+    mut commands: Commands,
+    time: Res<Time>,
+
+    mut hitbox_query: Query<
+        (
+            Entity,
+            &mut PlayerPunchHitboxLifetime,
+        ),
+    >,
+) {
+    for (entity, mut lifetime) in &mut hitbox_query {
+        lifetime.0.tick(time.delta());
+
+        if lifetime.0.is_finished() {
+            commands.entity(entity).despawn();
+        }
+    }
 }
 
 pub fn spawn_floating_damage_text(
@@ -1000,102 +1174,6 @@ pub fn update_basic_gun_defeat_particles(
     }
 }
 
-pub fn player_punch_damage(
-    mut commands: Commands,
-    keyboard: Res<ButtonInput<KeyCode>>,
-    time: Res<Time>,
-    mut meshes: ResMut<Assets<Mesh>>,
-    mut materials: ResMut<Assets<StandardMaterial>>,
-    mut player_query: Query<(&Transform, &CombatStats, &mut ElementMastery),(With<Player>, Without<CombatTarget>)>,
-    mut target_query: Query<(Entity, &Transform, &mut Health, &CombatStats, Option<&ElementExpReward>,),(With<CombatTarget>,Without<Player>)>,
-    gamepads: Query<&Gamepad>,
-    dialog_query: Query<(), With<GuardianDialogUI>>,
-) {
-    if !dialog_query.is_empty() {
-        return;
-    }
-    let attack_pressed =
-        keyboard.just_pressed(KeyCode::KeyJ)
-            || gamepads.iter().any(|gamepad| {
-                gamepad.just_pressed(
-                    GamepadButton::West,
-                )
-            });
-
-    if !attack_pressed {
-        return;
-    }
-
-    let Ok((player_transform,player_stats, mut element_mastery,)) = player_query.single_mut() else { return };
-    let mut rng = rand::rng();
-
-    for (target_entity, target_transform, mut target_health, target_stats, reward) in &mut target_query
-    {
-        if target_health.current <= 0 {
-            continue;
-        }
-
-        let distance = player_transform.translation.distance(target_transform.translation);
-
-        if distance > 2.0 {
-            continue;
-        }
-
-        let (damage, is_critical) =
-        calculate_combat_damage(
-            player_stats,
-            target_stats,
-            &mut rng,
-        );
-
-        target_health.current -= damage;
-        target_health.current = target_health.current.clamp(0, target_health.max);
-
-        let damage_kind = if is_critical {
-            FloatingDamageKind::EnemyCritical
-        } else {
-            FloatingDamageKind::EnemyNormal
-        };
-
-        spawn_floating_damage_text(
-            &mut commands,
-            damage,
-            target_transform.translation
-                + Vec3::new(0.0, 2.0, 0.0),
-            damage_kind,
-        );
-
-        if target_health.current > 0 {
-            continue;
-        }
-
-        if let Some(reward) = reward {
-            let gain = reward.grant_all(
-                &mut element_mastery,
-                &mut rng,
-            );
-
-            println!(
-                "Element EXP: Water +{}, Fire +{}, Wind +{}, Earth +{}, Inw +{}",
-                gain.water,
-                gain.fire,
-                gain.wind,
-                gain.earth,
-                gain.inw,
-            );
-        }
-
-        spawn_defeat_particles(
-            &mut commands,
-            &mut meshes,
-            &mut materials,
-            target_transform.translation + Vec3::Y,
-            time.elapsed_secs(),
-        );
-
-        commands.entity(target_entity).despawn();
-    }
-}
 pub fn rebuild_player_combat_stats_from_exp(
     mut player_query: Query<(&BaseStats,&ElementMastery,&mut CombatStats,&mut Health,&mut Mana),(With<Player>,Changed<ElementMastery>,)>,
 ) {
@@ -1128,4 +1206,328 @@ pub fn respawn_player_when_defeated(
     velocity.z = 0.0;
     health.current = health.max;
     commands.spawn(AudioPlayer::new(asset_server.load("sounds/sfx_game_over.ogg")));
+}
+
+const PLAYER_LEFT_HAND_BONE: &str = "mixamorig_LeftHand";
+const PLAYER_RIGHT_HAND_BONE: &str = "mixamorig_RightHand";
+fn tag_player_hand_bones(
+    mut commands: Commands,
+
+    bone_query: Query<
+        (Entity, &Name),
+        Added<Name>,
+    >,
+
+    child_of_query: Query<&ChildOf>,
+    player_query: Query<(), With<Player>>,
+) {
+    for (entity, name) in &bone_query {
+        if !belongs_to_player(
+            entity,
+            &child_of_query,
+            &player_query,
+        ) {
+            continue;
+        }
+
+        let hand = match name.as_str() {
+            PLAYER_LEFT_HAND_BONE => PlayerHand::Left,
+            PLAYER_RIGHT_HAND_BONE => PlayerHand::Right,
+            _ => continue,
+        };
+
+        commands
+            .entity(entity)
+            .insert(PlayerHandBone(hand));
+
+        info!("Found player hand bone: {}", name.as_str());
+    }
+}
+fn belongs_to_player(
+    entity: Entity,
+    child_of_query: &Query<&ChildOf>,
+    player_query: &Query<(), With<Player>>,
+) -> bool {
+    let mut current = entity;
+
+    loop {
+        if player_query.get(current).is_ok() {
+            return true;
+        }
+
+        let Ok(child_of) = child_of_query.get(current) else {
+            return false;
+        };
+
+        current = child_of.parent();
+    }
+}
+fn spawn_player_slap_hitbox(
+    mut commands: Commands,
+
+    anim_query: Query<
+        &PlayerAnimState,
+        (
+            With<PlayerAnimationTarget>,
+            Changed<PlayerAnimState>,
+        ),
+    >,
+
+    bone_query: Query<(Entity, &Name)>,
+
+    child_of_query: Query<&ChildOf>,
+    player_query: Query<(), With<Player>>,
+) {
+    let Ok(anim_state) = anim_query.single()
+    else {
+        return;
+    };
+
+    let is_slap = matches!(
+        *anim_state,
+        PlayerAnimState::SlapR
+            | PlayerAnimState::SlapL
+            | PlayerAnimState::SlapLR
+    );
+
+    if !is_slap {
+        return;
+    }
+
+    let mut spawned_count = 0;
+
+    for (bone_entity, bone_name) in &bone_query {
+        if !belongs_to_player(
+            bone_entity,
+            &child_of_query,
+            &player_query,
+        ) {
+            continue;
+        }
+
+        let correct_hand = match *anim_state {
+            PlayerAnimState::SlapR => {
+                bone_name.as_str()
+                    == PLAYER_RIGHT_HAND_BONE
+            }
+
+            PlayerAnimState::SlapL => {
+                bone_name.as_str()
+                    == PLAYER_LEFT_HAND_BONE
+            }
+
+            // SlapLR ให้ Collider ออกทั้งสองมือ
+            PlayerAnimState::SlapLR => {
+                bone_name.as_str()
+                    == PLAYER_RIGHT_HAND_BONE
+                    || bone_name.as_str()
+                        == PLAYER_LEFT_HAND_BONE
+            }
+
+            _ => false,
+        };
+
+        if !correct_hand {
+            continue;
+        }
+
+        commands
+            .entity(bone_entity)
+            .with_children(|parent| {
+                parent.spawn((
+                    Name::new("Player Slap Hitbox"),
+
+                    PlayerSlapHitbox {
+                        lifetime: Timer::from_seconds(
+                            0.30,
+                            TimerMode::Once,
+                        ),
+                        has_hit: false,
+                    },
+
+                    // ขนาด Collider ที่มือ
+                    Collider::sphere(0.22),
+
+                    // ตรวจชนแต่ไม่ผลัก Enemy
+                    Sensor,
+
+                    // จำเป็นสำหรับ CollisionStart
+                    CollisionEventsEnabled,
+
+                    // Collider อยู่ตรง origin ของกระดูกมือ
+                    Transform::IDENTITY,
+                ));
+            });
+
+        spawned_count += 1;
+    }
+
+    if spawned_count == 0 {
+        warn!(
+            "Slap hitbox not spawned: hand bone not found"
+        );
+    }
+}
+
+fn player_slap_hit_enemy(
+    mut commands: Commands,
+    time: Res<Time>,
+
+    mut meshes: ResMut<Assets<Mesh>>,
+    mut materials: ResMut<Assets<StandardMaterial>>,
+
+    mut collision_reader:
+        MessageReader<CollisionStart>,
+
+    mut hitbox_query:
+        Query<&mut PlayerSlapHitbox>,
+
+    player_query: Query<
+        (&CombatStats, &AtkAndDefElement),
+        (With<Player>, Without<CombatTarget>),
+    >,
+
+    mut target_query: Query<
+        (
+            &mut Health,
+            &CombatStats,
+            &AtkAndDefElement,
+            &GlobalTransform,
+        ),
+        (With<CombatTarget>, Without<Player>),
+    >,
+) {
+    let Ok((
+        player_stats,
+        player_element,
+    )) = player_query.single()
+    else {
+        return;
+    };
+
+    let mut rng = rand::rng();
+
+    for event in collision_reader.read() {
+        let (hitbox_entity, target_entity) =
+            if hitbox_query.contains(event.collider1) {
+                (
+                    event.collider1,
+                    event.body2.unwrap_or(event.collider2),
+                )
+            } else if hitbox_query.contains(event.collider2) {
+                (
+                    event.collider2,
+                    event.body1.unwrap_or(event.collider1),
+                )
+            } else {
+                continue;
+            };
+
+        let Ok(mut hitbox) =
+            hitbox_query.get_mut(hitbox_entity)
+        else {
+            continue;
+        };
+
+        if hitbox.has_hit {
+            continue;
+        }
+
+        let Ok((
+            mut target_health,
+            target_stats,
+            target_element,
+            target_transform,
+        )) = target_query.get_mut(target_entity)
+        else {
+            continue;
+        };
+
+        hitbox.has_hit = true;
+
+        let (base_damage, is_critical) =
+            calculate_combat_damage(
+                player_stats,
+                target_stats,
+                &mut rng,
+            );
+
+        let element_multiplier =
+            elemental_multiplier(
+                player_element.0,
+                target_element.0,
+            );
+
+        let damage =
+            (base_damage as f32 * element_multiplier)
+                .round()
+                .max(1.0) as i32;
+
+        target_health.current -= damage;
+        target_health.current =
+            target_health.current.clamp(
+                0,
+                target_health.max,
+            );
+
+        let damage_kind = if is_critical {
+            FloatingDamageKind::EnemyCritical
+        } else {
+            FloatingDamageKind::EnemyNormal
+        };
+
+        let target_position =
+            target_transform.translation();
+
+        spawn_floating_damage_text(
+            &mut commands,
+            damage,
+            target_position
+                + Vec3::new(0.0, 2.0, 0.0),
+            damage_kind,
+        );
+
+        info!(
+            "Slap hit: damage={}, HP={}/{}",
+            damage,
+            target_health.current,
+            target_health.max,
+        );
+
+        if target_health.current > 0 {
+            commands.entity(hitbox_entity).despawn();
+            continue;
+        }
+
+        spawn_defeat_particles(
+            &mut commands,
+            &mut meshes,
+            &mut materials,
+            target_position,
+            time.elapsed_secs(),
+        );
+
+        commands.entity(target_entity).despawn();
+
+        commands.entity(hitbox_entity).despawn();
+    }
+}
+fn despawn_player_slap_hitbox(
+    mut commands: Commands,
+    time: Res<Time>,
+
+    mut hitbox_query: Query<
+        (
+            Entity,
+            &mut PlayerSlapHitbox,
+        ),
+    >,
+) {
+    for (entity, mut hitbox) in &mut hitbox_query {
+        hitbox.lifetime.tick(time.delta());
+
+        if hitbox.lifetime.is_finished() {
+            commands.entity(entity).despawn();
+        }
+    }
 }

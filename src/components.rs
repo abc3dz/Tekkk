@@ -97,6 +97,46 @@ pub struct PlayerHurtTimer(pub Timer);
 #[derive(Component)]
 pub struct PlayerFootstepSound;
 
+#[derive(Component, Debug, Clone, Copy, PartialEq, Eq)]
+pub enum PlayerHand {
+    Left,
+    Right,
+}
+
+#[derive(Component)]
+pub struct PlayerHandBone(pub PlayerHand);
+
+#[derive(Component)]
+pub struct PunchHitboxRequest {
+    pub owner: Entity,
+    pub hand: PlayerHand,
+    pub delay: Timer,
+    pub lifetime: f32,
+}
+
+#[derive(Component)]
+pub struct PlayerPunchHitbox {
+    pub owner: Entity,
+    pub already_hit: Vec<Entity>,
+}
+
+#[derive(Component)]
+pub struct PlayerPunchHitboxLifetime(pub Timer);
+
+#[derive(Debug, Clone, Copy)]
+pub enum FloatingDamageKind {
+    EnemyNormal,
+    EnemyCritical,
+    PlayerHit,
+    PlayerDrain,
+}
+
+#[derive(Component)]
+pub struct PlayerSlapHitbox {
+    pub lifetime: Timer,
+    pub has_hit: bool,
+}
+
 //guardian
 #[derive(Resource)]
 pub struct GuardianAnimationGraph {
@@ -223,7 +263,16 @@ pub enum EnemyState {
 pub struct EnemyMuamuaAnimationGraph {
     pub graph: Handle<AnimationGraph>,
     pub idle: AnimationNodeIndex,
+    pub chase: AnimationNodeIndex,
 }
 
 #[derive(Component)]
-pub struct EnemyMuamuaAnimationTarget;
+pub struct EnemyMuamuaAnimationTarget {
+    pub root: Entity,
+}
+
+#[derive(Component, Debug, Clone, Copy, PartialEq, Eq)]
+pub enum EnemyMuamuaAnimState {
+    Idle,
+    Chase,
+}
