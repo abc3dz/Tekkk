@@ -1382,8 +1382,12 @@ fn player_slap_hit_enemy(
     mut hitbox_query:
         Query<&mut PlayerSlapHitbox>,
 
-    player_query: Query<
-        (&CombatStats, &AtkAndDefElement),
+    mut player_query: Query<
+        (
+            &CombatStats,
+            &AtkAndDefElement,
+            &mut ElementMastery,
+        ),
         (With<Player>, Without<CombatTarget>),
     >,
 
@@ -1393,6 +1397,7 @@ fn player_slap_hit_enemy(
             &CombatStats,
             &AtkAndDefElement,
             &GlobalTransform,
+            Option<&ElementExpReward>,
         ),
         (With<CombatTarget>, Without<Player>),
     >,
@@ -1400,7 +1405,8 @@ fn player_slap_hit_enemy(
     let Ok((
         player_stats,
         player_element,
-    )) = player_query.single()
+        mut element_mastery,
+    )) = player_query.single_mut()
     else {
         return;
     };
@@ -1438,6 +1444,7 @@ fn player_slap_hit_enemy(
             target_stats,
             target_element,
             target_transform,
+            reward,
         )) = target_query.get_mut(target_entity)
         else {
             continue;
@@ -1497,6 +1504,22 @@ fn player_slap_hit_enemy(
         if target_health.current > 0 {
             commands.entity(hitbox_entity).despawn();
             continue;
+        }
+
+        if let Some(reward) = reward {
+            let gain = reward.grant_all(
+                &mut *element_mastery,
+                &mut rng,
+            );
+
+            info!(
+                "EXP gain: Water +{}, Fire +{}, Wind +{}, Earth +{}, Inw +{}",
+                gain.water,
+                gain.fire,
+                gain.wind,
+                gain.earth,
+                gain.inw,
+            );
         }
 
         spawn_defeat_particles(

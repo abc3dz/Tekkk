@@ -155,11 +155,11 @@ impl ElementExpReward {
 
 impl ElementExpReward {
     pub const BASIC_PRACTICE_GUN: Self = Self {
-        water: ExpRange::new(2, 5),
-        fire: ExpRange::new(2, 5),
-        wind: ExpRange::new(2, 5),
-        earth: ExpRange::new(2, 5),
-        inw: ExpRange::new(2, 3),
+        water: ExpRange::new(2, 3),
+        fire: ExpRange::new(2, 3),
+        wind: ExpRange::new(2, 3),
+        earth: ExpRange::new(2, 3),
+        inw: ExpRange::new(1, 1),
     };
 
     pub const ADVANCED_PRACTICE_MINION: Self = Self {

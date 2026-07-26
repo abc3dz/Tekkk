@@ -264,6 +264,7 @@ pub struct EnemyMuamuaAnimationGraph {
     pub graph: Handle<AnimationGraph>,
     pub idle: AnimationNodeIndex,
     pub chase: AnimationNodeIndex,
+    pub attack: AnimationNodeIndex,
 }
 
 #[derive(Component)]
@@ -275,4 +276,18 @@ pub struct EnemyMuamuaAnimationTarget {
 pub enum EnemyMuamuaAnimState {
     Idle,
     Chase,
+    Attack,
 }
+
+#[derive(Component)]
+pub struct MuamuaPunchHitbox {
+    pub owner: Entity,
+    pub has_hit: bool,
+    pub lifetime: Timer,
+}
+
+#[derive(Component)]
+pub struct MuamuaAttackTimer(pub Timer);
+
+#[derive(Resource)]
+pub struct MuamuaRespawnTimer(pub Timer);

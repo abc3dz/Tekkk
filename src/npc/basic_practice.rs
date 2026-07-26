@@ -209,7 +209,7 @@ pub fn basic_practice_gun_shoot_projectile(
         }
 
         let direction = direction.normalize();
-        let speed = 7.0;
+        let speed = 5.0;
         let spawn_pos = gun_tf.translation + direction * 0.8 + Vec3::Y * 0.3;
         let yaw = direction.x.atan2(direction.z);
 
@@ -269,12 +269,12 @@ pub fn basic_projectile_hit_player(
             FloatingDamageKind::PlayerHit,
         );
 
-        play_player_hurt_animation(
-            &mut commands,
-            player_entity,
-            &anim_graph,
-            &mut anim_query,
-        );
+        // play_player_hurt_animation(
+        //     &mut commands,
+        //     player_entity,
+        //     &anim_graph,
+        //     &mut anim_query,
+        // );
 
         commands.entity(projectile_entity).despawn();
     }

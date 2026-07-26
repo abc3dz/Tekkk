@@ -5,27 +5,10 @@ use bevy::{
 };
 use bevy_wind_waker_shader::prelude::*;
 
-use crate::{
-    combat::{
-        AtkAndDefElement,
-        BaseStats,
-        CombatStats,
-        CombatTarget,
-        Element,
-        ElementExpReward,
-    },
-    components::{
-        Enemy,
-        EnemyState,
-        GameScene,
-        Health,
-        Player,
-        EnemyMuamuaAnimationGraph,
-        EnemyMuamuaAnimationTarget,
-        EnemyMuamuaAnimState
-    },
-};
-use crate::npc::practice_common::spawn_enemy_health_bar;
+use crate::combat::*;
+use crate::components::*;
+use crate::npc::practice_common::*;
+use crate::player::*;
 
 #[derive(Component, Debug)]
 pub struct EnemyMuamua;
@@ -34,7 +17,16 @@ pub struct EnemyMuamuaPlugin;
 
 impl Plugin for EnemyMuamuaPlugin {
     fn build(&self, app: &mut App) {
-        app.add_systems(
+        app
+        .insert_resource(
+            MuamuaRespawnTimer(
+                Timer::from_seconds(
+                    3.0,
+                    TimerMode::Once,
+                ),
+            ),
+        )
+        .add_systems(
             OnEnter(GameScene::Desert),
             (
                 setup_enemy_muamua_animation_graph,
@@ -48,6 +40,11 @@ impl Plugin for EnemyMuamuaPlugin {
                 enemy_muamua_chase_player,
                 update_enemy_muamua_animation,
                 debug_enemy_muamua_spawn,
+
+                spawn_muamua_punch_hitbox,
+                muamua_punch_hit_player,
+                despawn_muamua_punch_hitbox,
+                respawn_enemy_muamua_when_defeated
             )
             .chain()
             .run_if(in_state(GameScene::Desert)),
@@ -59,50 +56,86 @@ fn spawn_enemy_muamua(
     mut commands: Commands,
     asset_server: Res<AssetServer>,
 ) {
-    let muamua_scene = asset_server.load(GltfAssetLabel::Scene(0).from_asset("enemy/EnemyMuamua.glb"));
-    let spawn_positions = Vec3::new(5.0, 0.0, 5.0);
-    const MUAMUA_BODY_Y: f32 = 1.0;
-    let base_stats = BaseStats::MUAMUA;
-    let enemy_muamua = commands.spawn((
-        Name::new("Enemy Muamua"),
-
-        // Marker
-        Enemy,
-        EnemyMuamua,
-        EnemyState::Idle,
-
-        Health {
-            current: base_stats.max_hp as i32,
-            max: base_stats.max_hp as i32,
-        },
-
-        base_stats,
-        CombatStats::from(base_stats),
-        AtkAndDefElement(Element::Earth),
-        ElementExpReward::MUAMUA,
-
-        // Physics
-        RigidBody::Dynamic,
-        Collider::capsule(0.45, 1.0),
-        LockedAxes::ROTATION_LOCKED,
-        LinearVelocity::ZERO,
-
-        Transform::from_translation(
-            spawn_positions + Vec3::Y * MUAMUA_BODY_Y,
-        ),
-        
-        // ออกจาก Desert แล้วลบ Muamua
-        DespawnOnExit(GameScene::Desert),
-    )).with_children(|parent| {
-            parent.spawn((SceneRoot(muamua_scene.clone()),
-                Transform::from_xyz(0.0,-MUAMUA_BODY_Y,0.0,),
-                WindWakerShaderBuilder::default().time_of_day(TimeOfDay::Day).weather(Weather::Sunny).build(),
-            ));
-        }).id();
-
-    commands.entity(enemy_muamua).insert(CombatTarget);
-    spawn_enemy_health_bar(
+    spawn_enemy_muamua_entity(
         &mut commands,
+        &asset_server,
+    );
+}
+
+fn spawn_enemy_muamua_entity(
+    commands: &mut Commands,
+    asset_server: &AssetServer,
+) {
+    let muamua_scene = asset_server.load(
+        GltfAssetLabel::Scene(0)
+            .from_asset("enemy/EnemyMuamua.glb"),
+    );
+
+    let spawn_position =
+        Vec3::new(5.0, 0.0, 5.0);
+
+    const MUAMUA_BODY_Y: f32 = 1.0;
+
+    let base_stats = BaseStats::MUAMUA;
+
+    let enemy_muamua = commands
+        .spawn((
+            Name::new("Enemy Muamua"),
+
+            Enemy,
+            EnemyMuamua,
+            EnemyState::Idle,
+
+            Health {
+                current: base_stats.max_hp as i32,
+                max: base_stats.max_hp as i32,
+            },
+
+            base_stats,
+            CombatStats::from(base_stats),
+            AtkAndDefElement(Element::Earth),
+            ElementExpReward::MUAMUA,
+
+            RigidBody::Dynamic,
+            Collider::capsule(0.45, 1.0),
+            LockedAxes::ROTATION_LOCKED,
+            LinearVelocity::ZERO,
+
+            Transform::from_translation(
+                spawn_position
+                    + Vec3::Y * MUAMUA_BODY_Y,
+            ),
+
+            DespawnOnExit(GameScene::Desert),
+        ))
+        .with_children(|parent| {
+            parent.spawn((
+                SceneRoot(muamua_scene),
+                Transform::from_xyz(
+                    0.0,
+                    -MUAMUA_BODY_Y,
+                    0.0,
+                ),
+                WindWakerShaderBuilder::default()
+                    .time_of_day(TimeOfDay::Day)
+                    .weather(Weather::Sunny)
+                    .build(),
+            ));
+        })
+        .id();
+
+    commands.entity(enemy_muamua).insert((
+        CombatTarget,
+        MuamuaAttackTimer(
+            Timer::from_seconds(
+                1.0,
+                TimerMode::Repeating,
+            ),
+        ),
+    ));
+
+    spawn_enemy_health_bar(
+        commands,
         enemy_muamua,
     );
 }
@@ -171,11 +204,20 @@ fn setup_enemy_muamua_animation_graph(
         1.0,
         graph.root,
     );
+    let attack = graph.add_clip(
+        asset_server.load(
+            GltfAssetLabel::Animation(0)
+                .from_asset("enemy/EnemyMuamua.glb"),
+        ),
+        1.0,
+        graph.root,
+    );
 
     commands.insert_resource(EnemyMuamuaAnimationGraph {
         graph: graphs.add(graph),
         idle,
         chase,
+        attack
     });
 }
 
@@ -236,7 +278,7 @@ fn find_enemy_muamua_root(
 }
 
 const MUAMUA_CHASE_RANGE: f32 = 10.0;
-const MUAMUA_STOP_DISTANCE: f32 = 1.5;
+const MUAMUA_STOP_DISTANCE: f32 = 1.0;
 const MUAMUA_MOVE_SPEED: f32 = 3.0;
 
 fn enemy_muamua_chase_player(
@@ -286,13 +328,21 @@ fn enemy_muamua_chase_player(
             continue;
         }
 
-        // เข้าใกล้ Player แล้ว ให้หยุดก่อน
-        // ภายหลังตรงนี้ค่อยเปลี่ยนเป็น Attack
+        // เข้าใกล้ Player
         if distance <= MUAMUA_STOP_DISTANCE {
             velocity.x = 0.0;
             velocity.z = 0.0;
 
-            *enemy_state = EnemyState::Idle;
+            if flat_direction.length_squared() > 0.0001 {
+                let direction = flat_direction.normalize();
+
+                muamua_transform.rotation =
+                    Quat::from_rotation_y(
+                        direction.x.atan2(direction.z),
+                    );
+            }
+
+            *enemy_state = EnemyState::Attack;
             continue;
         }
 
@@ -344,6 +394,10 @@ fn update_enemy_muamua_animation(
                 EnemyMuamuaAnimState::Chase
             }
 
+            EnemyState::Attack => {
+                EnemyMuamuaAnimState::Attack
+            }
+
             _ => EnemyMuamuaAnimState::Idle,
         };
 
@@ -366,8 +420,264 @@ fn update_enemy_muamua_animation(
                     .play(animation_graph.chase)
                     .repeat();
             }
+            EnemyMuamuaAnimState::Attack => {
+                animation_player
+                    .play(animation_graph.attack)
+                    .repeat();
+            }
         }
 
         *current_animation = wanted_animation;
     }
+}
+
+fn spawn_muamua_punch_hitbox(
+    mut commands: Commands,
+    time: Res<Time>,
+
+    mut muamua_query: Query<
+        (
+            Entity,
+            &EnemyState,
+            &mut MuamuaAttackTimer,
+        ),
+        With<EnemyMuamua>,
+    >,
+) {
+    for (
+        muamua_entity,
+        enemy_state,
+        mut attack_timer,
+    ) in &mut muamua_query
+    {
+        if !matches!(
+            *enemy_state,
+            EnemyState::Attack
+        ) {
+            attack_timer.0.reset();
+            continue;
+        }
+
+        attack_timer.0.tick(time.delta());
+
+        if !attack_timer.0.just_finished() {
+            continue;
+        }
+
+        commands
+            .entity(muamua_entity)
+            .with_children(|parent| {
+                parent.spawn((
+                    MuamuaPunchHitbox {
+                        owner: muamua_entity,
+                        has_hit: false,
+                        lifetime: Timer::from_seconds(
+                            0.20,
+                            TimerMode::Once,
+                        ),
+                    },
+
+                    Collider::sphere(0.35),
+                    Sensor,
+                    CollisionEventsEnabled,
+
+                    Transform::from_xyz(
+                        0.0,
+                        0.0,
+                        0.85,
+                    ),
+                ));
+            });
+    }
+}
+
+fn muamua_punch_hit_player(
+    mut commands: Commands,
+    mut collision_reader:
+        MessageReader<CollisionStart>,
+
+    mut hitbox_query:
+        Query<&mut MuamuaPunchHitbox>,
+
+    muamua_query: Query<
+        (
+            &CombatStats,
+            &AtkAndDefElement,
+        ),
+        (
+            With<EnemyMuamua>,
+            Without<Player>,
+        ),
+    >,
+
+    mut player_query: Query<
+        (
+            &mut Health,
+            &CombatStats,
+            &AtkAndDefElement,
+            &GlobalTransform,
+        ),
+        (
+            With<Player>,
+            Without<EnemyMuamua>,
+        ),
+    >,
+) {
+    let mut rng = rand::rng();
+
+    for event in collision_reader.read() {
+        let (
+            hitbox_entity,
+            other_body,
+        ) = if hitbox_query.contains(
+            event.collider1,
+        ) {
+            (
+                event.collider1,
+                event.body2
+                    .unwrap_or(event.collider2),
+            )
+        } else if hitbox_query.contains(
+            event.collider2,
+        ) {
+            (
+                event.collider2,
+                event.body1
+                    .unwrap_or(event.collider1),
+            )
+        } else {
+            continue;
+        };
+
+        let Ok(mut hitbox) =
+            hitbox_query.get_mut(hitbox_entity)
+        else {
+            continue;
+        };
+
+        if hitbox.has_hit {
+            continue;
+        }
+
+        let Ok((
+            mut player_health,
+            player_stats,
+            player_element,
+            player_global_transform,
+        )) = player_query.get_mut(other_body)
+        else {
+            continue;
+        };
+
+        let Ok((
+            muamua_stats,
+            muamua_element,
+        )) = muamua_query.get(hitbox.owner)
+        else {
+            continue;
+        };
+
+        let (
+            base_damage,
+            is_critical,
+        ) = calculate_combat_damage(
+            muamua_stats,
+            player_stats,
+            &mut rng,
+        );
+
+        let element_multiplier =
+            elemental_multiplier(
+                muamua_element.0,
+                player_element.0,
+            );
+
+        let damage = (
+            base_damage as f32
+                * element_multiplier
+        )
+            .round()
+            .max(1.0) as i32;
+
+        player_health.current -= damage;
+
+        player_health.current =
+            player_health.current.clamp(
+                0,
+                player_health.max,
+            );
+        spawn_floating_damage_text(
+            &mut commands,
+            damage,
+            player_global_transform.translation()
+                + Vec3::new(0.0, 2.0, 0.0),
+            FloatingDamageKind::PlayerHit,
+        );
+        hitbox.has_hit = true;
+
+        info!(
+            "Muamua hit Player: damage={}, critical={}, HP={}/{}",
+            damage,
+            is_critical,
+            player_health.current,
+            player_health.max,
+        );
+    }
+}
+
+fn despawn_muamua_punch_hitbox(
+    mut commands: Commands,
+    time: Res<Time>,
+
+    mut hitbox_query: Query<
+        (
+            Entity,
+            &mut MuamuaPunchHitbox,
+        ),
+    >,
+) {
+    for (
+        entity,
+        mut hitbox,
+    ) in &mut hitbox_query
+    {
+        hitbox.lifetime.tick(time.delta());
+
+        if hitbox.lifetime.is_finished() {
+            commands.entity(entity).despawn();
+        }
+    }
+}
+
+fn respawn_enemy_muamua_when_defeated(
+    mut commands: Commands,
+    time: Res<Time>,
+    asset_server: Res<AssetServer>,
+
+    mut respawn_timer:
+        ResMut<MuamuaRespawnTimer>,
+
+    muamua_query:
+        Query<(), With<EnemyMuamua>>,
+) {
+    // Muamua ยังอยู่ ไม่ต้อง Respawn
+    if !muamua_query.is_empty() {
+        respawn_timer.0.reset();
+        return;
+    }
+
+    respawn_timer.0.tick(time.delta());
+
+    if !respawn_timer.0.just_finished() {
+        return;
+    }
+
+    spawn_enemy_muamua_entity(
+        &mut commands,
+        &asset_server,
+    );
+
+    respawn_timer.0.reset();
+
+    info!("Enemy Muamua respawned");
 }
