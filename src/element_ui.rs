@@ -80,7 +80,7 @@ fn setup_element_status_ui(
         .with_children(|root| {
             root.spawn((
                 Node {
-                    width: Val::Px(650.0),
+                    width: Val::Px(950.0),
                     min_height: Val::Px(620.0),
                     flex_direction: FlexDirection::Column,
                     row_gap: Val::Px(6.0),
@@ -180,6 +180,67 @@ fn setup_element_status_ui(
                             marker,
                         ));
                 }
+                panel.spawn((
+                    Node {
+                        position_type: PositionType::Absolute,
+                        width: Val::Px(330.0),
+                        top: Val::Px(95.0),
+                        right: Val::Px(24.0),
+                        flex_direction: FlexDirection::Column,
+                        row_gap: Val::Px(12.0),
+                        padding: UiRect::all(Val::Px(20.0)),
+                        ..default()
+                    },
+                    BackgroundColor(
+                        Color::srgba(0.10, 0.10, 0.14, 0.90),
+                    ),
+                ))
+                .with_children(|controls| {
+                    controls.spawn((
+                        Text::new("CONTROLS"),
+                        TextFont {
+                            font_size: 28.0,
+                            ..default()
+                        },
+                        TextColor(Color::WHITE),
+                        Node {
+                            margin: UiRect::bottom(
+                                Val::Px(10.0),
+                            ),
+                            ..default()
+                        },
+                    ));
+
+                    let control_rows = [
+                        "Move",
+                        "  W A S D / D-Pad",
+                        "",
+                        "Jump",
+                        "  K / Gamepad South",
+                        "",
+                        "Slap",
+                        "  J / Gamepad West",
+                        "",
+                        "Dash",
+                        "  L / Gamepad East",
+                        "",
+                    ];
+
+                    for control in control_rows {
+                        controls.spawn((
+                            Text::new(control),
+                            TextFont {
+                                font_size: 20.0,
+                                ..default()
+                            },
+                            TextColor(Color::srgb(
+                                0.85,
+                                0.85,
+                                0.90,
+                            )),
+                        ));
+                    }
+                });
 
                 panel.spawn((
                     Text::new("Esc: Resume"),

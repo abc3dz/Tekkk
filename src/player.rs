@@ -1373,8 +1373,11 @@ fn player_slap_hit_enemy(
     mut commands: Commands,
     time: Res<Time>,
 
-    mut meshes: ResMut<Assets<Mesh>>,
-    mut materials: ResMut<Assets<StandardMaterial>>,
+    mut meshes:
+        ResMut<Assets<Mesh>>,
+
+    mut materials:
+        ResMut<Assets<StandardMaterial>>,
 
     mut collision_reader:
         MessageReader<CollisionStart>,
@@ -1388,7 +1391,10 @@ fn player_slap_hit_enemy(
             &AtkAndDefElement,
             &mut ElementMastery,
         ),
-        (With<Player>, Without<CombatTarget>),
+        (
+            With<Player>,
+            Without<CombatTarget>,
+        ),
     >,
 
     mut target_query: Query<
@@ -1398,8 +1404,15 @@ fn player_slap_hit_enemy(
             &AtkAndDefElement,
             &GlobalTransform,
             Option<&ElementExpReward>,
+
+            // Practice ไม่มี EnemyState
+            // Muamua มี EnemyState
+            Option<&mut EnemyState>,
         ),
-        (With<CombatTarget>, Without<Player>),
+        (
+            With<CombatTarget>,
+            Without<Player>,
+        ),
     >,
 ) {
     let Ok((
@@ -1414,20 +1427,29 @@ fn player_slap_hit_enemy(
     let mut rng = rand::rng();
 
     for event in collision_reader.read() {
-        let (hitbox_entity, target_entity) =
-            if hitbox_query.contains(event.collider1) {
-                (
-                    event.collider1,
-                    event.body2.unwrap_or(event.collider2),
-                )
-            } else if hitbox_query.contains(event.collider2) {
-                (
-                    event.collider2,
-                    event.body1.unwrap_or(event.collider1),
-                )
-            } else {
-                continue;
-            };
+        // เช็กว่าฝั่งไหนคือ Hitbox ของ Player
+        let (
+            hitbox_entity,
+            target_entity,
+        ) = if hitbox_query.contains(
+            event.collider1,
+        ) {
+            (
+                event.collider1,
+                event.body2
+                    .unwrap_or(event.collider2),
+            )
+        } else if hitbox_query.contains(
+            event.collider2,
+        ) {
+            (
+                event.collider2,
+                event.body1
+                    .unwrap_or(event.collider1),
+            )
+        } else {
+            continue;
+        };
 
         let Ok(mut hitbox) =
             hitbox_query.get_mut(hitbox_entity)
@@ -1435,6 +1457,7 @@ fn player_slap_hit_enemy(
             continue;
         };
 
+        // Hitbox นี้เคยทำดาเมจแล้ว
         if hitbox.has_hit {
             continue;
         }
@@ -1445,19 +1468,34 @@ fn player_slap_hit_enemy(
             target_element,
             target_transform,
             reward,
-        )) = target_query.get_mut(target_entity)
+            mut enemy_state,
+        )) = target_query.get_mut(
+            target_entity,
+        )
         else {
             continue;
         };
 
+        // เป้าหมายตายไปแล้ว
+        // ห้ามแจก EXP หรือทำดาเมจซ้ำ
+        if target_health.current <= 0 {
+            commands
+                .entity(hitbox_entity)
+                .despawn();
+
+            continue;
+        }
+
         hitbox.has_hit = true;
 
-        let (base_damage, is_critical) =
-            calculate_combat_damage(
-                player_stats,
-                target_stats,
-                &mut rng,
-            );
+        let (
+            base_damage,
+            is_critical,
+        ) = calculate_combat_damage(
+            player_stats,
+            target_stats,
+            &mut rng,
+        );
 
         let element_multiplier =
             elemental_multiplier(
@@ -1465,23 +1503,27 @@ fn player_slap_hit_enemy(
                 target_element.0,
             );
 
-        let damage =
-            (base_damage as f32 * element_multiplier)
-                .round()
-                .max(1.0) as i32;
+        let damage = (
+            base_damage as f32
+                * element_multiplier
+        )
+            .round()
+            .max(1.0) as i32;
 
         target_health.current -= damage;
+
         target_health.current =
             target_health.current.clamp(
                 0,
                 target_health.max,
             );
 
-        let damage_kind = if is_critical {
-            FloatingDamageKind::EnemyCritical
-        } else {
-            FloatingDamageKind::EnemyNormal
-        };
+        let damage_kind =
+            if is_critical {
+                FloatingDamageKind::EnemyCritical
+            } else {
+                FloatingDamageKind::EnemyNormal
+            };
 
         let target_position =
             target_transform.translation();
@@ -1501,11 +1543,38 @@ fn player_slap_hit_enemy(
             target_health.max,
         );
 
+        // ==============================
+        // ยังไม่ตาย → เล่น Hurt
+        // ==============================
         if target_health.current > 0 {
-            commands.entity(hitbox_entity).despawn();
+            if let Some(state) =
+                enemy_state.as_mut()
+            {
+                **state =
+                    EnemyState::Hurt;
+
+                commands
+                    .entity(target_entity)
+                    .insert(
+                        MuamuaStateTimer(
+                            Timer::from_seconds(
+                                0.45,
+                                TimerMode::Once,
+                            ),
+                        ),
+                    );
+            }
+
+            commands
+                .entity(hitbox_entity)
+                .despawn();
+
             continue;
         }
 
+        // ==============================
+        // HP เหลือ 0 → แจก EXP
+        // ==============================
         if let Some(reward) = reward {
             let gain = reward.grant_all(
                 &mut *element_mastery,
@@ -1522,6 +1591,52 @@ fn player_slap_hit_enemy(
             );
         }
 
+        // ==============================
+        // มี EnemyState = Muamua
+        // เล่น Dead ก่อน ยังไม่ despawn
+        // ==============================
+        if let Some(state) =
+            enemy_state.as_mut()
+        {
+            **state =
+                EnemyState::Dead;
+
+            commands
+                .entity(target_entity)
+                .insert(
+                    MuamuaStateTimer(
+                        Timer::from_seconds(
+                            1.20,
+                            TimerMode::Once,
+                        ),
+                    ),
+                );
+
+            // ป้องกัน Player ตบซ้ำระหว่างเล่น Dead
+            commands
+                .entity(target_entity)
+                .remove::<CombatTarget>();
+
+            spawn_defeat_particles(
+                &mut commands,
+                &mut meshes,
+                &mut materials,
+                target_position,
+                time.elapsed_secs(),
+            );
+
+            commands
+                .entity(hitbox_entity)
+                .despawn();
+
+            continue;
+        }
+
+        // ==============================
+        // ไม่มี EnemyState
+        // เช่น Basic / Advanced Practice
+        // ตายแล้วหายทันทีเหมือนเดิม
+        // ==============================
         spawn_defeat_particles(
             &mut commands,
             &mut meshes,
@@ -1530,11 +1645,16 @@ fn player_slap_hit_enemy(
             time.elapsed_secs(),
         );
 
-        commands.entity(target_entity).despawn();
+        commands
+            .entity(target_entity)
+            .despawn();
 
-        commands.entity(hitbox_entity).despawn();
+        commands
+            .entity(hitbox_entity)
+            .despawn();
     }
 }
+
 fn despawn_player_slap_hitbox(
     mut commands: Commands,
     time: Res<Time>,

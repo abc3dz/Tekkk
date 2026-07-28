@@ -265,6 +265,8 @@ pub struct EnemyMuamuaAnimationGraph {
     pub idle: AnimationNodeIndex,
     pub chase: AnimationNodeIndex,
     pub attack: AnimationNodeIndex,
+    pub hurt: AnimationNodeIndex,
+    pub dead: AnimationNodeIndex,
 }
 
 #[derive(Component)]
@@ -277,6 +279,8 @@ pub enum EnemyMuamuaAnimState {
     Idle,
     Chase,
     Attack,
+    Hurt,
+    Dead,
 }
 
 #[derive(Component)]
@@ -291,3 +295,6 @@ pub struct MuamuaAttackTimer(pub Timer);
 
 #[derive(Resource)]
 pub struct MuamuaRespawnTimer(pub Timer);
+
+#[derive(Component)]
+pub struct  MuamuaStateTimer(pub Timer);

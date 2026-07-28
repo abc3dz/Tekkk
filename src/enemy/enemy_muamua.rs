@@ -21,7 +21,7 @@ impl Plugin for EnemyMuamuaPlugin {
         .insert_resource(
             MuamuaRespawnTimer(
                 Timer::from_seconds(
-                    3.0,
+                    1.0,
                     TimerMode::Once,
                 ),
             ),
@@ -40,6 +40,7 @@ impl Plugin for EnemyMuamuaPlugin {
                 enemy_muamua_chase_player,
                 update_enemy_muamua_animation,
                 debug_enemy_muamua_spawn,
+                update_muamua_hurt_and_dead,
 
                 spawn_muamua_punch_hitbox,
                 muamua_punch_hit_player,
@@ -212,12 +213,30 @@ fn setup_enemy_muamua_animation_graph(
         1.0,
         graph.root,
     );
+    let hurt = graph.add_clip(
+        asset_server.load(
+            GltfAssetLabel::Animation(1)
+                .from_asset("enemy/EnemyMuamua.glb"),
+        ),
+        1.0,
+        graph.root,
+    );
+    let dead = graph.add_clip(
+        asset_server.load(
+            GltfAssetLabel::Animation(2)
+                .from_asset("enemy/EnemyMuamua.glb"),
+        ),
+        1.0,
+        graph.root,
+    );
 
     commands.insert_resource(EnemyMuamuaAnimationGraph {
         graph: graphs.add(graph),
         idle,
         chase,
-        attack
+        attack,
+        hurt,
+        dead
     });
 }
 
@@ -284,7 +303,10 @@ const MUAMUA_MOVE_SPEED: f32 = 3.0;
 fn enemy_muamua_chase_player(
     player_query: Query<
         &Transform,
-        (With<Player>, Without<EnemyMuamua>),
+        (
+            With<Player>,
+            Without<EnemyMuamua>,
+        ),
     >,
 
     mut muamua_query: Query<
@@ -293,10 +315,15 @@ fn enemy_muamua_chase_player(
             &mut LinearVelocity,
             &mut EnemyState,
         ),
-        (With<EnemyMuamua>, Without<Player>),
+        (
+            With<EnemyMuamua>,
+            Without<Player>,
+        ),
     >,
 ) {
-    let Ok(player_transform) = player_query.single() else {
+    let Ok(player_transform) =
+        player_query.single()
+    else {
         return;
     };
 
@@ -306,58 +333,86 @@ fn enemy_muamua_chase_player(
         mut enemy_state,
     ) in &mut muamua_query
     {
+        // ตอนเจ็บหรือตาย ห้ามเดินไล่
+        // และห้ามเปลี่ยนกลับเป็น Idle/Chase/Attack
+        if matches!(
+            *enemy_state,
+            EnemyState::Hurt
+                | EnemyState::Dead
+        ) {
+            velocity.x = 0.0;
+            velocity.z = 0.0;
+            continue;
+        }
+
         let to_player =
             player_transform.translation
                 - muamua_transform.translation;
 
-        // ไม่สนแกน Y เพราะเดินอยู่บนพื้น
+        // ไม่ใช้แกน Y เพราะเดินบนพื้น
         let flat_direction = Vec3::new(
             to_player.x,
             0.0,
             to_player.z,
         );
 
-        let distance = flat_direction.length();
+        let distance =
+            flat_direction.length();
 
         // Player อยู่นอกระยะตรวจจับ
         if distance > MUAMUA_CHASE_RANGE {
             velocity.x = 0.0;
             velocity.z = 0.0;
 
-            *enemy_state = EnemyState::Idle;
+            *enemy_state =
+                EnemyState::Idle;
+
             continue;
         }
 
-        // เข้าใกล้ Player
+        // Player อยู่ในระยะต่อย
         if distance <= MUAMUA_STOP_DISTANCE {
             velocity.x = 0.0;
             velocity.z = 0.0;
 
-            if flat_direction.length_squared() > 0.0001 {
-                let direction = flat_direction.normalize();
+            // หันหน้าเข้าหา Player
+            if flat_direction.length_squared()
+                > 0.0001
+            {
+                let direction =
+                    flat_direction.normalize();
 
                 muamua_transform.rotation =
                     Quat::from_rotation_y(
-                        direction.x.atan2(direction.z),
+                        direction
+                            .x
+                            .atan2(direction.z),
                     );
             }
 
-            *enemy_state = EnemyState::Attack;
+            *enemy_state =
+                EnemyState::Attack;
+
             continue;
         }
 
-        let direction = flat_direction.normalize();
+        // อยู่ในระยะตรวจจับ แต่ยังไม่ถึงระยะต่อย
+        let direction =
+            flat_direction.normalize();
 
-        velocity.x = direction.x * MUAMUA_MOVE_SPEED;
-        velocity.z = direction.z * MUAMUA_MOVE_SPEED;
+        velocity.x =
+            direction.x * MUAMUA_MOVE_SPEED;
 
-        // หันหน้าเข้าหา Player
+        velocity.z =
+            direction.z * MUAMUA_MOVE_SPEED;
+
         muamua_transform.rotation =
             Quat::from_rotation_y(
                 direction.x.atan2(direction.z),
             );
 
-        *enemy_state = EnemyState::Chase;
+        *enemy_state =
+            EnemyState::Chase;
     }
 }
 
@@ -390,6 +445,8 @@ fn update_enemy_muamua_animation(
         };
 
         let wanted_animation = match enemy_state {
+            EnemyState::Hurt => EnemyMuamuaAnimState::Hurt,
+            EnemyState::Dead => EnemyMuamuaAnimState::Dead,
             EnemyState::Chase => {
                 EnemyMuamuaAnimState::Chase
             }
@@ -425,9 +482,75 @@ fn update_enemy_muamua_animation(
                     .play(animation_graph.attack)
                     .repeat();
             }
+            EnemyMuamuaAnimState::Hurt => {
+                animation_player.play(animation_graph.hurt);
+            }
+
+            EnemyMuamuaAnimState::Dead => {
+                animation_player.play(animation_graph.dead);
+            }
         }
 
         *current_animation = wanted_animation;
+    }
+}
+
+fn update_muamua_hurt_and_dead(
+    mut commands: Commands,
+    time: Res<Time>,
+
+    mut muamua_query: Query<
+        (
+            Entity,
+            &mut EnemyState,
+            &mut MuamuaStateTimer,
+            &mut LinearVelocity,
+        ),
+        With<EnemyMuamua>,
+    >,
+) {
+    for (
+        muamua_entity,
+        mut enemy_state,
+        mut state_timer,
+        mut velocity,
+    ) in &mut muamua_query
+    {
+        // Hurt และ Dead ต้องหยุดเดิน
+        velocity.x = 0.0;
+        velocity.z = 0.0;
+
+        state_timer.0.tick(time.delta());
+
+        if !state_timer.0.is_finished() {
+            continue;
+        }
+
+        match *enemy_state {
+            EnemyState::Hurt => {
+                // เล่น Hurt จบแล้วกลับ Idle
+                *enemy_state =
+                    EnemyState::Idle;
+
+                commands
+                    .entity(muamua_entity)
+                    .remove::<MuamuaStateTimer>();
+            }
+
+            EnemyState::Dead => {
+                // เล่น Dead จบแล้วจึงลบ Entity
+                commands
+                    .entity(muamua_entity)
+                    .despawn();
+            }
+
+            _ => {
+                // กัน Timer ค้างอยู่ในสถานะอื่น
+                commands
+                    .entity(muamua_entity)
+                    .remove::<MuamuaStateTimer>();
+            }
+        }
     }
 }
 
