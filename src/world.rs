@@ -17,7 +17,7 @@ impl Plugin for WorldPlugin {
             .add_systems(Update, go_to_hub.run_if(in_state(GameScene::LoadingHub)))
             .add_systems(OnExit(GameScene::LoadingHub), cleanup_loading_ui)
 
-            .add_systems(OnEnter(GameScene::Hub), hub::spawn_hub)
+            .add_systems(OnEnter(GameScene::Hub), (hub::spawn_hub, setup_hub_light))
             .add_systems(Update, check_warp_to_desert.run_if(in_state(GameScene::Hub)))
             .add_systems(OnExit(GameScene::Hub), cleanup_current_scene)
 
@@ -26,6 +26,7 @@ impl Plugin for WorldPlugin {
             .add_systems(OnExit(GameScene::LoadingDesert), cleanup_loading_ui)
 
             .add_systems(OnEnter(GameScene::Desert), desert::spawn_desert)
+            .add_systems(OnEnter(GameScene::Desert), setup_desert_light)
             .add_systems(Update, check_warp_to_hub.run_if(in_state(GameScene::Desert)))
             .add_systems(OnExit(GameScene::Desert), cleanup_current_scene);
     }
@@ -110,4 +111,38 @@ fn check_warp_to_hub(
             next_state.set(GameScene::LoadingHub);
         }
     }
+}
+
+fn setup_hub_light(mut commands: Commands) {
+    commands.spawn((
+        DirectionalLight {
+            illuminance: 8_000.0,
+            shadows_enabled: true,
+            ..default()
+        },
+        Transform::from_rotation(Quat::from_euler(
+            EulerRot::XYZ,
+            -1.0,
+            -0.5,
+            0.0,
+        )),
+        CurrentScene,
+    ));
+}
+
+fn setup_desert_light(mut commands: Commands) {
+    commands.spawn((
+        DirectionalLight {
+            illuminance: 15_000.0,
+            shadows_enabled: true,
+            ..default()
+        },
+        Transform::from_rotation(Quat::from_euler(
+            EulerRot::XYZ,
+            -0.8,
+            -0.3,
+            0.0,
+        )),
+        CurrentScene,
+    ));
 }

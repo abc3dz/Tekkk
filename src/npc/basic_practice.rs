@@ -269,12 +269,12 @@ pub fn basic_projectile_hit_player(
             FloatingDamageKind::PlayerHit,
         );
 
-        // play_player_hurt_animation(
-        //     &mut commands,
-        //     player_entity,
-        //     &anim_graph,
-        //     &mut anim_query,
-        // );
+        play_player_hurt_animation(
+            &mut commands,
+            player_entity,
+            &anim_graph,
+            &mut anim_query,
+        );
 
         commands.entity(projectile_entity).despawn();
     }

@@ -129,7 +129,7 @@ fn spawn_enemy_muamua_entity(
         CombatTarget,
         MuamuaAttackTimer(
             Timer::from_seconds(
-                1.0,
+                0.3,
                 TimerMode::Repeating,
             ),
         ),
@@ -335,29 +335,18 @@ fn enemy_muamua_chase_player(
     {
         // ตอนเจ็บหรือตาย ห้ามเดินไล่
         // และห้ามเปลี่ยนกลับเป็น Idle/Chase/Attack
-        if matches!(
-            *enemy_state,
-            EnemyState::Hurt
-                | EnemyState::Dead
-        ) {
+        if matches!(*enemy_state, EnemyState::Hurt | EnemyState::Dead) {
             velocity.x = 0.0;
             velocity.z = 0.0;
             continue;
         }
 
-        let to_player =
-            player_transform.translation
-                - muamua_transform.translation;
+        let to_player = player_transform.translation- muamua_transform.translation;
 
         // ไม่ใช้แกน Y เพราะเดินบนพื้น
-        let flat_direction = Vec3::new(
-            to_player.x,
-            0.0,
-            to_player.z,
-        );
+        let flat_direction = Vec3::new(to_player.x,0.0,to_player.z);
 
-        let distance =
-            flat_direction.length();
+        let distance = flat_direction.length();
 
         // Player อยู่นอกระยะตรวจจับ
         if distance > MUAMUA_CHASE_RANGE {

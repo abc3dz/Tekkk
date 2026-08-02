@@ -239,9 +239,23 @@ pub enum GameScene {
 }
 
 //
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum DefeatParticleState {
+    Rising,
+    ChasingPlayer,
+}
+
 #[derive(Component)]
-pub struct BasicGunDefeatParticle {
+pub struct DefeatParticle {
     pub velocity: Vec3,
+
+    // ตอนนี้ลูกกลมอยู่ช่วงไหน
+    pub state: DefeatParticleState,
+
+    // เวลาที่ให้ลอยขึ้นก่อนเริ่มวิ่งหา Player
+    pub state_timer: Timer,
+
+    // กันลูกกลมค้าง หากหา Player ไม่เจอ
     pub lifetime: Timer,
 }
 

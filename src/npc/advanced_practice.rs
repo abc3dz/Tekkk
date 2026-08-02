@@ -213,12 +213,12 @@ pub fn minion_drain_player_life(
         minion_health.current += drain_amount;
         minion_health.current = minion_health.current.clamp(0, minion_health.max);
 
-        // play_player_hurt_animation(
-        //     &mut commands,
-        //     player_entity,
-        //     &anim_graph,
-        //     &mut anim_query,
-        // );
+        play_player_hurt_animation(
+            &mut commands,
+            player_entity,
+            &anim_graph,
+            &mut anim_query,
+        );
         commands.spawn(AudioPlayer::new(asset_server.load("sounds/npc/514479__metrostock99__blllllllup-and-you-suck-ad-libs.ogg")));
     }
 }

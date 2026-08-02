@@ -34,7 +34,7 @@ impl Plugin for PlayerPlugin {
             update_player_status_ui,
             rebuild_player_combat_stats_from_exp,
             update_floating_damage_text,
-            update_basic_gun_defeat_particles,
+            update_defeat_particles,
             player_return_after_hurt,
             respawn_player_when_defeated,
             ).chain()
@@ -1131,12 +1131,15 @@ fn spawn_defeat_particles(
         let r1 = pseudo_random(seed + i as f32 * 1.37);
         let r2 = pseudo_random(seed + i as f32 * 2.11);
         let r3 = pseudo_random(seed + i as f32 * 3.73);
+
         let size = 0.08 + r1 * 0.22;
+
         let offset = Vec3::new(
             (r2 - 0.5) * 1.2,
             0.3 + r1 * 0.4,
             (r3 - 0.5) * 1.2,
         );
+
         let velocity = Vec3::new(
             (r2 - 0.5) * 0.6,
             1.2 + r1 * 1.4,
@@ -1144,32 +1147,165 @@ fn spawn_defeat_particles(
         );
 
         commands.spawn((
-            BasicGunDefeatParticle {
+            DefeatParticle {
                 velocity,
-                lifetime: Timer::from_seconds(0.8 + r3 * 0.5, TimerMode::Once),
+
+                state: DefeatParticleState::Rising,
+
+                state_timer: Timer::from_seconds(
+                    0.35 + r2 * 0.25,
+                    TimerMode::Once,
+                ),
+
+                lifetime: Timer::from_seconds(
+                    4.0,
+                    TimerMode::Once,
+                ),
             },
-            Mesh3d(meshes.add(Sphere::new(size))),
-            MeshMaterial3d(materials.add(StandardMaterial {
-                base_color: Color::srgba(1.0, 1.0, 1.0, 0.45),
-                alpha_mode: AlphaMode::Blend,
-                ..default()
-            })),
-            Transform::from_translation(position + offset),
+
+            Mesh3d(
+                meshes.add(
+                    Sphere::new(size),
+                ),
+            ),
+
+            MeshMaterial3d(
+                materials.add(
+                    StandardMaterial {
+                        base_color: Color::srgba(
+                            1.0,
+                            1.0,
+                            1.0,
+                            0.45,
+                        ),
+
+                        alpha_mode:
+                            AlphaMode::Blend,
+
+                        ..default()
+                    },
+                ),
+            ),
+
+            Transform::from_translation(
+                position + offset,
+            ),
+
             GlobalTransform::default(),
         ));
     }
 }
 
-pub fn update_basic_gun_defeat_particles(
+pub fn update_defeat_particles(
     mut commands: Commands,
     time: Res<Time>,
-    mut particle_query: Query<(Entity, &mut Transform, &mut BasicGunDefeatParticle)>,
+
+    player_query:
+        Query<&GlobalTransform, With<Player>>,
+
+    mut particle_query: Query<
+        (
+            Entity,
+            &mut Transform,
+            &mut DefeatParticle,
+        ),
+        Without<Player>,
+    >,
 ) {
-    for (entity, mut transform, mut particle) in &mut particle_query {
+    let delta_seconds = time.delta_secs();
+
+    // ตำแหน่งเป้าหมายบริเวณกลางตัว Player
+    let player_target = player_query
+        .single()
+        .ok()
+        .map(|player_transform| {
+            player_transform.translation()
+                + Vec3::Y * 0.4
+        });
+
+    for (
+        particle_entity,
+        mut particle_transform,
+        mut particle,
+    ) in &mut particle_query
+    {
         particle.lifetime.tick(time.delta());
-        transform.translation += particle.velocity * time.delta_secs();
+
+        // กัน Particle ค้างอยู่ใน Scene
         if particle.lifetime.is_finished() {
-            commands.entity(entity).despawn();
+            commands
+                .entity(particle_entity)
+                .despawn();
+
+            continue;
+        }
+
+        match particle.state {
+            DefeatParticleState::Rising => {
+                particle
+                    .state_timer
+                    .tick(time.delta());
+
+                // ช่วงแรกยังใช้ความเร็วลอยขึ้นแบบเดิม
+                particle_transform.translation +=
+                    particle.velocity
+                        * delta_seconds;
+
+                if particle
+                    .state_timer
+                    .is_finished()
+                {
+                    particle.state =
+                        DefeatParticleState::
+                            ChasingPlayer;
+                }
+            }
+
+            DefeatParticleState::ChasingPlayer => {
+                let Some(target_position) =
+                    player_target
+                else {
+                    continue;
+                };
+
+                let to_player =
+                    target_position
+                        - particle_transform.translation;
+
+                let distance =
+                    to_player.length();
+
+                // เข้าใกล้ Player แล้วถือว่าถูกเก็บ
+                if distance <= 0.35 {
+                    commands
+                        .entity(particle_entity)
+                        .despawn();
+
+                    continue;
+                }
+
+                let direction =
+                    to_player.normalize();
+
+                let desired_velocity =
+                    direction * 7.0;
+
+                // ค่อย ๆ เลี้ยวหา Player
+                // ไม่หักมุมทันที
+                let turn_amount =
+                    (8.0 * delta_seconds)
+                        .clamp(0.0, 1.0);
+
+                particle.velocity =
+                    particle.velocity.lerp(
+                        desired_velocity,
+                        turn_amount,
+                    );
+
+                particle_transform.translation +=
+                    particle.velocity
+                        * delta_seconds;
+            }
         }
     }
 }

@@ -11,9 +11,11 @@ pub fn spawn_hub(
 ) {
     commands.spawn((
         SceneRoot(asset_server.load(GltfAssetLabel::Scene(0).from_asset("maps/EvrmHub.glb"))),
-        WindWakerShaderBuilder::default().time_of_day(TimeOfDay::Day).weather(Weather::Sunny).build(),
-        Transform::default(),
+        //WindWakerShaderBuilder::default().time_of_day(TimeOfDay::Day).weather(Weather::Sunny).build(),
+        // Transform::default(),
+        // Visibility::Inherited,
         CurrentScene,
+
     ));
     //ground
     commands.spawn((
@@ -37,6 +39,6 @@ pub fn spawn_hub(
     ));
     commands.spawn((
         AudioPlayer::new(asset_server.load("sounds/BGM_StartScene.ogg")),
-        PlaybackSettings{mode: bevy::audio::PlaybackMode::Loop, volume:  bevy::audio::Volume::Linear(0.3), ..default()},
+        PlaybackSettings{mode: bevy::audio::PlaybackMode::Loop, volume:  bevy::audio::Volume::Linear(0.3), ..default()},DespawnOnExit(GameScene::Hub),
     ));
 }
