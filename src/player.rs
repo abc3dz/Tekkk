@@ -24,10 +24,10 @@ impl Plugin for PlayerPlugin {
             player_jump_input,
             player_jump_update,
             player_combo_input,
+            player_dash_input,
             player_dash_move,
             spawn_player_dash_trail_during_dash,
             player_combo_update,
-            player_dash_input,
             player_dash_update,
             update_player_dash_effect,
             update_player_animation,
@@ -315,9 +315,7 @@ pub fn player_dash_input(
     gamepads: Query<&Gamepad>,
     dialog_query: Query<(), With<GuardianDialogUI>>,
 ) {
-    if !dialog_query.is_empty() {
-        return;
-    }
+    if !dialog_query.is_empty() { return }
 
     let dash_pressed =
         keyboard.just_pressed(KeyCode::KeyL)
@@ -327,16 +325,12 @@ pub fn player_dash_input(
                 )
             });
 
-    if !dash_pressed {
-        return;
-    }
+    if !dash_pressed { return }
 
     let Ok((player_entity, player_tf, combo)) = player_query.single() 
     else { return };
 
-    if combo.current_index.is_some() {
-        return;
-    }
+    if combo.current_index.is_some() { return }
 
     let Ok((entity, mut anim_player, mut anim_state)) = anim_query.single_mut() 
     else { return };
@@ -519,7 +513,9 @@ pub fn spawn_player_dash_trail_during_dash(
                 scale: Vec3::splat(1.0),
             },
             GlobalTransform::default(),
+            WindWakerShaderBuilder::default().time_of_day(TimeOfDay::Day).weather(Weather::Sunny).build(),
         ));
+        
         commands.spawn(AudioPlayer::new(asset_server.load("sounds/742717__artix0__dash-sound-effect.ogg")));
     }
 }
@@ -702,7 +698,12 @@ fn update_player_animation(
     for (mut player, mut anim_state) in &mut anim_query {
         if matches!(
             *anim_state,
-            PlayerAnimState::SlapR | PlayerAnimState::SlapL | PlayerAnimState::SlapLR | PlayerAnimState::Jump | PlayerAnimState::Hurt
+            PlayerAnimState::SlapR | 
+            PlayerAnimState::SlapL | 
+            PlayerAnimState::SlapLR | 
+            PlayerAnimState::Jump | 
+            PlayerAnimState::Hurt | 
+            PlayerAnimState::Dash
         ) {
             continue;
         }

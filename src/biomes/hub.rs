@@ -29,7 +29,7 @@ pub fn spawn_hub(
         Transform::from_xyz(0.0, 1.0, -15.5),
         DespawnOnExit(GameScene::Hub),
     ));
-    //gate
+    //warp
     commands.spawn((
         WarpToDesert,
         CurrentScene,
