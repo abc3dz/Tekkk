@@ -13,6 +13,7 @@ mod biomes;
 mod npc;
 mod element_ui;
 mod enemy;
+mod warp_portal;
 
 fn main() {
     App::new()
@@ -38,5 +39,6 @@ fn main() {
             //enemy::EnemyPlugin,
             element_ui::ElementUiPlugin,
         ))
+        
         .run();
 }
