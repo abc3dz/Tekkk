@@ -12,6 +12,8 @@ pub struct PlayerPlugin;
 
 impl Plugin for PlayerPlugin {
     fn build(&self, app: &mut App) {app
+        .add_plugins(MaterialPlugin::<PlayerEnergyMaterial>::default())
+        .add_systems(Startup,setup_player_energy_assets)
         .add_systems(Startup, (
             setup_player_animation_graph, 
             spawn_player,
@@ -43,16 +45,21 @@ impl Plugin for PlayerPlugin {
                 tag_player_hand_bones,
                 spawn_requested_player_punch_hitboxes,
                 update_player_punch_hitbox_lifetime,
-            ).chain()
-        )
+            ).chain())
         .add_systems(
             Update,
             (
                 spawn_player_slap_hitbox,
                 player_slap_hit_enemy,
                 despawn_player_slap_hitbox,
-            )
-                .chain(),
+            ).chain())
+        .add_systems(
+            Update,
+            (
+                player_energy_input,
+                update_player_energy_ball,
+                player_energy_hit_enemy
+            ).chain(),
         );
     }
 }
@@ -1809,5 +1816,411 @@ fn despawn_player_slap_hitbox(
         if hitbox.lifetime.is_finished() {
             commands.entity(entity).despawn();
         }
+    }
+}
+fn setup_player_energy_assets(
+    mut commands: Commands,
+    mut meshes: ResMut<Assets<Mesh>>,
+    mut materials: ResMut<
+        Assets<PlayerEnergyMaterial>,
+    >,
+) {
+    commands.insert_resource(
+        PlayerEnergyAssets {
+            mesh: meshes.add(
+                Sphere::new(0.32),
+            ),
+
+            material: materials.add(
+                PlayerEnergyMaterial {},
+            ),
+        },
+    );
+}
+fn player_energy_input(
+    mut commands: Commands,
+
+    keyboard: Res<ButtonInput<KeyCode>>,
+
+    gamepads: Query<&Gamepad>,
+
+    energy_assets: Res<PlayerEnergyAssets>,
+
+    player_query: Query<
+        &Transform,
+        With<Player>,
+    >,
+
+    dialog_query: Query<
+        (),
+        With<GuardianDialogUI>,
+    >,
+) {
+    if !dialog_query.is_empty() {
+        return;
+    }
+
+    let energy_pressed =
+        keyboard.just_pressed(KeyCode::KeyI)
+            || gamepads.iter().any(
+                |gamepad| {
+                    gamepad.just_pressed(
+                        GamepadButton::North,
+                    )
+                },
+            );
+
+    if !energy_pressed {
+        return;
+    }
+
+    let Ok(player_transform) =
+        player_query.single()
+    else {
+        return;
+    };
+
+    // ใช้ทิศเดียวกับระบบ Dash ของมึง
+    let direction =
+        player_transform.rotation * Vec3::Z;
+
+    let direction = direction.normalize();
+
+    // ปล่อยจากด้านหน้าบริเวณกลางตัว
+    let spawn_position =
+        player_transform.translation
+            + Vec3::Y * 0.45
+            + direction * 0.90;
+
+    commands.spawn((
+        Name::new("Player Energy Ball"),
+
+        PlayerEnergyBall {
+            direction,
+            speed: 12.0,
+
+            lifetime: Timer::from_seconds(
+                2.0,
+                TimerMode::Once,
+            ),
+            has_hit: false,
+        },
+
+        Mesh3d(
+            energy_assets.mesh.clone(),
+        ),
+
+        MeshMaterial3d(
+            energy_assets.material.clone(),
+        ),
+        RigidBody::Kinematic,
+        Collider::sphere(0.32),
+        Sensor,
+        CollisionEventsEnabled,
+
+        Transform {
+            translation: spawn_position,
+            rotation: player_transform.rotation,
+            scale: Vec3::ONE,
+        },
+
+        GlobalTransform::default(),
+    ));
+}
+fn update_player_energy_ball(
+    mut commands: Commands,
+    time: Res<Time>,
+
+    mut energy_query: Query<
+        (
+            Entity,
+            &mut Transform,
+            &mut PlayerEnergyBall,
+        ),
+    >,
+) {
+    let delta_seconds =
+        time.delta_secs();
+
+    for (
+        entity,
+        mut transform,
+        mut energy,
+    ) in &mut energy_query
+    {
+        energy.lifetime.tick(
+            time.delta(),
+        );
+
+        transform.translation +=
+            energy.direction
+                * energy.speed
+                * delta_seconds;
+
+        if energy.lifetime.is_finished() {
+            commands
+                .entity(entity)
+                .despawn();
+        }
+    }
+}
+fn player_energy_hit_enemy(
+    mut commands: Commands,
+    time: Res<Time>,
+
+    mut meshes: ResMut<Assets<Mesh>>,
+    mut materials: ResMut<Assets<StandardMaterial>>,
+
+    mut collision_reader: MessageReader<CollisionStart>,
+
+    mut energy_query: Query<
+        &mut PlayerEnergyBall,
+    >,
+
+    mut player_query: Query<
+        (
+            &CombatStats,
+            &AtkAndDefElement,
+            &mut ElementMastery,
+        ),
+        (
+            With<Player>,
+            Without<CombatTarget>,
+        ),
+    >,
+
+    mut target_query: Query<
+        (
+            &mut Health,
+            &CombatStats,
+            &AtkAndDefElement,
+            &GlobalTransform,
+            Option<&ElementExpReward>,
+            Option<&mut EnemyState>,
+        ),
+        (
+            With<CombatTarget>,
+            Without<Player>,
+        ),
+    >,
+) {
+    let Ok((
+        player_stats,
+        player_element,
+        mut element_mastery,
+    )) = player_query.single_mut()
+    else {
+        return;
+    };
+
+    let mut rng = rand::rng();
+
+    for event in collision_reader.read() {
+        // ตรวจว่าฝั่งไหนเป็นลูกพลัง
+        let (
+            energy_entity,
+            target_entity,
+        ) = if energy_query.contains(
+            event.collider1,
+        ) {
+            (
+                event.collider1,
+
+                event.body2
+                    .unwrap_or(event.collider2),
+            )
+        } else if energy_query.contains(
+            event.collider2,
+        ) {
+            (
+                event.collider2,
+
+                event.body1
+                    .unwrap_or(event.collider1),
+            )
+        } else {
+            // Collision นี้ไม่เกี่ยวกับลูกพลัง
+            continue;
+        };
+
+        let Ok(mut energy) =
+            energy_query.get_mut(energy_entity)
+        else {
+            continue;
+        };
+
+        // ลูกพลังนี้ทำดาเมจไปแล้ว
+        if energy.has_hit {
+            continue;
+        }
+
+        let Ok((
+            mut target_health,
+            target_stats,
+            target_element,
+            target_transform,
+            reward,
+            mut enemy_state,
+        )) = target_query.get_mut(target_entity)
+        else {
+            // ชนพื้นหรือกำแพง
+            // แต่ไม่ใช่ CombatTarget
+            continue;
+        };
+
+        // ศัตรูตายอยู่แล้ว
+        if target_health.current <= 0 {
+            commands
+                .entity(energy_entity)
+                .despawn();
+
+            continue;
+        }
+
+        energy.has_hit = true;
+
+        // คำนวณดาเมจพื้นฐานและ Critical
+        let (
+            base_damage,
+            is_critical,
+        ) = calculate_combat_damage(
+            player_stats,
+            target_stats,
+            &mut rng,
+        );
+
+        // คำนวณตัวคูณธาตุ
+        let element_multiplier =
+            elemental_multiplier(
+                player_element.0,
+                target_element.0,
+            );
+
+        let damage = (
+            base_damage as f32
+                * element_multiplier
+        )
+            .round()
+            .max(1.0) as i32;
+
+        // หัก HP
+        target_health.current -= damage;
+
+        target_health.current =
+            target_health.current.clamp(
+                0,
+                target_health.max,
+            );
+
+        let target_position =
+            target_transform.translation();
+
+        let damage_kind =
+            if is_critical {
+                FloatingDamageKind::EnemyCritical
+            } else {
+                FloatingDamageKind::EnemyNormal
+            };
+
+        spawn_floating_damage_text(
+            &mut commands,
+            damage,
+            target_position
+                + Vec3::new(0.0, 2.0, 0.0),
+            damage_kind,
+        );
+
+        info!(
+            "Energy hit: damage={}, HP={}/{}",
+            damage,
+            target_health.current,
+            target_health.max,
+        );
+
+        // ลูกพลังโดนเป้าหมายแล้วให้หาย
+        commands
+            .entity(energy_entity)
+            .despawn();
+
+        // ==============================
+        // ศัตรูยังไม่ตาย
+        // ==============================
+        if target_health.current > 0 {
+            if let Some(state) =
+                enemy_state.as_mut()
+            {
+                **state = EnemyState::Hurt;
+
+                commands
+                    .entity(target_entity)
+                    .insert(
+                        MuamuaStateTimer(
+                            Timer::from_seconds(
+                                0.45,
+                                TimerMode::Once,
+                            ),
+                        ),
+                    );
+            }
+
+            continue;
+        }
+
+        // ==============================
+        // ศัตรูตาย แจก EXP
+        // ==============================
+        if let Some(reward) = reward {
+            let gain = reward.grant_all(
+                &mut *element_mastery,
+                &mut rng,
+            );
+
+            info!(
+                "Energy EXP gain: Water +{}, Fire +{}, Wind +{}, Earth +{}, Inw +{}",
+                gain.water,
+                gain.fire,
+                gain.wind,
+                gain.earth,
+                gain.inw,
+            );
+        }
+
+        spawn_defeat_particles(
+            &mut commands,
+            &mut meshes,
+            &mut materials,
+            target_position,
+            time.elapsed_secs(),
+        );
+
+        // ==============================
+        // Muamua มี EnemyState
+        // ==============================
+        if let Some(state) =
+            enemy_state.as_mut()
+        {
+            **state = EnemyState::Dead;
+
+            commands
+                .entity(target_entity)
+                .insert(
+                    MuamuaStateTimer(
+                        Timer::from_seconds(
+                            1.20,
+                            TimerMode::Once,
+                        ),
+                    ),
+                )
+                .remove::<CombatTarget>();
+
+            continue;
+        }
+
+        // ==============================
+        // Practice enemy ไม่มี EnemyState
+        // ==============================
+        commands
+            .entity(target_entity)
+            .despawn();
     }
 }
