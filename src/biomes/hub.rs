@@ -11,9 +11,7 @@ pub fn spawn_hub(
 ) {
     commands.spawn((
         SceneRoot(asset_server.load(GltfAssetLabel::Scene(0).from_asset("maps/EvrmHub.glb"))),
-        //WindWakerShaderBuilder::default().time_of_day(TimeOfDay::Day).weather(Weather::Sunny).build(),
-        // Transform::default(),
-        // Visibility::Inherited,
+        WindWakerShaderBuilder::default().time_of_day(TimeOfDay::Day).weather(Weather::Sunny).build(),
         CurrentScene,
 
     ));
@@ -22,12 +20,14 @@ pub fn spawn_hub(
         RigidBody::Static,
         Collider::cuboid(36.0, 0.1, 39.0),
         Transform::from_xyz(0.0, 0.0, 0.0),
+        DespawnOnExit(GameScene::Hub),
     ));
     //wall
     commands.spawn((
         RigidBody::Static,
         Collider::cuboid(32.0, 3.0, 0.3),
         Transform::from_xyz(0.0, 1.0, -15.5),
+        DespawnOnExit(GameScene::Hub),
     ));
     //gate
     commands.spawn((
@@ -36,9 +36,11 @@ pub fn spawn_hub(
         Sensor,
         Collider::cuboid(2.0, 2.0, 2.0),
         Transform::from_xyz(0.0, 1.0, -15.0),
+        DespawnOnExit(GameScene::Hub),
     ));
     commands.spawn((
         AudioPlayer::new(asset_server.load("sounds/BGM_StartScene.ogg")),
-        PlaybackSettings{mode: bevy::audio::PlaybackMode::Loop, volume:  bevy::audio::Volume::Linear(0.3), ..default()},DespawnOnExit(GameScene::Hub),
+        PlaybackSettings{mode: bevy::audio::PlaybackMode::Loop, volume:  bevy::audio::Volume::Linear(0.3), ..default()},
+        DespawnOnExit(GameScene::Hub),
     ));
 }

@@ -12,17 +12,17 @@ pub fn spawn_desert(
 ) {
     commands.spawn((
         SceneRoot(asset_server.load(GltfAssetLabel::Scene(0).from_asset("maps/EvrmDesert.glb"))),
-        WindWakerShaderBuilder::default().time_of_day(TimeOfDay::Day).weather(Weather::Sunny).build(),
-        Transform::default(),
+        WindWakerShaderBuilder::default().time_of_day(TimeOfDay::Day).weather(Weather::Rainy).build(),
+        Transform::from_xyz(0.0, 0.0, 0.0),
         CurrentScene,
     ));
-
+    //ground
     commands.spawn((
         RigidBody::Static,
-        Collider::cuboid(50.0, 0.1, 50.0),
+        Collider::cuboid(50.0, 0.1, 109.0),
         Transform::from_xyz(0.0, 0.0, 0.0),
     ));
-
+    //warp
     commands.spawn((
         CurrentScene,
         WarpToHub,

@@ -20,7 +20,7 @@ impl Plugin for BasicPracticePlugin {
             .insert_resource(
                 BasicGunRespawnTimer(
                     Timer::from_seconds(
-                        1.0,
+                        3.0,
                         TimerMode::Once,
                     ),
                 ),
@@ -74,7 +74,7 @@ let gun_entity = commands
 
             BasicGunShootTimer(
                 Timer::from_seconds(
-                    1.0,
+                    3.0,
                     TimerMode::Repeating,
                 ),
             ),

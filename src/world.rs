@@ -25,8 +25,7 @@ impl Plugin for WorldPlugin {
             .add_systems(Update, go_to_desert.run_if(in_state(GameScene::LoadingDesert)))
             .add_systems(OnExit(GameScene::LoadingDesert), cleanup_loading_ui)
 
-            .add_systems(OnEnter(GameScene::Desert), desert::spawn_desert)
-            .add_systems(OnEnter(GameScene::Desert), setup_desert_light)
+            .add_systems(OnEnter(GameScene::Desert), (desert::spawn_desert, setup_desert_light))
             .add_systems(Update, check_warp_to_hub.run_if(in_state(GameScene::Desert)))
             .add_systems(OnExit(GameScene::Desert), cleanup_current_scene);
     }

@@ -19,7 +19,7 @@ impl Plugin for AdvancedPracticePlugin {
             .insert_resource(
                 AdvancedMinionRespawnTimer(
                     Timer::from_seconds(
-                        1.0,
+                        2.0,
                         TimerMode::Once,
                     ),
                 ),
@@ -114,7 +114,7 @@ let minion_entity = commands
 
             MinionLifeDrainTimer(
                 Timer::from_seconds(
-                    0.5,
+                    2.0,
                     TimerMode::Repeating,
                 ),
             ),
