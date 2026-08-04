@@ -4,6 +4,7 @@ use bevy::{
     render::render_resource::AsBindGroup,
     shader::ShaderRef,
 };
+use crate::components::*;
 
 const WARP_PORTAL_SHADER: &str = "shaders/warp_portal.wgsl";
 
@@ -44,5 +45,6 @@ pub fn spawn_warp_portal(
         Mesh3d(portal_mesh),
         MeshMaterial3d(portal_material),
         Transform::from_xyz(0.0,2.0,-14.0,),
+        DespawnOnExit(GameScene::Hub),
     ));
 }

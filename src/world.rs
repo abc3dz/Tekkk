@@ -5,6 +5,7 @@ use crate::biomes::{hub, desert};
 use crate::npc::guardian::GuardianPlugin;
 use crate::enemy::enemy_muamua::*;
 use crate::warp_portal::*;
+use crate::enemy::enemy_choky::*;
 
 pub struct WorldPlugin;
 
@@ -14,6 +15,7 @@ impl Plugin for WorldPlugin {
         .add_plugins(GuardianPlugin)
         .add_plugins(EnemyMuamuaPlugin)
         .add_plugins(WarpPortalPlugin)
+        .add_plugins(EnemyChokyPlugin)
         
         .add_systems(OnEnter(GameScene::LoadingHub), spawn_loading_ui)
         .add_systems(Update, go_to_hub.run_if(in_state(GameScene::LoadingHub)))

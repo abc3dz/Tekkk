@@ -1,4 +1,7 @@
 use bevy::prelude::*;
+use bevy::reflect::TypePath;
+use bevy::render::render_resource::AsBindGroup;
+use bevy::shader::ShaderRef;
 
 //player
 #[derive(Component)]
@@ -39,6 +42,7 @@ pub struct PlayerAnimationGraph {
     pub dash: AnimationNodeIndex,
     pub jump: AnimationNodeIndex,
     pub hurt: AnimationNodeIndex,
+    pub power: AnimationNodeIndex,
 }
 
 #[derive(Component, PartialEq, Eq, Clone, Copy)]
@@ -51,6 +55,7 @@ pub enum PlayerAnimState {
     Dash,
     Jump,
     Hurt,
+    Power,
 }
 
 #[derive(Component)]
@@ -95,6 +100,9 @@ pub struct PlayerJumpTimer(pub Timer);
 pub struct PlayerHurtTimer(pub Timer);
 
 #[derive(Component)]
+pub struct PlayerPowerTimer(pub Timer);
+
+#[derive(Component)]
 pub struct PlayerFootstepSound;
 
 #[derive(Component, Debug, Clone, Copy, PartialEq, Eq)]
@@ -133,6 +141,31 @@ pub enum FloatingDamageKind {
 
 #[derive(Component)]
 pub struct PlayerSlapHitbox {
+    pub lifetime: Timer,
+    pub has_hit: bool,
+}
+
+pub const PLAYER_ENERGY_SHADER_PATH: &str = "shaders/player_energy_ball.wgsl";
+
+#[derive(Asset,TypePath,AsBindGroup,Debug,Clone)]
+pub struct PlayerEnergyMaterial {}
+
+impl Material for PlayerEnergyMaterial {
+    fn fragment_shader() -> ShaderRef {
+        PLAYER_ENERGY_SHADER_PATH.into()
+    }
+}
+
+#[derive(Resource)]
+pub struct PlayerEnergyAssets {
+    pub mesh: Handle<Mesh>,
+    pub material: Handle<PlayerEnergyMaterial>,
+}
+
+#[derive(Component)]
+pub struct PlayerEnergyBall {
+    pub direction: Vec3,
+    pub speed: f32,
     pub lifetime: Timer,
     pub has_hit: bool,
 }
@@ -273,6 +306,7 @@ pub enum EnemyState {
     Dead,
 }
 
+//Muamua
 #[derive(Resource)]
 pub struct EnemyMuamuaAnimationGraph {
     pub graph: Handle<AnimationGraph>,
@@ -312,3 +346,44 @@ pub struct MuamuaRespawnTimer(pub Timer);
 
 #[derive(Component)]
 pub struct  MuamuaStateTimer(pub Timer);
+
+//Choky
+#[derive(Resource)]
+pub struct EnemyChokyAnimationGraph {
+    pub graph: Handle<AnimationGraph>,
+    pub idle: AnimationNodeIndex,
+    pub chase: AnimationNodeIndex,
+    pub attack: AnimationNodeIndex,
+    pub hurt: AnimationNodeIndex,
+    pub dead: AnimationNodeIndex,
+}
+
+#[derive(Component)]
+pub struct EnemyChokyAnimationTarget {
+    pub root: Entity,
+}
+
+#[derive(Component, Debug, Clone, Copy, PartialEq, Eq)]
+pub enum EnemyChokyAnimState {
+    Idle,
+    Chase,
+    Attack,
+    Hurt,
+    Dead,
+}
+
+#[derive(Component)]
+pub struct ChokyPunchHitbox {
+    pub owner: Entity,
+    pub has_hit: bool,
+    pub lifetime: Timer,
+}
+
+#[derive(Component)]
+pub struct ChokyAttackTimer(pub Timer);
+
+#[derive(Resource)]
+pub struct ChokyRespawnTimer(pub Timer);
+
+#[derive(Component)]
+pub struct  ChokyStateTimer(pub Timer);

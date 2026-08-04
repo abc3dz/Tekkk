@@ -57,6 +57,7 @@ impl Plugin for PlayerPlugin {
             Update,
             (
                 player_energy_input,
+                player_power_update,
                 update_player_energy_ball,
                 player_energy_hit_enemy
             ).chain(),
@@ -261,6 +262,14 @@ fn setup_player_animation_graph(
         1.0,
         graph.root,
     );
+    let power = graph.add_clip(
+    asset_server.load(
+        GltfAssetLabel::Animation(8)
+            .from_asset("player/PlayerMoya.glb"),
+    ),
+    1.0,
+    graph.root,
+);
 
     let graph_handle = graphs.add(graph);
 
@@ -274,6 +283,7 @@ fn setup_player_animation_graph(
         dash,
         jump,
         hurt,
+        power,
     });
 }
 
@@ -705,12 +715,9 @@ fn update_player_animation(
     for (mut player, mut anim_state) in &mut anim_query {
         if matches!(
             *anim_state,
-            PlayerAnimState::SlapR | 
-            PlayerAnimState::SlapL | 
-            PlayerAnimState::SlapLR | 
-            PlayerAnimState::Jump | 
-            PlayerAnimState::Hurt | 
-            PlayerAnimState::Dash
+            PlayerAnimState::SlapR | PlayerAnimState::SlapL |            
+            PlayerAnimState::SlapLR | PlayerAnimState::Jump |             
+            PlayerAnimState::Hurt | PlayerAnimState::Dash | PlayerAnimState::Power            
         ) {
             continue;
         }
@@ -1846,14 +1853,24 @@ fn player_energy_input(
 
     energy_assets: Res<PlayerEnergyAssets>,
 
-    player_query: Query<
-        &Transform,
+    mut player_query: Query<
+        (&Transform, &mut Mana),
         With<Player>,
     >,
 
     dialog_query: Query<
         (),
         With<GuardianDialogUI>,
+    >,
+    anim_graph: Res<PlayerAnimationGraph>,
+
+    mut anim_query: Query<
+        (
+            Entity,
+            &mut AnimationPlayer,
+            &mut PlayerAnimState,
+        ),
+        With<PlayerAnimationTarget>,
     >,
 ) {
     if !dialog_query.is_empty() {
@@ -1873,12 +1890,58 @@ fn player_energy_input(
     if !energy_pressed {
         return;
     }
-
-    let Ok(player_transform) =
-        player_query.single()
+    let Ok((player_transform, mut mana)) =
+        player_query.single_mut()
     else {
         return;
     };
+
+    if mana.current < 3 {
+        info!(
+            "Not enough mana: {}/{}",
+            mana.current,
+            mana.max,
+        );
+
+        return;
+    }
+    
+    
+    let Ok((
+        anim_entity,
+        mut anim_player,
+        mut anim_state,
+    )) = anim_query.single_mut()
+    else {
+        return;
+    };
+
+    if matches!(
+        *anim_state,
+        PlayerAnimState::Hurt
+            | PlayerAnimState::Dash
+            | PlayerAnimState::Jump
+            | PlayerAnimState::Power
+    ) {
+        return;
+    }
+    mana.current -= 3;
+
+    anim_player.stop_all();
+    anim_player.play(anim_graph.power);
+
+    *anim_state = PlayerAnimState::Power;
+
+    commands.entity(anim_entity).insert(
+        PlayerPowerTimer(
+            Timer::from_seconds(
+                0.70,
+                TimerMode::Once,
+            ),
+        ),
+    );
+
+    
 
     // ใช้ทิศเดียวกับระบบ Dash ของมึง
     let direction =
@@ -2222,5 +2285,45 @@ fn player_energy_hit_enemy(
         commands
             .entity(target_entity)
             .despawn();
+    }
+}
+fn player_power_update(
+    mut commands: Commands,
+    time: Res<Time>,
+    anim_graph: Res<PlayerAnimationGraph>,
+
+    mut anim_query: Query<
+        (
+            Entity,
+            &mut AnimationPlayer,
+            &mut PlayerAnimState,
+            &mut PlayerPowerTimer,
+        ),
+        With<PlayerAnimationTarget>,
+    >,
+) {
+    for (
+        entity,
+        mut anim_player,
+        mut anim_state,
+        mut power_timer,
+    ) in &mut anim_query
+    {
+        power_timer.0.tick(time.delta());
+
+        if !power_timer.0.is_finished() {
+            continue;
+        }
+
+        anim_player.stop_all();
+        anim_player
+            .play(anim_graph.idle)
+            .repeat();
+
+        *anim_state = PlayerAnimState::Idle;
+
+        commands
+            .entity(entity)
+            .remove::<PlayerPowerTimer>();
     }
 }
