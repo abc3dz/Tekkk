@@ -4,7 +4,10 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
-bevy = "0.18"
+bevy = {
+    version = "0.18",
+    features = ["debug"]
+}
 avian3d = "0.6"
 bevy_framepace = "0.20"
 rand = "0.9"
