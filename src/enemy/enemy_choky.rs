@@ -489,7 +489,7 @@ fn update_choky_hurt_and_dead(
         (
             Entity,
             &mut EnemyState,
-            &mut ChokyStateTimer,
+            &mut EnemyStateTimer,
             &mut LinearVelocity,
         ),
         With<EnemyChoky>,
@@ -502,7 +502,6 @@ fn update_choky_hurt_and_dead(
         mut velocity,
     ) in &mut choky_query
     {
-        // Hurt และ Dead ต้องหยุดเดิน
         velocity.x = 0.0;
         velocity.z = 0.0;
 
@@ -514,27 +513,23 @@ fn update_choky_hurt_and_dead(
 
         match *enemy_state {
             EnemyState::Hurt => {
-                // เล่น Hurt จบแล้วกลับ Idle
-                *enemy_state =
-                    EnemyState::Idle;
+                *enemy_state = EnemyState::Idle;
 
                 commands
                     .entity(choky_entity)
-                    .remove::<ChokyStateTimer>();
+                    .remove::<EnemyStateTimer>();
             }
 
             EnemyState::Dead => {
-                // เล่น Dead จบแล้วจึงลบ Entity
                 commands
                     .entity(choky_entity)
                     .despawn();
             }
 
             _ => {
-                // กัน Timer ค้างอยู่ในสถานะอื่น
                 commands
                     .entity(choky_entity)
-                    .remove::<ChokyStateTimer>();
+                    .remove::<EnemyStateTimer>();
             }
         }
     }

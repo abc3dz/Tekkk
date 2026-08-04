@@ -1707,7 +1707,7 @@ fn player_slap_hit_enemy(
                 commands
                     .entity(target_entity)
                     .insert(
-                        MuamuaStateTimer(
+                        EnemyStateTimer(
                             Timer::from_seconds(
                                 0.45,
                                 TimerMode::Once,
@@ -1755,7 +1755,7 @@ fn player_slap_hit_enemy(
             commands
                 .entity(target_entity)
                 .insert(
-                    MuamuaStateTimer(
+                    EnemyStateTimer(
                         Timer::from_seconds(
                             1.20,
                             TimerMode::Once,
@@ -2217,7 +2217,7 @@ fn player_energy_hit_enemy(
                 commands
                     .entity(target_entity)
                     .insert(
-                        MuamuaStateTimer(
+                        EnemyStateTimer(
                             Timer::from_seconds(
                                 0.45,
                                 TimerMode::Once,
@@ -2267,7 +2267,7 @@ fn player_energy_hit_enemy(
             commands
                 .entity(target_entity)
                 .insert(
-                    MuamuaStateTimer(
+                    EnemyStateTimer(
                         Timer::from_seconds(
                             1.20,
                             TimerMode::Once,

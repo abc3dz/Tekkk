@@ -492,7 +492,7 @@ fn update_muamua_hurt_and_dead(
         (
             Entity,
             &mut EnemyState,
-            &mut MuamuaStateTimer,
+            &mut EnemyStateTimer,
             &mut LinearVelocity,
         ),
         With<EnemyMuamua>,
@@ -505,7 +505,6 @@ fn update_muamua_hurt_and_dead(
         mut velocity,
     ) in &mut muamua_query
     {
-        // Hurt และ Dead ต้องหยุดเดิน
         velocity.x = 0.0;
         velocity.z = 0.0;
 
@@ -517,27 +516,23 @@ fn update_muamua_hurt_and_dead(
 
         match *enemy_state {
             EnemyState::Hurt => {
-                // เล่น Hurt จบแล้วกลับ Idle
-                *enemy_state =
-                    EnemyState::Idle;
+                *enemy_state = EnemyState::Idle;
 
                 commands
                     .entity(muamua_entity)
-                    .remove::<MuamuaStateTimer>();
+                    .remove::<EnemyStateTimer>();
             }
 
             EnemyState::Dead => {
-                // เล่น Dead จบแล้วจึงลบ Entity
                 commands
                     .entity(muamua_entity)
                     .despawn();
             }
 
             _ => {
-                // กัน Timer ค้างอยู่ในสถานะอื่น
                 commands
                     .entity(muamua_entity)
-                    .remove::<MuamuaStateTimer>();
+                    .remove::<EnemyStateTimer>();
             }
         }
     }
