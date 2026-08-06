@@ -73,7 +73,7 @@ fn spawn_enemy_choky_entity(
     );
 
     let spawn_position =
-        Vec3::new(5.0, 0.0, 5.0);
+        Vec3::new(-13.0, 0.0, -40.0);
 
     const CHOKY_BODY_Y: f32 = 1.0;
 
@@ -417,6 +417,8 @@ fn update_enemy_choky_animation(
             &mut EnemyChokyAnimState,
         ),
     >,
+    mut commands: Commands,
+    asset_server: Res<AssetServer>
 ) {
     for (
         animation_target,
@@ -470,10 +472,12 @@ fn update_enemy_choky_animation(
             }
             EnemyChokyAnimState::Hurt => {
                 animation_player.play(animation_graph.hurt);
+                commands.spawn(AudioPlayer::new(asset_server.load("sounds/enemy/567989__ancientwarrior__woundedmaleshort_choky_hurt.ogg")));
             }
 
             EnemyChokyAnimState::Dead => {
                 animation_player.play(animation_graph.dead);
+                commands.spawn(AudioPlayer::new(asset_server.load("sounds/enemy/567989__ancientwarrior__woundedmaleshort_choky_dead.ogg")));
             }
         }
 
@@ -597,35 +601,18 @@ fn spawn_choky_punch_hitbox(
 
 fn choky_punch_hit_player(
     mut commands: Commands,
-    mut collision_reader:
-        MessageReader<CollisionStart>,
-
-    mut hitbox_query:
-        Query<&mut ChokyPunchHitbox>,
-
-    choky_query: Query<
-        (
-            &CombatStats,
-            &AtkAndDefElement,
-        ),
-        (
-            With<EnemyChoky>,
-            Without<Player>,
-        ),
-    >,
-
-    mut player_query: Query<
-        (
-            &mut Health,
-            &CombatStats,
-            &AtkAndDefElement,
-            &GlobalTransform,
-        ),
+    mut collision_reader: MessageReader<CollisionStart>,
+    mut hitbox_query: Query<&mut ChokyPunchHitbox>,
+    choky_query: Query<(&CombatStats,&AtkAndDefElement),(With<EnemyChoky>,Without<Player>)>,
+    mut player_query: Query<(Entity,&mut Health,&CombatStats,&AtkAndDefElement,&GlobalTransform),
         (
             With<Player>,
             Without<EnemyChoky>,
         ),
     >,
+    anim_graph: Res<PlayerAnimationGraph>,
+    mut player_anim_query: Query<(&mut AnimationPlayer,&mut PlayerAnimState),With<PlayerAnimationTarget>>,
+    asset_server: Res<AssetServer>
 ) {
     let mut rng = rand::rng();
 
@@ -664,6 +651,7 @@ fn choky_punch_hit_player(
         }
 
         let Ok((
+            player_entity,
             mut player_health,
             player_stats,
             player_element,
@@ -710,6 +698,15 @@ fn choky_punch_hit_player(
                 0,
                 player_health.max,
             );
+        if player_health.current > 0 {
+            play_player_hurt_animation(
+                &mut commands,
+                player_entity,
+                &anim_graph,
+                &mut player_anim_query,
+            );
+        }
+        commands.spawn(AudioPlayer::new(asset_server.load("sounds/331935__pyro13djt__hit_hurt.ogg")));
         spawn_floating_damage_text(
             &mut commands,
             damage,

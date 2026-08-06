@@ -188,9 +188,7 @@ pub fn minion_drain_player_life(
     anim_graph: Res<PlayerAnimationGraph>,
     mut anim_query: Query<(&mut AnimationPlayer, &mut PlayerAnimState), With<PlayerAnimationTarget>,>,
     mut player_query: Query<(Entity, &Transform, &mut Health),(With<Player>, Without<GuardianClone>),>,
-    mut minion_query: Query<(&Transform, &mut Health, &mut MinionLifeDrainTimer),
-        (With<GuardianClone>, Without<Player>),
-    >,
+    mut minion_query: Query<(&Transform, &mut Health, &mut MinionLifeDrainTimer),(With<GuardianClone>, Without<Player>)>,
 ) {
     let Ok((player_entity, player_tf, mut player_health)) = player_query.single_mut() else { return };
 

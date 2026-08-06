@@ -43,6 +43,7 @@ pub struct PlayerAnimationGraph {
     pub jump: AnimationNodeIndex,
     pub hurt: AnimationNodeIndex,
     pub power: AnimationNodeIndex,
+    pub dead: AnimationNodeIndex,
 }
 
 #[derive(Component, PartialEq, Eq, Clone, Copy)]
@@ -56,6 +57,7 @@ pub enum PlayerAnimState {
     Jump,
     Hurt,
     Power,
+    Dead,
 }
 
 #[derive(Component)]
@@ -306,6 +308,9 @@ pub enum EnemyState {
     Dead,
 }
 
+#[derive(Component)]
+pub struct EnemyStateTimer(pub Timer);
+
 //Muamua
 #[derive(Resource)]
 pub struct EnemyMuamuaAnimationGraph {
@@ -344,8 +349,6 @@ pub struct MuamuaAttackTimer(pub Timer);
 #[derive(Resource)]
 pub struct MuamuaRespawnTimer(pub Timer);
 
-#[derive(Component)]
-pub struct  MuamuaStateTimer(pub Timer);
 
 //Choky
 #[derive(Resource)]
@@ -384,6 +387,3 @@ pub struct ChokyAttackTimer(pub Timer);
 
 #[derive(Resource)]
 pub struct ChokyRespawnTimer(pub Timer);
-
-#[derive(Component)]
-pub struct  ChokyStateTimer(pub Timer);

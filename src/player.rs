@@ -119,14 +119,27 @@ fn apply_gamepad_deadzone(
 fn player_movement(
     keyboard: Res<ButtonInput<KeyCode>>,
     gamepads: Query<&Gamepad>,
-    mut player_query: Query<(&MoveSpeed, &mut LinearVelocity, &mut Transform), With<Player>>,
+    mut player_query: Query<
+        (
+            &Health,
+            &MoveSpeed,
+            &mut LinearVelocity,
+            &mut Transform,
+        ),
+        With<Player>,
+    >,
     dialog_query: Query<(), With<GuardianDialogUI>>,
     mut commands: Commands,
     asset_server: Res<AssetServer>,
 ) {
 
-    let Ok((speed, mut velocity, mut transform)) = player_query.single_mut()
+    let Ok((health,speed, mut velocity, mut transform)) = player_query.single_mut()
     else { return };
+    if health.current <= 0 {
+        velocity.x = 0.0;
+        velocity.z = 0.0;
+        return;
+    }
     if !dialog_query.is_empty() {
         velocity.x = 0.0;
         velocity.z = 0.0;
@@ -269,7 +282,15 @@ fn setup_player_animation_graph(
     ),
     1.0,
     graph.root,
-);
+    );
+    let dead = graph.add_clip(
+    asset_server.load(
+        GltfAssetLabel::Animation(9)
+            .from_asset("player/PlayerMoya.glb"),
+    ),
+    1.0,
+    graph.root,
+    );
 
     let graph_handle = graphs.add(graph);
 
@@ -284,6 +305,7 @@ fn setup_player_animation_graph(
         jump,
         hurt,
         power,
+        dead,
     });
 }
 
@@ -355,6 +377,10 @@ pub fn player_dash_input(
     anim_player.stop_all();
     anim_player.play(anim_graph.dash);
     *anim_state = PlayerAnimState::Dash;
+
+    if *anim_state == PlayerAnimState::Dead {
+        return;
+    }
 
     commands.entity(entity).insert(
         PlayerDashTimer(Timer::from_seconds(0.45, TimerMode::Once))
@@ -433,6 +459,9 @@ pub fn player_jump_input(
     else { return };
 
     if velocity.y.abs() > 0.1 {
+        return;
+    }
+    if *anim_state == PlayerAnimState::Dead {
         return;
     }
 
@@ -541,21 +570,42 @@ pub fn play_player_hurt_animation(
     commands: &mut Commands,
     player_entity: Entity,
     anim_graph: &PlayerAnimationGraph,
-    anim_query: &mut Query<(&mut AnimationPlayer, &mut PlayerAnimState), With<PlayerAnimationTarget>>,
+
+    anim_query: &mut Query<
+        (
+            &mut AnimationPlayer,
+            &mut PlayerAnimState,
+        ),
+        With<PlayerAnimationTarget>,
+    >,
 ) {
-    let Ok((mut anim_player, mut anim_state)) = anim_query.single_mut() 
-    else { return };
-    if *anim_state == PlayerAnimState::Hurt {
+    let Ok((
+        mut anim_player,
+        mut anim_state,
+    )) = anim_query.single_mut()
+    else {
+        return;
+    };
+
+    if matches!(
+        *anim_state,
+        PlayerAnimState::Hurt | PlayerAnimState::Dead
+    ) {
         return;
     }
+
     anim_player.stop_all();
     anim_player.play(anim_graph.hurt);
+
     *anim_state = PlayerAnimState::Hurt;
+
     commands.entity(player_entity).insert(
-        PlayerHurtTimer(Timer::from_seconds(
-            0.5,
-            TimerMode::Once,
-        )),
+        PlayerHurtTimer(
+            Timer::from_seconds(
+                0.5,
+                TimerMode::Once,
+            ),
+        ),
     );
 }
 
@@ -621,7 +671,10 @@ pub fn player_combo_input(
     };
     let Ok((mut anim_player, mut anim_state)) = anim_query.single_mut() else { return };
 
-    if *anim_state == PlayerAnimState::Hurt {
+    if matches!(
+        *anim_state,
+        PlayerAnimState::Hurt | PlayerAnimState::Dead
+    ) {
         return;
     }
 
@@ -715,9 +768,9 @@ fn update_player_animation(
     for (mut player, mut anim_state) in &mut anim_query {
         if matches!(
             *anim_state,
-            PlayerAnimState::SlapR | PlayerAnimState::SlapL |            
-            PlayerAnimState::SlapLR | PlayerAnimState::Jump |             
-            PlayerAnimState::Hurt | PlayerAnimState::Dash | PlayerAnimState::Power            
+            PlayerAnimState::SlapR | PlayerAnimState::SlapL | PlayerAnimState::SlapLR |
+            PlayerAnimState::Jump | PlayerAnimState::Hurt | PlayerAnimState::Dash | 
+            PlayerAnimState::Power | PlayerAnimState::Dead            
         ) {
             continue;
         }
@@ -1341,22 +1394,128 @@ pub fn rebuild_player_combat_stats_from_exp(
 }
 
 pub fn respawn_player_when_defeated(
-    mut player_query: Query<(&mut Health,&mut Transform,&mut LinearVelocity),With<Player>>,
     mut commands: Commands,
+    anim_graph: Res<PlayerAnimationGraph>,
     asset_server: Res<AssetServer>,
-) {
-    let Ok((mut health,mut transform,mut velocity)) = player_query.single_mut() else { return };
 
+    mut next_scene: ResMut<NextState<GameScene>>,
+
+    mut player_query: Query<
+        (
+            Entity,
+            &mut Health,
+            &mut Transform,
+            &mut LinearVelocity,
+            &mut PlayerCombo,
+        ),
+        With<Player>,
+    >,
+
+    mut anim_query: Query<
+        (
+            Entity,
+            &mut AnimationPlayer,
+            &mut PlayerAnimState,
+        ),
+        With<PlayerAnimationTarget>,
+    >,
+) {
+    let Ok((
+        player_entity,
+        mut health,
+        mut transform,
+        mut velocity,
+        mut combo,
+    )) = player_query.single_mut()
+    else {
+        return;
+    };
+
+    let Ok((
+        animation_entity,
+        mut animation_player,
+        mut animation_state,
+    )) = anim_query.single_mut()
+    else {
+        return;
+    };
+
+    // Player ยังไม่ตาย
     if health.current > 0 {
         return;
     }
 
-    transform.translation = Vec3::new(0.0, 2.0, 0.0);
+    // หยุด Player ขณะตาย
     velocity.x = 0.0;
     velocity.y = 0.0;
     velocity.z = 0.0;
+
+    // เพิ่งตาย เริ่มเล่น Animation Dead
+    if *animation_state != PlayerAnimState::Dead {
+        combo.current_index = None;
+        combo.queued_next = false;
+
+        // ล้างการเคลื่อนไหวและสถานะเก่าที่อาจค้าง
+        commands
+            .entity(player_entity)
+            .remove::<PlayerDashMove>()
+            .remove::<PlayerDashTrailTimer>()
+            .remove::<PlayerHurtTimer>();
+
+        commands
+            .entity(animation_entity)
+            .remove::<PlayerDashTimer>()
+            .remove::<PlayerJumpTimer>()
+            .remove::<PlayerPowerTimer>();
+
+        animation_player.stop_all();
+
+        // Dead ต้องไม่ repeat
+        animation_player.play(anim_graph.dead);
+
+        *animation_state = PlayerAnimState::Dead;
+
+        commands.spawn((
+            AudioPlayer::new(
+                asset_server.load("sounds/sfx_game_over.ogg"),
+            ),
+            PlaybackSettings::DESPAWN,
+        ));
+
+        return;
+    }
+
+    // อยู่ในท่า Dead แล้ว รอให้เล่นจบจริง
+    let dead_finished = animation_player
+        .animation(anim_graph.dead)
+        .is_some_and(|animation| animation.is_finished());
+
+    if !dead_finished {
+        return;
+    }
+
+    // ==========================================
+    // ท่า Dead จบแล้ว ค่อยเตรียม Player เกิดใหม่
+    // ==========================================
+
+    // ตำแหน่งเกิด Player ใน Hub
+    transform.translation = Vec3::new(0.0, 2.0, 0.0);
+
+    velocity.x = 0.0;
+    velocity.y = 0.0;
+    velocity.z = 0.0;
+
     health.current = health.max;
-    commands.spawn(AudioPlayer::new(asset_server.load("sounds/sfx_game_over.ogg")));
+
+    animation_player.stop_all();
+    animation_player
+        .play(anim_graph.idle)
+        .repeat();
+
+    *animation_state = PlayerAnimState::Idle;
+
+    // ไม่ว่าตายจากฉากไหน ให้โหลด Hub ใหม่
+    next_scene.set(GameScene::LoadingHub);
 }
 
 const PLAYER_LEFT_HAND_BONE: &str = "mixamorig_LeftHand";
@@ -1565,6 +1724,7 @@ fn player_slap_hit_enemy(
             Without<Player>,
         ),
     >,
+    asset_server: Res<AssetServer>
 ) {
     let Ok((
         player_stats,
@@ -1698,12 +1858,9 @@ fn player_slap_hit_enemy(
         // ยังไม่ตาย → เล่น Hurt
         // ==============================
         if target_health.current > 0 {
-            if let Some(state) =
-                enemy_state.as_mut()
-            {
-                **state =
-                    EnemyState::Hurt;
-
+            if let Some(state) = enemy_state.as_mut(){
+                **state = EnemyState::Hurt;
+                commands.spawn(AudioPlayer::new(asset_server.load("sounds/enemy/404327__pfranzen__male-grunts-and-groans_muamua_hurt.ogg")));
                 commands
                     .entity(target_entity)
                     .insert(
@@ -1746,12 +1903,9 @@ fn player_slap_hit_enemy(
         // มี EnemyState = Muamua
         // เล่น Dead ก่อน ยังไม่ despawn
         // ==============================
-        if let Some(state) =
-            enemy_state.as_mut()
-        {
-            **state =
-                EnemyState::Dead;
-
+        if let Some(state) = enemy_state.as_mut(){
+            **state =EnemyState::Dead;
+            commands.spawn(AudioPlayer::new(asset_server.load("sounds/enemy/404327__pfranzen__male-grunts-and-groans_muamua_dead.ogg")));
             commands
                 .entity(target_entity)
                 .insert(
@@ -1922,6 +2076,7 @@ fn player_energy_input(
             | PlayerAnimState::Dash
             | PlayerAnimState::Jump
             | PlayerAnimState::Power
+            | PlayerAnimState::Dead
     ) {
         return;
     }

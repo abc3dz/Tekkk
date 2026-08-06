@@ -420,6 +420,8 @@ fn update_enemy_muamua_animation(
             &mut EnemyMuamuaAnimState,
         ),
     >,
+    mut commands: Commands,
+    asset_server: Res<AssetServer>
 ) {
     for (
         animation_target,
@@ -473,10 +475,12 @@ fn update_enemy_muamua_animation(
             }
             EnemyMuamuaAnimState::Hurt => {
                 animation_player.play(animation_graph.hurt);
+                commands.spawn(AudioPlayer::new(asset_server.load("sounds/enemy/404327__pfranzen__male-grunts-and-groans_muamua_hurt.ogg")));
             }
 
             EnemyMuamuaAnimState::Dead => {
                 animation_player.play(animation_graph.dead);
+                commands.spawn(AudioPlayer::new(asset_server.load("sounds/enemy/404327__pfranzen__male-grunts-and-groans_muamua_dead.ogg")));
             }
         }
 
@@ -517,16 +521,17 @@ fn update_muamua_hurt_and_dead(
         match *enemy_state {
             EnemyState::Hurt => {
                 *enemy_state = EnemyState::Idle;
-
                 commands
                     .entity(muamua_entity)
                     .remove::<EnemyStateTimer>();
+                
             }
 
             EnemyState::Dead => {
                 commands
                     .entity(muamua_entity)
                     .despawn();
+                
             }
 
             _ => {
@@ -600,35 +605,18 @@ fn spawn_muamua_punch_hitbox(
 
 fn muamua_punch_hit_player(
     mut commands: Commands,
-    mut collision_reader:
-        MessageReader<CollisionStart>,
-
-    mut hitbox_query:
-        Query<&mut MuamuaPunchHitbox>,
-
-    muamua_query: Query<
-        (
-            &CombatStats,
-            &AtkAndDefElement,
-        ),
-        (
-            With<EnemyMuamua>,
-            Without<Player>,
-        ),
-    >,
-
-    mut player_query: Query<
-        (
-            &mut Health,
-            &CombatStats,
-            &AtkAndDefElement,
-            &GlobalTransform,
-        ),
+    mut collision_reader: MessageReader<CollisionStart>,
+    mut hitbox_query: Query<&mut MuamuaPunchHitbox>,
+    muamua_query: Query<(&CombatStats,&AtkAndDefElement),(With<EnemyMuamua>,Without<Player>)>,
+    mut player_query: Query<(Entity,&mut Health,&CombatStats,&AtkAndDefElement,&GlobalTransform),
         (
             With<Player>,
             Without<EnemyMuamua>,
         ),
     >,
+    anim_graph: Res<PlayerAnimationGraph>,
+    mut player_anim_query: Query<(&mut AnimationPlayer,&mut PlayerAnimState),With<PlayerAnimationTarget>>,
+    asset_server: Res<AssetServer>
 ) {
     let mut rng = rand::rng();
 
@@ -667,6 +655,7 @@ fn muamua_punch_hit_player(
         }
 
         let Ok((
+            player_entity,
             mut player_health,
             player_stats,
             player_element,
@@ -708,11 +697,17 @@ fn muamua_punch_hit_player(
 
         player_health.current -= damage;
 
-        player_health.current =
-            player_health.current.clamp(
-                0,
-                player_health.max,
+        player_health.current = player_health.current.clamp(0,player_health.max);
+
+        if player_health.current > 0 {
+            play_player_hurt_animation(
+                &mut commands,
+                player_entity,
+                &anim_graph,
+                &mut player_anim_query,
             );
+        }
+        commands.spawn(AudioPlayer::new(asset_server.load("sounds/331935__pyro13djt__hit_hurt.ogg")));
         spawn_floating_damage_text(
             &mut commands,
             damage,
