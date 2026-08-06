@@ -25,6 +25,14 @@ https://freesound.org/people/metrostock99/sounds/514479/
 licensed under CC BY 4.0.
 Edited and partially used.
 
+https://freesound.org/people/AncientWarrior/sounds/567989/
+Licensed under Creative Commons Zero (CC0)
+Converted from WAV to OGG to reduce file size.
+
+https://freesound.org/people/pfranzen/sounds/404327/
+licensed under CC BY 4.0.
+Edited and partially used.
+
 # Tools
 
 Blender, Krita, LMMS, VSC
