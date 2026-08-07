@@ -7,6 +7,7 @@ use bevy_wind_waker_shader::prelude::*;
 
 use crate::components::*;
 use crate::combat::*;
+use crate::camera::*;
 
 pub struct PlayerPlugin;
 
@@ -570,14 +571,9 @@ pub fn play_player_hurt_animation(
     commands: &mut Commands,
     player_entity: Entity,
     anim_graph: &PlayerAnimationGraph,
-
-    anim_query: &mut Query<
-        (
-            &mut AnimationPlayer,
-            &mut PlayerAnimState,
-        ),
-        With<PlayerAnimationTarget>,
-    >,
+    anim_query: &mut Query<(&mut AnimationPlayer,&mut PlayerAnimState),With<PlayerAnimationTarget>>,
+    camera_query: &Query<Entity, With<MainCamera>>,
+    asset_server: &Res<AssetServer>
 ) {
     let Ok((
         mut anim_player,
@@ -607,6 +603,16 @@ pub fn play_player_hurt_animation(
             ),
         ),
     );
+    if let Ok(camera_entity) = camera_query.single() {
+            commands
+                .entity(camera_entity)
+                .insert(CameraShake::new(
+                    0.6, // สั่น 0.6 วินาที
+                    0.18, // ความแรง
+                ));
+        }
+    
+    commands.spawn(AudioPlayer::new(asset_server.load("sounds/331935__pyro13djt__hit_hurt.ogg")));
 }
 
 pub fn player_return_after_hurt(
@@ -1397,9 +1403,7 @@ pub fn respawn_player_when_defeated(
     mut commands: Commands,
     anim_graph: Res<PlayerAnimationGraph>,
     asset_server: Res<AssetServer>,
-
     mut next_scene: ResMut<NextState<GameScene>>,
-
     mut player_query: Query<
         (
             Entity,
@@ -1410,7 +1414,6 @@ pub fn respawn_player_when_defeated(
         ),
         With<Player>,
     >,
-
     mut anim_query: Query<
         (
             Entity,
@@ -1419,6 +1422,7 @@ pub fn respawn_player_when_defeated(
         ),
         With<PlayerAnimationTarget>,
     >,
+    camera_query: Query<Entity, With<MainCamera>>,
 ) {
     let Ok((
         player_entity,
@@ -1454,7 +1458,15 @@ pub fn respawn_player_when_defeated(
     if *animation_state != PlayerAnimState::Dead {
         combo.current_index = None;
         combo.queued_next = false;
-
+        commands.spawn(AudioPlayer::new(asset_server.load("sounds/moya_dead.ogg")));
+        if let Ok(camera_entity) = camera_query.single() {
+            commands
+                .entity(camera_entity)
+                .insert(CameraShake::new(
+                    0.6, // สั่น 0.6 วินาที
+                    0.18, // ความแรง
+                ));
+        }
         // ล้างการเคลื่อนไหวและสถานะเก่าที่อาจค้าง
         commands
             .entity(player_entity)
@@ -1682,19 +1694,10 @@ fn spawn_player_slap_hitbox(
 fn player_slap_hit_enemy(
     mut commands: Commands,
     time: Res<Time>,
-
-    mut meshes:
-        ResMut<Assets<Mesh>>,
-
-    mut materials:
-        ResMut<Assets<StandardMaterial>>,
-
-    mut collision_reader:
-        MessageReader<CollisionStart>,
-
-    mut hitbox_query:
-        Query<&mut PlayerSlapHitbox>,
-
+    mut meshes: ResMut<Assets<Mesh>>,
+    mut materials: ResMut<Assets<StandardMaterial>>,
+    mut collision_reader: MessageReader<CollisionStart>,
+    mut hitbox_query: Query<&mut PlayerSlapHitbox>,
     mut player_query: Query<
         (
             &CombatStats,
@@ -1706,7 +1709,6 @@ fn player_slap_hit_enemy(
             Without<CombatTarget>,
         ),
     >,
-
     mut target_query: Query<
         (
             &mut Health,
@@ -1714,7 +1716,6 @@ fn player_slap_hit_enemy(
             &AtkAndDefElement,
             &GlobalTransform,
             Option<&ElementExpReward>,
-
             // Practice ไม่มี EnemyState
             // Muamua มี EnemyState
             Option<&mut EnemyState>,
@@ -1724,7 +1725,6 @@ fn player_slap_hit_enemy(
             Without<Player>,
         ),
     >,
-    asset_server: Res<AssetServer>
 ) {
     let Ok((
         player_stats,
@@ -1860,7 +1860,7 @@ fn player_slap_hit_enemy(
         if target_health.current > 0 {
             if let Some(state) = enemy_state.as_mut(){
                 **state = EnemyState::Hurt;
-                commands.spawn(AudioPlayer::new(asset_server.load("sounds/enemy/404327__pfranzen__male-grunts-and-groans_muamua_hurt.ogg")));
+                
                 commands
                     .entity(target_entity)
                     .insert(
@@ -1905,7 +1905,7 @@ fn player_slap_hit_enemy(
         // ==============================
         if let Some(state) = enemy_state.as_mut(){
             **state =EnemyState::Dead;
-            commands.spawn(AudioPlayer::new(asset_server.load("sounds/enemy/404327__pfranzen__male-grunts-and-groans_muamua_dead.ogg")));
+            
             commands
                 .entity(target_entity)
                 .insert(
@@ -2026,6 +2026,7 @@ fn player_energy_input(
         ),
         With<PlayerAnimationTarget>,
     >,
+    asset_server: Res<AssetServer>
 ) {
     if !dialog_query.is_empty() {
         return;
@@ -2086,7 +2087,7 @@ fn player_energy_input(
     anim_player.play(anim_graph.power);
 
     *anim_state = PlayerAnimState::Power;
-
+    commands.spawn(AudioPlayer::new(asset_server.load("sounds/moya_power.ogg")));
     commands.entity(anim_entity).insert(
         PlayerPowerTimer(
             Timer::from_seconds(
@@ -2095,8 +2096,6 @@ fn player_energy_input(
             ),
         ),
     );
-
-    
 
     // ใช้ทิศเดียวกับระบบ Dash ของมึง
     let direction =
@@ -2145,6 +2144,7 @@ fn player_energy_input(
         GlobalTransform::default(),
     ));
 }
+
 fn update_player_energy_ball(
     mut commands: Commands,
     time: Res<Time>,
@@ -2185,16 +2185,10 @@ fn update_player_energy_ball(
 fn player_energy_hit_enemy(
     mut commands: Commands,
     time: Res<Time>,
-
     mut meshes: ResMut<Assets<Mesh>>,
     mut materials: ResMut<Assets<StandardMaterial>>,
-
     mut collision_reader: MessageReader<CollisionStart>,
-
-    mut energy_query: Query<
-        &mut PlayerEnergyBall,
-    >,
-
+    mut energy_query: Query<&mut PlayerEnergyBall>,
     mut player_query: Query<
         (
             &CombatStats,
@@ -2206,7 +2200,6 @@ fn player_energy_hit_enemy(
             Without<CombatTarget>,
         ),
     >,
-
     mut target_query: Query<
         (
             &mut Health,

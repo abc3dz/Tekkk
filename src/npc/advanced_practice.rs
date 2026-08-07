@@ -10,6 +10,7 @@ use crate::player::{
     play_player_hurt_animation,
     spawn_floating_damage_text,
 };
+use crate::camera::*;
 
 pub struct AdvancedPracticePlugin;
 
@@ -189,6 +190,7 @@ pub fn minion_drain_player_life(
     mut anim_query: Query<(&mut AnimationPlayer, &mut PlayerAnimState), With<PlayerAnimationTarget>,>,
     mut player_query: Query<(Entity, &Transform, &mut Health),(With<Player>, Without<GuardianClone>),>,
     mut minion_query: Query<(&Transform, &mut Health, &mut MinionLifeDrainTimer),(With<GuardianClone>, Without<Player>)>,
+    camera_query: Query<Entity, With<MainCamera>>,
 ) {
     let Ok((player_entity, player_tf, mut player_health)) = player_query.single_mut() else { return };
 
@@ -207,7 +209,7 @@ pub fn minion_drain_player_life(
                 + Vec3::new(0.0, 2.0, 0.0),
             FloatingDamageKind::PlayerDrain,
         );
-
+        commands.spawn(AudioPlayer::new(asset_server.load("sounds/npc/514479__metrostock99__blllllllup-and-you-suck-ad-libs.ogg")));
         minion_health.current += drain_amount;
         minion_health.current = minion_health.current.clamp(0, minion_health.max);
 
@@ -216,8 +218,10 @@ pub fn minion_drain_player_life(
             player_entity,
             &anim_graph,
             &mut anim_query,
+            &camera_query,
+            &asset_server
         );
-        commands.spawn(AudioPlayer::new(asset_server.load("sounds/npc/514479__metrostock99__blllllllup-and-you-suck-ad-libs.ogg")));
+        
     }
 }
 

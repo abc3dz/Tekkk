@@ -9,6 +9,7 @@ use crate::combat::*;
 use crate::components::*;
 use crate::npc::practice_common::*;
 use crate::player::*;
+use crate::camera::*;
 
 #[derive(Component, Debug)]
 pub struct EnemyChoky;
@@ -600,8 +601,9 @@ fn choky_punch_hit_player(
         ),
     >,
     anim_graph: Res<PlayerAnimationGraph>,
-    mut player_anim_query: Query<(&mut AnimationPlayer,&mut PlayerAnimState),With<PlayerAnimationTarget>>,
-    asset_server: Res<AssetServer>
+    mut anim_query: Query<(&mut AnimationPlayer,&mut PlayerAnimState),With<PlayerAnimationTarget>>,
+    asset_server: Res<AssetServer>,
+    camera_query: Query<Entity, With<MainCamera>>,
 ) {
     let mut rng = rand::rng();
 
@@ -692,10 +694,12 @@ fn choky_punch_hit_player(
                 &mut commands,
                 player_entity,
                 &anim_graph,
-                &mut player_anim_query,
+                &mut anim_query,
+                &camera_query,
+                &asset_server
             );
         }
-        commands.spawn(AudioPlayer::new(asset_server.load("sounds/331935__pyro13djt__hit_hurt.ogg")));
+        
         spawn_floating_damage_text(
             &mut commands,
             damage,

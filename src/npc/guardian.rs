@@ -4,10 +4,7 @@ use avian3d::prelude::*;
 use bevy_wind_waker_shader::prelude::*;
 use bevy::animation::graph::AnimationGraph;
 use bevy::animation::AnimationPlayer;
-//use rand::Rng;
 use crate::components::*;
-//use crate::player::{play_player_hurt_animation, spawn_floating_damage_text,};
-//use crate::combat::*;
 use crate::npc::{
     advanced_practice::AdvancedPracticePlugin,
     basic_practice::BasicPracticePlugin,

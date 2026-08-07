@@ -10,7 +10,7 @@ use crate::player::{
     play_player_hurt_animation,
     spawn_floating_damage_text,
 };
-//use crate::npc::guardian::*;
+use crate::camera::*;
 
 pub struct BasicPracticePlugin;
 
@@ -247,6 +247,7 @@ pub fn basic_projectile_hit_player(
     mut player_query: Query<(Entity, &Transform, &mut Health), (With<Player>, Without<BasicPracticeProjectile>)>,
     anim_graph: Res<PlayerAnimationGraph>,
     mut anim_query: Query<(&mut AnimationPlayer, &mut PlayerAnimState), With<PlayerAnimationTarget>>,
+    camera_query: Query<Entity, With<MainCamera>>,
 ) {
     let Ok((player_entity, player_tf, mut health)) = player_query.single_mut()
     else { return };
@@ -260,8 +261,6 @@ pub fn basic_projectile_hit_player(
         health.current -= projectile.hp_damage;
         health.current = health.current.clamp(0, health.max);
 
-        commands.spawn(AudioPlayer::new(asset_server.load("sounds/331935__pyro13djt__hit_hurt.ogg")));
-
         spawn_floating_damage_text(
             &mut commands,
             projectile.hp_damage,
@@ -274,6 +273,8 @@ pub fn basic_projectile_hit_player(
             player_entity,
             &anim_graph,
             &mut anim_query,
+            &camera_query,
+            &asset_server
         );
 
         commands.entity(projectile_entity).despawn();
