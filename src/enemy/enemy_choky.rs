@@ -404,19 +404,8 @@ fn enemy_choky_chase_player(
 
 fn update_enemy_choky_animation(
     animation_graph: Res<EnemyChokyAnimationGraph>,
-
-    choky_query: Query<
-        &EnemyState,
-        With<EnemyChoky>,
-    >,
-
-    mut animation_query: Query<
-        (
-            &EnemyChokyAnimationTarget,
-            &mut AnimationPlayer,
-            &mut EnemyChokyAnimState,
-        ),
-    >,
+    choky_query: Query<&EnemyState, With<EnemyChoky>>,
+    mut animation_query: Query<(&EnemyChokyAnimationTarget,&mut AnimationPlayer,&mut EnemyChokyAnimState)>,
     mut commands: Commands,
     asset_server: Res<AssetServer>
 ) {

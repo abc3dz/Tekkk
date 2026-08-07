@@ -6,6 +6,7 @@ use crate::npc::guardian::GuardianPlugin;
 use crate::enemy::enemy_muamua::*;
 use crate::warp_portal::*;
 use crate::enemy::enemy_choky::*;
+use crate::biomes::mtr_quicksand::*;
 
 pub struct WorldPlugin;
 
@@ -16,6 +17,7 @@ impl Plugin for WorldPlugin {
         .add_plugins(EnemyMuamuaPlugin)
         .add_plugins(WarpPortalPlugin)
         .add_plugins(EnemyChokyPlugin)
+        .add_plugins(MaterialPlugin::<QuicksandMaterial>::default())
         
         .add_systems(OnEnter(GameScene::LoadingHub), spawn_loading_ui)
         .add_systems(Update, go_to_hub.run_if(in_state(GameScene::LoadingHub)))
@@ -31,7 +33,9 @@ impl Plugin for WorldPlugin {
 
         .add_systems(OnEnter(GameScene::Desert), (desert::spawn_desert, setup_desert_light))
         .add_systems(Update, check_warp_to_hub.run_if(in_state(GameScene::Desert)))
-        .add_systems(OnExit(GameScene::Desert), cleanup_current_scene);
+        .add_systems(OnExit(GameScene::Desert), cleanup_current_scene)
+        .add_systems(OnEnter(GameScene::Desert),spawn_quicksand,)
+        .add_systems(Update,update_quicksand_shader.run_if(in_state(GameScene::Desert)));
     }
 }
 
