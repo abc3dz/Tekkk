@@ -19,6 +19,11 @@ Keyboard: L
 Xbox Controller: B
 PlayStation Controller: Circle
 
+Power
+Keyboard: I
+Xbox Controller: Y
+PlayStation Controller: Triangle
+
 Player Status (toggle)
 Keyboard: ESC
 Xbox Controller: Start
