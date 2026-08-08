@@ -5,4 +5,9 @@ A 3D action-adventure prototype game built with Bevy Engine.
 https://abc3dz.github.io/Tekkk/
 
 # Screenshot
-<img src="https://github.com/abc3dz/Tekkk/blob/main/gif/20260720PlaytestSS.gif" height="300" width="300">
+Hub and Desert
+
+<img src="https://github.com/abc3dz/Tekkk/blob/main/gif/2026080HubSS.gif">
+<img src="https://github.com/abc3dz/Tekkk/blob/main/gif/20260808DesertSS.gif">
+
+Floating Island, Lagoon, and Vacano soon
