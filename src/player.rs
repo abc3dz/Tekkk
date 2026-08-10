@@ -1703,6 +1703,7 @@ fn player_slap_hit_enemy(
             &CombatStats,
             &AtkAndDefElement,
             &mut ElementMastery,
+            &GlobalTransform,
         ),
         (
             With<Player>,
@@ -1716,9 +1717,8 @@ fn player_slap_hit_enemy(
             &AtkAndDefElement,
             &GlobalTransform,
             Option<&ElementExpReward>,
-            // Practice ไม่มี EnemyState
-            // Muamua มี EnemyState
             Option<&mut EnemyState>,
+            Option<&mut LinearVelocity>,
         ),
         (
             With<CombatTarget>,
@@ -1730,6 +1730,7 @@ fn player_slap_hit_enemy(
         player_stats,
         player_element,
         mut element_mastery,
+        player_transform,
     )) = player_query.single_mut()
     else {
         return;
@@ -1780,6 +1781,7 @@ fn player_slap_hit_enemy(
             target_transform,
             reward,
             mut enemy_state,
+            mut target_velocity,
         )) = target_query.get_mut(
             target_entity,
         )
@@ -1905,6 +1907,20 @@ fn player_slap_hit_enemy(
         // ==============================
         if let Some(state) = enemy_state.as_mut(){
             **state =EnemyState::Dead;
+            let player_position = player_transform.translation();
+
+            let knockback_direction = Vec3::new(
+                target_position.x - player_position.x,
+                0.0,
+                target_position.z - player_position.z,
+            )
+            .normalize_or_zero();
+
+            // 2 m/s × 0.25 sec ≈ 0.5 เมตร
+            if let Some(velocity) = target_velocity.as_mut() {
+                velocity.x = knockback_direction.x * 6.0;
+                velocity.z = knockback_direction.z * 6.0;
+            }
             
             commands
                 .entity(target_entity)
@@ -2264,7 +2280,12 @@ fn player_energy_hit_enemy(
         if energy.has_hit {
             continue;
         }
-
+        let investigate_direction = Vec3::new(
+            -energy.direction.x,
+            0.0,
+            -energy.direction.z,
+        )
+        .normalize_or_zero();
         let Ok((
             mut target_health,
             target_stats,
@@ -2357,25 +2378,36 @@ fn player_energy_hit_enemy(
         // ศัตรูยังไม่ตาย
         // ==============================
         if target_health.current > 0 {
-            if let Some(state) =
-                enemy_state.as_mut()
-            {
-                **state = EnemyState::Hurt;
+    if let Some(state) =
+        enemy_state.as_mut()
+    {
+        **state = EnemyState::Hurt;
 
-                commands
-                    .entity(target_entity)
-                    .insert(
-                        EnemyStateTimer(
-                            Timer::from_seconds(
-                                0.45,
-                                TimerMode::Once,
-                            ),
-                        ),
-                    );
-            }
+        commands
+            .entity(target_entity)
+            .insert((
+                EnemyStateTimer(
+                    Timer::from_seconds(
+                        0.45,
+                        TimerMode::Once,
+                    ),
+                ),
 
-            continue;
-        }
+                // จำว่าลูกพลังยิงมาจากทางไหน
+                EnemyInvestigateDirection {
+                    direction: investigate_direction,
+
+                    // เดินหาต้นทางได้นาน 3 วินาที
+                    timer: Timer::from_seconds(
+                        3.0,
+                        TimerMode::Once,
+                    ),
+                },
+            ));
+    }
+
+    continue;
+}
 
         // ==============================
         // ศัตรูตาย แจก EXP

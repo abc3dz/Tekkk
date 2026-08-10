@@ -311,6 +311,12 @@ pub enum EnemyState {
 #[derive(Component)]
 pub struct EnemyStateTimer(pub Timer);
 
+#[derive(Component, Debug)]
+pub struct EnemyInvestigateDirection {
+    pub direction: Vec3,
+    pub timer: Timer,
+}
+
 //Muamua
 #[derive(Resource)]
 pub struct EnemyMuamuaAnimationGraph {

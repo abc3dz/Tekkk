@@ -299,6 +299,9 @@ const CHOKY_STOP_DISTANCE: f32 = 1.0;
 const CHOKY_MOVE_SPEED: f32 = 3.0;
 
 fn enemy_choky_chase_player(
+    mut commands: Commands,
+    time: Res<Time>,
+
     player_query: Query<
         &Transform,
         (
@@ -309,9 +312,11 @@ fn enemy_choky_chase_player(
 
     mut choky_query: Query<
         (
+            Entity,
             &mut Transform,
             &mut LinearVelocity,
             &mut EnemyState,
+            Option<&mut EnemyInvestigateDirection>,
         ),
         (
             With<EnemyChoky>,
@@ -326,28 +331,94 @@ fn enemy_choky_chase_player(
     };
 
     for (
+        choky_entity,
         mut choky_transform,
         mut velocity,
         mut enemy_state,
+        investigate,
     ) in &mut choky_query
     {
-        // ตอนเจ็บหรือตาย ห้ามเดินไล่
-        // และห้ามเปลี่ยนกลับเป็น Idle/Chase/Attack
-        if matches!(*enemy_state, EnemyState::Hurt | EnemyState::Dead) {
+        // Hurt / Dead ยังหยุดเหมือนเดิม
+        if matches!(
+            *enemy_state,
+            EnemyState::Hurt | EnemyState::Dead
+        ) {
             velocity.x = 0.0;
             velocity.z = 0.0;
             continue;
         }
 
-        let to_player = player_transform.translation- choky_transform.translation;
+        let to_player =
+            player_transform.translation
+                - choky_transform.translation;
 
-        // ไม่ใช้แกน Y เพราะเดินบนพื้น
-        let flat_direction = Vec3::new(to_player.x,0.0,to_player.z);
+        let flat_direction =
+            Vec3::new(
+                to_player.x,
+                0.0,
+                to_player.z,
+            );
 
-        let distance = flat_direction.length();
+        let distance =
+            flat_direction.length();
 
-        // Player อยู่นอกระยะตรวจจับ
+        // ==========================================
+        // Player ยังอยู่นอกระยะมองเห็น
+        // แต่ Choky รู้ว่าลูกพลังมาจากทางไหน
+        // ==========================================
         if distance > CHOKY_CHASE_RANGE {
+            if let Some(mut investigate) = investigate {
+                investigate.timer.tick(time.delta());
+
+                // หมดเวลาค้นหา
+                if investigate.timer.is_finished() {
+                    velocity.x = 0.0;
+                    velocity.z = 0.0;
+
+                    *enemy_state =
+                        EnemyState::Idle;
+
+                    commands
+                        .entity(choky_entity)
+                        .remove::<EnemyInvestigateDirection>();
+
+                    continue;
+                }
+
+                let direction =
+                    investigate.direction;
+
+                // เดินไปทางต้นทางของลูกพลัง
+                velocity.x =
+                    direction.x
+                        * CHOKY_MOVE_SPEED;
+
+                velocity.z =
+                    direction.z
+                        * CHOKY_MOVE_SPEED;
+
+                // หันหน้าไปทางที่เดิน
+                if direction.length_squared()
+                    > 0.0001
+                {
+                    choky_transform.rotation =
+                        Quat::from_rotation_y(
+                            direction
+                                .x
+                                .atan2(direction.z),
+                        );
+                }
+
+                // ใช้ animation Chase เป็นท่าเดิน
+                *enemy_state =
+                    EnemyState::Chase;
+
+                continue;
+            }
+
+            // ไม่ได้โดนยิง
+            // และ Player ก็อยู่ไกล
+            // = Idle เหมือนเดิม
             velocity.x = 0.0;
             velocity.z = 0.0;
 
@@ -357,12 +428,19 @@ fn enemy_choky_chase_player(
             continue;
         }
 
+        // ==========================================
+        // เจอ Player แล้ว
+        // ไม่ต้องตามทิศ projectile อีก
+        // ==========================================
+        commands
+            .entity(choky_entity)
+            .remove::<EnemyInvestigateDirection>();
+
         // Player อยู่ในระยะต่อย
         if distance <= CHOKY_STOP_DISTANCE {
             velocity.x = 0.0;
             velocity.z = 0.0;
 
-            // หันหน้าเข้าหา Player
             if flat_direction.length_squared()
                 > 0.0001
             {
@@ -383,19 +461,25 @@ fn enemy_choky_chase_player(
             continue;
         }
 
-        // อยู่ในระยะตรวจจับ แต่ยังไม่ถึงระยะต่อย
+        // ==========================================
+        // เจอ Player แล้ว → ไล่ Player ตามปกติ
+        // ==========================================
         let direction =
             flat_direction.normalize();
 
         velocity.x =
-            direction.x * CHOKY_MOVE_SPEED;
+            direction.x
+                * CHOKY_MOVE_SPEED;
 
         velocity.z =
-            direction.z * CHOKY_MOVE_SPEED;
+            direction.z
+                * CHOKY_MOVE_SPEED;
 
         choky_transform.rotation =
             Quat::from_rotation_y(
-                direction.x.atan2(direction.z),
+                direction
+                    .x
+                    .atan2(direction.z),
             );
 
         *enemy_state =

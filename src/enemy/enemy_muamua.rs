@@ -302,6 +302,10 @@ const MUAMUA_STOP_DISTANCE: f32 = 1.0;
 const MUAMUA_MOVE_SPEED: f32 = 3.0;
 
 fn enemy_muamua_chase_player(
+
+    mut commands: Commands,
+    time: Res<Time>,
+
     player_query: Query<
         &Transform,
         (
@@ -312,9 +316,11 @@ fn enemy_muamua_chase_player(
 
     mut muamua_query: Query<
         (
+            Entity,
             &mut Transform,
             &mut LinearVelocity,
             &mut EnemyState,
+            Option<&mut EnemyInvestigateDirection>,
         ),
         (
             With<EnemyMuamua>,
@@ -329,28 +335,94 @@ fn enemy_muamua_chase_player(
     };
 
     for (
+        muamua_entity,
         mut muamua_transform,
         mut velocity,
         mut enemy_state,
+        investigate,
     ) in &mut muamua_query
     {
-        // ตอนเจ็บหรือตาย ห้ามเดินไล่
-        // และห้ามเปลี่ยนกลับเป็น Idle/Chase/Attack
-        if matches!(*enemy_state, EnemyState::Hurt | EnemyState::Dead) {
+        // Hurt / Dead ยังหยุดเหมือนเดิม
+        if matches!(
+            *enemy_state,
+            EnemyState::Hurt | EnemyState::Dead
+        ) {
             velocity.x = 0.0;
             velocity.z = 0.0;
             continue;
         }
 
-        let to_player = player_transform.translation- muamua_transform.translation;
+        let to_player =
+            player_transform.translation
+                - muamua_transform.translation;
 
-        // ไม่ใช้แกน Y เพราะเดินบนพื้น
-        let flat_direction = Vec3::new(to_player.x,0.0,to_player.z);
+        let flat_direction =
+            Vec3::new(
+                to_player.x,
+                0.0,
+                to_player.z,
+            );
 
-        let distance = flat_direction.length();
+        let distance =
+            flat_direction.length();
 
-        // Player อยู่นอกระยะตรวจจับ
+        // ==========================================
+        // Player ยังอยู่นอกระยะมองเห็น
+        // แต่ Muamua รู้ว่าลูกพลังมาจากทางไหน
+        // ==========================================
         if distance > MUAMUA_CHASE_RANGE {
+            if let Some(mut investigate) = investigate {
+                investigate.timer.tick(time.delta());
+
+                // หมดเวลาค้นหา
+                if investigate.timer.is_finished() {
+                    velocity.x = 0.0;
+                    velocity.z = 0.0;
+
+                    *enemy_state =
+                        EnemyState::Idle;
+
+                    commands
+                        .entity(muamua_entity)
+                        .remove::<EnemyInvestigateDirection>();
+
+                    continue;
+                }
+
+                let direction =
+                    investigate.direction;
+
+                // เดินไปทางต้นทางของลูกพลัง
+                velocity.x =
+                    direction.x
+                        * MUAMUA_MOVE_SPEED;
+
+                velocity.z =
+                    direction.z
+                        * MUAMUA_MOVE_SPEED;
+
+                // หันหน้าไปทางที่เดิน
+                if direction.length_squared()
+                    > 0.0001
+                {
+                    muamua_transform.rotation =
+                        Quat::from_rotation_y(
+                            direction
+                                .x
+                                .atan2(direction.z),
+                        );
+                }
+
+                // ใช้ animation Chase เป็นท่าเดิน
+                *enemy_state =
+                    EnemyState::Chase;
+
+                continue;
+            }
+
+            // ไม่ได้โดนยิง
+            // และ Player ก็อยู่ไกล
+            // = Idle เหมือนเดิม
             velocity.x = 0.0;
             velocity.z = 0.0;
 
@@ -360,12 +432,19 @@ fn enemy_muamua_chase_player(
             continue;
         }
 
+        // ==========================================
+        // เจอ Player แล้ว
+        // ไม่ต้องตามทิศ projectile อีก
+        // ==========================================
+        commands
+            .entity(muamua_entity)
+            .remove::<EnemyInvestigateDirection>();
+
         // Player อยู่ในระยะต่อย
         if distance <= MUAMUA_STOP_DISTANCE {
             velocity.x = 0.0;
             velocity.z = 0.0;
 
-            // หันหน้าเข้าหา Player
             if flat_direction.length_squared()
                 > 0.0001
             {
@@ -386,19 +465,25 @@ fn enemy_muamua_chase_player(
             continue;
         }
 
-        // อยู่ในระยะตรวจจับ แต่ยังไม่ถึงระยะต่อย
+        // ==========================================
+        // เจอ Player แล้ว → ไล่ Player ตามปกติ
+        // ==========================================
         let direction =
             flat_direction.normalize();
 
         velocity.x =
-            direction.x * MUAMUA_MOVE_SPEED;
+            direction.x
+                * MUAMUA_MOVE_SPEED;
 
         velocity.z =
-            direction.z * MUAMUA_MOVE_SPEED;
+            direction.z
+                * MUAMUA_MOVE_SPEED;
 
         muamua_transform.rotation =
             Quat::from_rotation_y(
-                direction.x.atan2(direction.z),
+                direction
+                    .x
+                    .atan2(direction.z),
             );
 
         *enemy_state =
@@ -510,10 +595,25 @@ fn update_muamua_hurt_and_dead(
         mut velocity,
     ) in &mut muamua_query
     {
-        velocity.x = 0.0;
-        velocity.z = 0.0;
-
         state_timer.0.tick(time.delta());
+
+        match *enemy_state {
+            EnemyState::Hurt => {
+                // Hurt ธรรมดาไม่กระเด็น
+                velocity.x = 0.0;
+                velocity.z = 0.0;
+            }
+
+            EnemyState::Dead => {
+                // ปล่อยให้กระเด็น 0.25 วินาที
+                if state_timer.0.elapsed_secs() >= 0.25 {
+                    velocity.x = 0.0;
+                    velocity.z = 0.0;
+                }
+            }
+
+            _ => {}
+        }
 
         if !state_timer.0.is_finished() {
             continue;
@@ -522,17 +622,16 @@ fn update_muamua_hurt_and_dead(
         match *enemy_state {
             EnemyState::Hurt => {
                 *enemy_state = EnemyState::Idle;
+
                 commands
                     .entity(muamua_entity)
                     .remove::<EnemyStateTimer>();
-                
             }
 
             EnemyState::Dead => {
                 commands
                     .entity(muamua_entity)
                     .despawn();
-                
             }
 
             _ => {
