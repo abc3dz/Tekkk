@@ -8,6 +8,7 @@ use bevy_wind_waker_shader::prelude::*;
 use crate::components::*;
 use crate::combat::*;
 use crate::camera::*;
+use crate::element_drop::*;
 
 pub struct PlayerPlugin;
 
@@ -1725,6 +1726,8 @@ fn player_slap_hit_enemy(
             Without<Player>,
         ),
     >,
+    camera_query: Query<Entity, With<MainCamera>>,
+    element_drop_assets: Res<ElementDropAssets>,
 ) {
     let Ok((
         player_stats,
@@ -1816,13 +1819,20 @@ fn player_slap_hit_enemy(
                 target_element.0,
             );
 
-        let damage = (
-            base_damage as f32
-                * element_multiplier
-        )
-            .round()
-            .max(1.0) as i32;
-
+        let damage = (base_damage as f32 * element_multiplier).round().max(1.0) as i32;
+        if is_critical {
+            if let Ok(camera_entity) = camera_query.single()
+            {
+                commands
+                    .entity(camera_entity)
+                    .insert(
+                        CameraShake::new(
+                            0.15, // ระยะเวลาสั่น
+                            0.08, // ความแรง
+                        ),
+                    );
+            }
+        }
         target_health.current -= damage;
 
         target_health.current =
@@ -1886,18 +1896,12 @@ fn player_slap_hit_enemy(
         // HP เหลือ 0 → แจก EXP
         // ==============================
         if let Some(reward) = reward {
-            let gain = reward.grant_all(
-                &mut *element_mastery,
+            spawn_element_reward_drops(
+                &mut commands,
+                &element_drop_assets,
+                reward,
+                target_position,
                 &mut rng,
-            );
-
-            info!(
-                "EXP gain: Water +{}, Fire +{}, Wind +{}, Earth +{}, Inw +{}",
-                gain.water,
-                gain.fire,
-                gain.wind,
-                gain.earth,
-                gain.inw,
             );
         }
 
@@ -2230,6 +2234,8 @@ fn player_energy_hit_enemy(
             Without<Player>,
         ),
     >,
+    camera_query: Query<Entity, With<MainCamera>>,
+    element_drop_assets: Res<ElementDropAssets>,
 ) {
     let Ok((
         player_stats,
@@ -2295,12 +2301,9 @@ fn player_energy_hit_enemy(
             mut enemy_state,
         )) = target_query.get_mut(target_entity)
         else {
-            // ชนพื้นหรือกำแพง
-            // แต่ไม่ใช่ CombatTarget
             continue;
         };
 
-        // ศัตรูตายอยู่แล้ว
         if target_health.current <= 0 {
             commands
                 .entity(energy_entity)
@@ -2312,30 +2315,26 @@ fn player_energy_hit_enemy(
         energy.has_hit = true;
 
         // คำนวณดาเมจพื้นฐานและ Critical
-        let (
-            base_damage,
-            is_critical,
-        ) = calculate_combat_damage(
-            player_stats,
-            target_stats,
-            &mut rng,
-        );
+        let (base_damage,is_critical) = calculate_combat_damage(player_stats,target_stats,&mut rng);
 
         // คำนวณตัวคูณธาตุ
-        let element_multiplier =
-            elemental_multiplier(
-                player_element.0,
-                target_element.0,
-            );
+        let element_multiplier = elemental_multiplier(player_element.0,target_element.0);
 
-        let damage = (
-            base_damage as f32
-                * element_multiplier
-        )
-            .round()
-            .max(1.0) as i32;
-
-        // หัก HP
+        let damage = (base_damage as f32 * element_multiplier).round().max(1.0) as i32;
+        if is_critical {
+            if let Ok(camera_entity) =
+                camera_query.single()
+            {
+                commands
+                    .entity(camera_entity)
+                    .insert(
+                        CameraShake::new(
+                            0.15, // ระยะเวลาสั่น
+                            0.08, // ความแรง
+                        ),
+                    );
+            }
+        }
         target_health.current -= damage;
 
         target_health.current =
@@ -2378,53 +2377,47 @@ fn player_energy_hit_enemy(
         // ศัตรูยังไม่ตาย
         // ==============================
         if target_health.current > 0 {
-    if let Some(state) =
-        enemy_state.as_mut()
-    {
-        **state = EnemyState::Hurt;
+            if let Some(state) =
+                enemy_state.as_mut()
+            {
+                **state = EnemyState::Hurt;
 
-        commands
-            .entity(target_entity)
-            .insert((
-                EnemyStateTimer(
-                    Timer::from_seconds(
-                        0.45,
-                        TimerMode::Once,
-                    ),
-                ),
+                commands
+                    .entity(target_entity)
+                    .insert((
+                        EnemyStateTimer(
+                            Timer::from_seconds(
+                                0.45,
+                                TimerMode::Once,
+                            ),
+                        ),
 
-                // จำว่าลูกพลังยิงมาจากทางไหน
-                EnemyInvestigateDirection {
-                    direction: investigate_direction,
+                        // จำว่าลูกพลังยิงมาจากทางไหน
+                        EnemyInvestigateDirection {
+                            direction: investigate_direction,
 
-                    // เดินหาต้นทางได้นาน 3 วินาที
-                    timer: Timer::from_seconds(
-                        3.0,
-                        TimerMode::Once,
-                    ),
-                },
-            ));
-    }
+                            // เดินหาต้นทางได้นาน 3 วินาที
+                            timer: Timer::from_seconds(
+                                3.0,
+                                TimerMode::Once,
+                            ),
+                        },
+                    ));
+            }
 
-    continue;
-}
+            continue;
+        }
 
         // ==============================
         // ศัตรูตาย แจก EXP
         // ==============================
         if let Some(reward) = reward {
-            let gain = reward.grant_all(
-                &mut *element_mastery,
+            spawn_element_reward_drops(
+                &mut commands,
+                &element_drop_assets,
+                reward,
+                target_position,
                 &mut rng,
-            );
-
-            info!(
-                "Energy EXP gain: Water +{}, Fire +{}, Wind +{}, Earth +{}, Inw +{}",
-                gain.water,
-                gain.fire,
-                gain.wind,
-                gain.earth,
-                gain.inw,
             );
         }
 

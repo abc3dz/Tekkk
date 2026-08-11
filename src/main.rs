@@ -11,6 +11,7 @@ mod combat;
 //mod fps;
 mod biomes;
 mod npc;
+mod element_drop;
 mod element_ui;
 mod enemy;
 mod warp_portal;
@@ -27,7 +28,7 @@ fn main() {
                 ..default()
             }),
             PhysicsPlugins::default(),
-            PhysicsDebugPlugin,
+            //PhysicsDebugPlugin,
             WindWakerShaderPlugin::default(),
             
         ))
@@ -38,7 +39,8 @@ fn main() {
             //fps::FpsPlugin, 
             //enemy::EnemyPlugin,
             element_ui::ElementUiPlugin,
+            element_drop::ElementDropPlugin,
         ))
-        
+
         .run();
 }
