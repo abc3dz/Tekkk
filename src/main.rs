@@ -7,6 +7,7 @@ mod player;
 mod camera;
 mod world;
 mod components;
+use crate::components::*;
 mod combat;
 //mod fps;
 mod biomes;
@@ -41,6 +42,6 @@ fn main() {
             element_ui::ElementUiPlugin,
             element_drop::ElementDropPlugin,
         ))
-
+        .add_systems(PreStartup, load_fonts)
         .run();
 }
