@@ -24,14 +24,6 @@ pub struct ElementDropAssets {
     pub water: Handle<StandardMaterial>,
     pub wind: Handle<StandardMaterial>,
     pub inw: Handle<StandardMaterial>,
-
-    pub ring_mesh: Handle<Mesh>,
-
-    pub ring_earth: Handle<StandardMaterial>,
-    pub ring_fire: Handle<StandardMaterial>,
-    pub ring_water: Handle<StandardMaterial>,
-    pub ring_wind: Handle<StandardMaterial>,
-    pub ring_inw: Handle<StandardMaterial>,
 }
 
 pub struct ElementDropPlugin;
@@ -54,15 +46,7 @@ pub fn setup_element_drop_assets(
     mut meshes: ResMut<Assets<Mesh>>,
     mut materials: ResMut<Assets<StandardMaterial>>,
 ) {
-    let mesh = meshes.add(Rectangle::new(0.55, 0.55));
-    let ring_mesh =
-    meshes.add(
-        Annulus::new(
-            0.28, // รูด้านใน
-            0.38, // ขอบนอก
-        )
-    );
-
+    let mesh = meshes.add(Rectangle::new(0.6, 0.6));
     let earth = materials.add(StandardMaterial {
         base_color_texture: Some(
             asset_server.load(
@@ -127,45 +111,7 @@ pub fn setup_element_drop_assets(
         cull_mode: None,
         ..default()
     });
-    let ring_earth =
-    materials.add(StandardMaterial {
-        base_color:
-            Color::srgb(0.45, 0.22, 0.08),
-        unlit: true,
-        ..default()
-    });
-
-    let ring_fire =
-        materials.add(StandardMaterial {
-            base_color:
-                Color::srgb(1.0, 0.20, 0.05),
-            unlit: true,
-            ..default()
-        });
-
-    let ring_water =
-        materials.add(StandardMaterial {
-            base_color:
-                Color::srgb(0.15, 0.65, 1.0),
-            unlit: true,
-            ..default()
-        });
-
-    let ring_wind =
-        materials.add(StandardMaterial {
-            base_color:
-                Color::srgb(0.65, 0.25, 1.0),
-            unlit: true,
-            ..default()
-        });
-
-    let ring_inw =
-        materials.add(StandardMaterial {
-            base_color:
-                Color::srgb(1.0, 0.75, 0.10),
-            unlit: true,
-            ..default()
-        });
+    
     commands.insert_resource(
         ElementDropAssets {
             mesh,
@@ -174,12 +120,6 @@ pub fn setup_element_drop_assets(
             water,
             wind,
             inw,
-            ring_mesh,
-            ring_earth,
-            ring_fire,
-            ring_water,
-            ring_wind,
-            ring_inw,
         },
     );
 }
@@ -197,41 +137,35 @@ pub fn spawn_element_drop(
 
     let (
         material,
-        ring_material,
         light_color,
         phase,
     ) = match element {
         Element::Earth => (
             assets.earth.clone(),
-            assets.ring_earth.clone(),
             Color::srgb(0.45, 0.22, 0.08),
             0.0,
         ),
 
         Element::Fire => (
             assets.fire.clone(),
-            assets.ring_fire.clone(),
             Color::srgb(1.0, 0.20, 0.05),
             1.0,
         ),
 
         Element::Water => (
             assets.water.clone(),
-            assets.ring_water.clone(),
             Color::srgb(0.15, 0.65, 1.0),
             2.0,
         ),
 
         Element::Wind => (
             assets.wind.clone(),
-            assets.ring_wind.clone(),
             Color::srgb(0.65, 0.25, 1.0),
             3.0,
         ),
 
         Element::Inw => (
             assets.inw.clone(),
-            assets.ring_inw.clone(),
             Color::srgb(1.0, 0.75, 0.10),
             4.0,
         ),
@@ -250,7 +184,6 @@ pub fn spawn_element_drop(
                 amount,
             },
 
-            // Root อยู่ที่ตำแหน่งศัตรูตาย
             Transform::from_translation(position),
         ))
         .with_children(|parent| {
@@ -278,32 +211,6 @@ pub fn spawn_element_drop(
                     0.0,
                     0.70,
                     0.0,
-                ),
-            ));
-
-            // ==========================
-            // Ring ใต้ไอเทม
-            // ==========================
-            parent.spawn((
-                Name::new("Element Drop Ring"),
-
-                Mesh3d(
-                    assets.ring_mesh.clone()
-                ),
-
-                MeshMaterial3d(
-                    ring_material
-                ),
-
-                Transform::from_xyz(
-                    0.0,
-                    0.03,
-                    0.0,
-                )
-                .with_rotation(
-                    Quat::from_rotation_x(
-                        -std::f32::consts::FRAC_PI_2
-                    )
                 ),
             ));
 

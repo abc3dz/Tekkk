@@ -63,7 +63,7 @@ fn spawn_enemy_muamua(
         &asset_server,
     );
 }
-
+const MUAMUA_SPAWN_POSITION: Vec3 = Vec3::new(5.0, 1.0, 5.0);
 fn spawn_enemy_muamua_entity(
     commands: &mut Commands,
     asset_server: &AssetServer,
@@ -72,9 +72,6 @@ fn spawn_enemy_muamua_entity(
         GltfAssetLabel::Scene(0)
             .from_asset("enemy/EnemyMuamua.glb"),
     );
-
-    let spawn_position =
-        Vec3::new(5.0, 0.0, 5.0);
 
     const MUAMUA_BODY_Y: f32 = 1.0;
 
@@ -103,10 +100,7 @@ fn spawn_enemy_muamua_entity(
             LockedAxes::ROTATION_LOCKED,
             LinearVelocity::ZERO,
 
-            Transform::from_translation(
-                spawn_position
-                    + Vec3::Y * MUAMUA_BODY_Y,
-            ),
+            Transform::from_translation(MUAMUA_SPAWN_POSITION + Vec3::Y * MUAMUA_BODY_Y,),
 
             DespawnOnExit(GameScene::Desert),
         ))
@@ -374,32 +368,50 @@ fn enemy_muamua_chase_player(
             if let Some(mut investigate) = investigate {
                 investigate.timer.tick(time.delta());
 
-                // หมดเวลาค้นหา
                 if investigate.timer.is_finished() {
-                    velocity.x = 0.0;
-                    velocity.z = 0.0;
+                    let to_spawn =
+                        MUAMUA_SPAWN_POSITION
+                            - muamua_transform.translation;
 
-                    *enemy_state =
-                        EnemyState::Idle;
+                    let flat_to_spawn =
+                        Vec3::new(
+                            to_spawn.x,
+                            0.0,
+                            to_spawn.z,
+                        );
 
-                    commands
-                        .entity(muamua_entity)
-                        .remove::<EnemyInvestigateDirection>();
+                    // กลับถึงจุด Spawn แล้ว
+                    if flat_to_spawn.length() <= 0.3 {
+                        velocity.x = 0.0;
+                        velocity.z = 0.0;
 
-                    continue;
+                        *enemy_state = EnemyState::Idle;
+
+                        commands
+                            .entity(muamua_entity)
+                            .remove::<EnemyInvestigateDirection>();
+
+                        continue;
+                    }
+
+                    // ยังไม่ถึง ให้เปลี่ยนทิศไปทางจุด Spawn
+                    investigate.direction =
+                        flat_to_spawn.normalize();
+
+                    // ให้เวลาเดินกลับ ไม่อย่างนั้น Timer จะ finished ตลอด
+                    investigate.timer =
+                        Timer::from_seconds(
+                            10.0,
+                            TimerMode::Once,
+                        );
                 }
 
                 let direction =
                     investigate.direction;
 
                 // เดินไปทางต้นทางของลูกพลัง
-                velocity.x =
-                    direction.x
-                        * MUAMUA_MOVE_SPEED;
-
-                velocity.z =
-                    direction.z
-                        * MUAMUA_MOVE_SPEED;
+                velocity.x = direction.x * MUAMUA_MOVE_SPEED;
+                velocity.z = direction.z * MUAMUA_MOVE_SPEED;
 
                 // หันหน้าไปทางที่เดิน
                 if direction.length_squared()

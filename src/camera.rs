@@ -66,7 +66,7 @@ fn follow_player(
     };
 
     let target =
-        player_tf.translation + Vec3::new(0.0, 5.0, 8.0);
+        player_tf.translation + Vec3::new(0.0, 4.0, 7.0);
 
     camera_tf.translation =
         camera_tf.translation.lerp(target, 0.1);
