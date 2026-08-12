@@ -11,7 +11,8 @@ use crate::components::{
     Health,
     Mana,
     Player,
-    GuardianDialogUI
+    GuardianDialogUI,
+    GameFonts,
 };
 
 pub struct ElementUiPlugin;
@@ -63,6 +64,7 @@ enum ElementExpText {
 
 fn setup_element_status_ui(
     mut commands: Commands,
+    fonts: Res<GameFonts>,
 ) {
     commands.spawn((
             ElementStatusUi,
@@ -92,7 +94,7 @@ fn setup_element_status_ui(
             .with_children(|panel| {
                 panel.spawn((
                     Text::new("PAUSED"),
-                    TextFont {font_size: 38.0, ..default()},
+                    TextFont {font: fonts.abc3dz.clone(),font_size: 38.0, ..default()},
                     TextColor(Color::srgb(1.0,0.82,0.20,),),
                     Node {
                         width: Val::Percent(100.0),
@@ -105,7 +107,7 @@ fn setup_element_status_ui(
                 ));
                 panel.spawn((
                     Text::new("PLAYER STATUS"),
-                    TextFont {font_size: 28.0, ..default()},
+                    TextFont {font: fonts.abc3dz.clone(), font_size: 28.0, ..default()},
                     TextColor(Color::WHITE),
                     Node {margin: UiRect::bottom(Val::Px(12.0)), ..default()},
                 ));
@@ -123,6 +125,7 @@ fn setup_element_status_ui(
                     panel.spawn((
                             Text::new(label),
                             TextFont {
+                                font: fonts.abc3dz.clone(),
                                 font_size: 23.0,
                                 ..default()
                             },
@@ -131,7 +134,7 @@ fn setup_element_status_ui(
                         .with_children(|text| {
                             text.spawn((
                                 TextSpan::default(),
-                                TextFont { font_size: 23.0, ..default()},
+                                TextFont { font: fonts.abc3dz.clone(), font_size: 23.0, ..default()},
                                 TextColor(Color::WHITE),
                                 value_marker,
                             ));
@@ -139,7 +142,7 @@ fn setup_element_status_ui(
                             if let Some(bonus_marker) = bonus_marker {
                                 text.spawn((
                                     TextSpan::default(),
-                                    TextFont {font_size: 23.0, ..default()},
+                                    TextFont {font: fonts.abc3dz.clone(), font_size: 23.0, ..default()},
                                     TextColor(Color::srgb(0.25,1.0,0.35,)),
                                     bonus_marker,
                                 ));
@@ -148,7 +151,7 @@ fn setup_element_status_ui(
                 }
                 panel.spawn((
                     Text::new("ELEMENT EXP"),
-                    TextFont {font_size: 28.0, ..default()},
+                    TextFont {font: fonts.abc3dz.clone(), font_size: 28.0, ..default()},
                     TextColor(Color::WHITE),
                     Node {
                         margin: UiRect {
@@ -171,11 +174,11 @@ fn setup_element_status_ui(
                 for (label, marker) in element_rows {
                     panel.spawn((
                             Text::new(label),
-                            TextFont {font_size: 23.0, ..default()},
+                            TextFont {font: fonts.abc3dz.clone(), font_size: 23.0, ..default()},
                             TextColor(Color::WHITE)))
                         .with_child((
                             TextSpan::default(),
-                            TextFont {font_size: 23.0, ..default()},
+                            TextFont {font: fonts.abc3dz.clone(), font_size: 23.0, ..default()},
                             TextColor(Color::WHITE),
                             marker,
                         ));
@@ -199,6 +202,7 @@ fn setup_element_status_ui(
                     controls.spawn((
                         Text::new("CONTROLS"),
                         TextFont {
+                            font: fonts.abc3dz.clone(),
                             font_size: 28.0,
                             ..default()
                         },
@@ -224,12 +228,16 @@ fn setup_element_status_ui(
                         "Dash",
                         "  L / Gamepad East",
                         "",
+                        "Power",
+                        " I / Gamepad North",
+                        "",
                     ];
 
                     for control in control_rows {
-                        controls.spawn((
-                            Text::new(control),
+                            controls.spawn((
+                                Text::new(control),
                             TextFont {
+                                font: fonts.abc3dz.clone(),
                                 font_size: 20.0,
                                 ..default()
                             },
@@ -244,7 +252,7 @@ fn setup_element_status_ui(
 
                 panel.spawn((
                     Text::new("Esc: Resume"),
-                    TextFont {font_size: 21.0, ..default()},
+                    TextFont {font: fonts.abc3dz.clone(), font_size: 21.0, ..default()},
                     TextColor(Color::srgb(0.75,0.75,0.80,)),
                     Node {margin: UiRect::top(Val::Px(18.0)), ..default()},
                 ));
