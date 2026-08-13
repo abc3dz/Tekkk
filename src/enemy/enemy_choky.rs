@@ -546,12 +546,12 @@ fn update_enemy_choky_animation(
             }
             EnemyChokyAnimState::Hurt => {
                 animation_player.play(animation_graph.hurt);
-                commands.spawn(AudioPlayer::new(asset_server.load("sounds/enemy/567989__ancientwarrior__woundedmaleshort_choky_hurt.ogg")));
+                commands.spawn(AudioPlayer::new(asset_server.load("sounds/enemy/choky_hurt.ogg")));
             }
 
             EnemyChokyAnimState::Dead => {
                 animation_player.play(animation_graph.dead);
-                commands.spawn(AudioPlayer::new(asset_server.load("sounds/enemy/567989__ancientwarrior__woundedmaleshort_choky_dead.ogg")));
+                commands.spawn(AudioPlayer::new(asset_server.load("sounds/enemy/choky_dead.ogg")));
             }
         }
 

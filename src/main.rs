@@ -8,7 +8,7 @@ mod camera;
 mod world;
 mod components;
 use crate::components::*;
-mod combat;
+//mod combat;
 //mod fps;
 mod biomes;
 mod npc;

@@ -1,18 +1,6 @@
 use bevy::prelude::*;
 use rand::Rng;
 
-#[derive(Component)] //
-pub struct Health {
-    pub current: i32,
-    pub max: i32,
-}
-
-#[derive(Component)] //
-pub struct Mana {
-    pub current: i32,
-    pub max: i32,
-}
-
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq, Hash,)]
 pub enum Element {
     #[default]

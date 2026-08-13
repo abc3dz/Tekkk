@@ -86,7 +86,7 @@ pub struct PlayerDashTrailTimer(pub Timer);
 pub struct PlayerJumpTimer(pub Timer);
 
 #[derive(Component)]
-pub struct PlayerHurtTimer(pub Timer);
+pub struct PlayerHurtTimer();
 
 #[derive(Component)]
 pub struct PlayerPowerTimer(pub Timer);

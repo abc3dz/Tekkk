@@ -3,7 +3,7 @@ use avian3d::prelude::*;
 use bevy::gltf::GltfAssetLabel;
 use bevy_wind_waker_shader::prelude::*;
 use rand::Rng;
-use crate::combat::*;
+
 use crate::components::*;
 use crate::npc::practice_common::spawn_enemy_health_bar;
 use crate::player::{
@@ -219,7 +219,7 @@ pub fn basic_practice_gun_shoot_projectile(
             ProjectileLifetime(Timer::from_seconds(4.0, TimerMode::Once)),
             SceneRoot(asset_server.load(GltfAssetLabel::Scene(0).from_asset("npc/BasicPracticeProjectile.glb"))),
             Transform {translation: spawn_pos, rotation: Quat::from_rotation_y(yaw), scale: Vec3::splat(1.0), ..default()},
-            AudioPlayer::new(asset_server.load("sounds/npc/shoot.ogg")),
+            AudioPlayer::new(asset_server.load("sounds/npc/basic_atk.ogg")),
             GlobalTransform::default(),
         ));
     }

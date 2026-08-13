@@ -40,7 +40,7 @@ pub fn spawn_hub(
     ));
     commands.spawn((
         AudioPlayer::new(asset_server.load("sounds/BGM_StartScene.ogg")),
-        PlaybackSettings{mode: bevy::audio::PlaybackMode::Loop, volume:  bevy::audio::Volume::Linear(0.3), ..default()},
+        PlaybackSettings{mode: bevy::audio::PlaybackMode::Loop, volume:  bevy::audio::Volume::Linear(0.1), ..default()},
         DespawnOnExit(GameScene::Hub),
     ));
 }

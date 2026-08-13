@@ -6,7 +6,6 @@ use avian3d::prelude::*;
 use bevy_wind_waker_shader::prelude::*;
 
 use crate::components::*;
-use crate::combat::*;
 use crate::camera::*;
 use crate::element_drop::*;
 
@@ -564,7 +563,7 @@ pub fn spawn_player_dash_trail_during_dash(
             WindWakerShaderBuilder::default().time_of_day(TimeOfDay::Day).weather(Weather::Sunny).build(),
         ));
         
-        commands.spawn(AudioPlayer::new(asset_server.load("sounds/742717__artix0__dash-sound-effect.ogg")));
+        commands.spawn(AudioPlayer::new(asset_server.load("sounds/moya_dash.ogg")));
     }
 }
 
@@ -598,10 +597,10 @@ pub fn play_player_hurt_animation(
 
     commands.entity(player_entity).insert(
         PlayerHurtTimer(
-            Timer::from_seconds(
-                0.5,
-                TimerMode::Once,
-            ),
+            // Timer::from_seconds(
+            //     0.5,
+            //     TimerMode::Once,
+            // ),
         ),
     );
     if let Ok(camera_entity) = camera_query.single() {
@@ -613,7 +612,7 @@ pub fn play_player_hurt_animation(
                 ));
         }
     
-    commands.spawn(AudioPlayer::new(asset_server.load("sounds/331935__pyro13djt__hit_hurt.ogg")));
+    commands.spawn(AudioPlayer::new(asset_server.load("sounds/moya_hurt.ogg")));
 }
 
 pub fn player_return_after_hurt(
@@ -883,10 +882,10 @@ fn combo_duration(index: usize) -> f32 {
 }
 fn combo_hit_sound(index: usize) -> &'static str {
     match index {
-        0 => "sounds/hit1.ogg",
-        1 => "sounds/hit2.ogg",
-        2 => "sounds/hit3.ogg",
-        _ => "sounds/hit1.ogg",
+        0 => "sounds/moya_hit1.ogg",
+        1 => "sounds/moya_hit2.ogg",
+        2 => "sounds/moya_hit3.ogg",
+        _ => "sounds/moya_hit1.ogg",
     }
 }
 
@@ -1900,7 +1899,8 @@ fn player_slap_hit_enemy(
                 &mut commands,
                 &element_drop_assets,
                 reward,
-                target_position,
+                target_transform.translation(),
+                target_transform.rotation(),
                 &mut rng,
             );
         }
@@ -2236,6 +2236,7 @@ fn player_energy_hit_enemy(
     >,
     camera_query: Query<Entity, With<MainCamera>>,
     element_drop_assets: Res<ElementDropAssets>,
+    asset_server: Res<AssetServer>
 ) {
     let Ok((
         player_stats,
@@ -2322,9 +2323,8 @@ fn player_energy_hit_enemy(
 
         let damage = (base_damage as f32 * element_multiplier).round().max(1.0) as i32;
         if is_critical {
-            if let Ok(camera_entity) =
-                camera_query.single()
-            {
+            commands.spawn(AudioPlayer::new(asset_server.load("sounds/moya_power_detection.ogg")));
+            if let Ok(camera_entity) = camera_query.single() {
                 commands
                     .entity(camera_entity)
                     .insert(
@@ -2416,7 +2416,8 @@ fn player_energy_hit_enemy(
                 &mut commands,
                 &element_drop_assets,
                 reward,
-                target_position,
+                target_transform.translation(),
+                target_transform.rotation(),
                 &mut rng,
             );
         }

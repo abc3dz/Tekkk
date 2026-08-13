@@ -34,15 +34,6 @@ impl Plugin for GuardianPlugin {
             cleanup_guardian_ui_when_player_leave,
         ).run_if(in_state(GameScene::Hub)))
         .add_systems(Update, guardian_dialog_exit_input.run_if(in_state(GameScene::Hub)))
-        
-        // .add_systems(Update, guardian_dialog_advanced_input.run_if(in_state(GameScene::Hub)))
-        
-        // .add_systems(Update, (
-        //     minion_chase_player,
-        //     minion_drain_player_life,
-        // ).run_if(in_state(GameScene::Hub)))
-        // .add_systems(Update, (respawn_advanced_minion_when_defeated).run_if(in_state(GameScene::Hub)))
-        //.add_systems(Update,update_enemy_health_bars)
         .add_systems(OnExit(GameScene::Hub), despawn_hub_only_entities);
     }
 }

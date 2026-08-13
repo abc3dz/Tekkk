@@ -5,7 +5,6 @@ use bevy::{
 };
 use bevy_wind_waker_shader::prelude::*;
 
-use crate::combat::*;
 use crate::components::*;
 use crate::npc::practice_common::*;
 use crate::player::*;
@@ -438,8 +437,7 @@ fn enemy_muamua_chase_player(
             velocity.x = 0.0;
             velocity.z = 0.0;
 
-            *enemy_state =
-                EnemyState::Idle;
+            *enemy_state = EnemyState::Idle;
 
             continue;
         }
@@ -457,9 +455,7 @@ fn enemy_muamua_chase_player(
             velocity.x = 0.0;
             velocity.z = 0.0;
 
-            if flat_direction.length_squared()
-                > 0.0001
-            {
+            if flat_direction.length_squared() > 0.0001 {
                 let direction =
                     flat_direction.normalize();
 
@@ -471,8 +467,7 @@ fn enemy_muamua_chase_player(
                     );
             }
 
-            *enemy_state =
-                EnemyState::Attack;
+            *enemy_state = EnemyState::Attack;
 
             continue;
         }
@@ -480,16 +475,9 @@ fn enemy_muamua_chase_player(
         // ==========================================
         // เจอ Player แล้ว → ไล่ Player ตามปกติ
         // ==========================================
-        let direction =
-            flat_direction.normalize();
-
-        velocity.x =
-            direction.x
-                * MUAMUA_MOVE_SPEED;
-
-        velocity.z =
-            direction.z
-                * MUAMUA_MOVE_SPEED;
+        let direction = flat_direction.normalize();
+        velocity.x = direction.x * MUAMUA_MOVE_SPEED;
+        velocity.z = direction.z * MUAMUA_MOVE_SPEED;
 
         muamua_transform.rotation =
             Quat::from_rotation_y(
@@ -498,18 +486,13 @@ fn enemy_muamua_chase_player(
                     .atan2(direction.z),
             );
 
-        *enemy_state =
-            EnemyState::Chase;
+        *enemy_state = EnemyState::Chase;
     }
 }
 
 fn update_enemy_muamua_animation(
     animation_graph: Res<EnemyMuamuaAnimationGraph>,
-
-    muamua_query: Query<
-        &EnemyState,
-        With<EnemyMuamua>,
-    >,
+    muamua_query: Query<&EnemyState,With<EnemyMuamua>>,
 
     mut animation_query: Query<
         (
@@ -573,12 +556,12 @@ fn update_enemy_muamua_animation(
             }
             EnemyMuamuaAnimState::Hurt => {
                 animation_player.play(animation_graph.hurt);
-                commands.spawn(AudioPlayer::new(asset_server.load("sounds/enemy/404327__pfranzen__male-grunts-and-groans_muamua_hurt.ogg")));
+                commands.spawn(AudioPlayer::new(asset_server.load("sounds/enemy/muamua_hurt.ogg")));
             }
 
             EnemyMuamuaAnimState::Dead => {
                 animation_player.play(animation_graph.dead);
-                commands.spawn(AudioPlayer::new(asset_server.load("sounds/enemy/404327__pfranzen__male-grunts-and-groans_muamua_dead.ogg")));
+                commands.spawn(AudioPlayer::new(asset_server.load("sounds/enemy/muamua_dead.ogg")));
             }
         }
 
@@ -870,12 +853,8 @@ fn respawn_enemy_muamua_when_defeated(
     mut commands: Commands,
     time: Res<Time>,
     asset_server: Res<AssetServer>,
-
-    mut respawn_timer:
-        ResMut<MuamuaRespawnTimer>,
-
-    muamua_query:
-        Query<(), With<EnemyMuamua>>,
+    mut respawn_timer: ResMut<MuamuaRespawnTimer>,
+    muamua_query: Query<(), With<EnemyMuamua>>,
 ) {
     // Muamua ยังอยู่ ไม่ต้อง Respawn
     if !muamua_query.is_empty() {

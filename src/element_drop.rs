@@ -1,6 +1,5 @@
 use bevy::prelude::*;
 
-use crate::combat::*;
 use crate::components::*;
 
 #[derive(Component, Debug)]
@@ -245,43 +244,47 @@ pub fn spawn_element_reward_drops(
     commands: &mut Commands,
     assets: &ElementDropAssets,
     reward: &ElementExpReward,
-    position: Vec3,
+    target_position: Vec3,
+    target_rotation: Quat,
     rng: &mut impl rand::Rng,
 ) {
+    // ตำแหน่งกึ่งกลางด้านหลัง target ระยะ 1.2 เมตร
+    let backward = target_rotation * Vec3::NEG_Z;
+    let right = target_rotation * Vec3::X;
+
+    let drop_center =
+        target_position
+        + backward * 1.2;
+
     let drops = [
         (
             Element::Water,
             reward.water.roll(rng),
-            Vec3::new(-0.6, 0.0, 0.0),
+            -right * 0.6,
         ),
         (
             Element::Fire,
             reward.fire.roll(rng),
-            Vec3::new(0.6, 0.0, 0.0),
+            right * 0.6,
         ),
         (
             Element::Wind,
             reward.wind.roll(rng),
-            Vec3::new(0.0, 0.0, -0.6),
+            -right * 0.3 + backward * 0.5,
         ),
         (
             Element::Earth,
             reward.earth.roll(rng),
-            Vec3::new(0.0, 0.0, 0.6),
+            right * 0.3 + backward * 0.5,
         ),
         (
             Element::Inw,
             reward.inw.roll(rng),
-            Vec3::new(0.0, 0.0, 0.0),
+            Vec3::ZERO,
         ),
     ];
 
-    for (
-        element,
-        amount,
-        offset,
-    ) in drops
-    {
+    for (element, amount, offset) in drops {
         if amount == 0 {
             continue;
         }
@@ -289,7 +292,7 @@ pub fn spawn_element_reward_drops(
         spawn_element_drop(
             commands,
             assets,
-            position + offset,
+            drop_center + offset,
             element,
             amount,
         );
@@ -315,6 +318,7 @@ pub fn collect_element_drops(
         ),
         Without<Player>,
     >,
+    asset_server: Res<AssetServer>,
 ) {
     let Ok((
         player_transform,
@@ -324,8 +328,7 @@ pub fn collect_element_drops(
         return;
     };
 
-    let player_position =
-        player_transform.translation();
+    let player_position = player_transform.translation();
 
     for (
         drop_entity,
@@ -358,9 +361,8 @@ pub fn collect_element_drops(
             );
         }
 
-        commands
-            .entity(drop_entity)
-            .despawn();
+        commands.entity(drop_entity).despawn();
+        commands.spawn(AudioPlayer::new(asset_server.load("sounds/get_element.ogg")));
     }
 }
 
@@ -404,29 +406,17 @@ pub fn animate_element_drop_icons(
         // ลอยขึ้นลง
         // ==========================
 
-        let floating =
-            (
-                elapsed * 2.5
-                    + icon.phase
-            )
-            .sin()
-                * 0.10;
-
-        transform.translation.y =
-            icon.base_y
-                + floating;
+        let floating = (elapsed * 2.5 + icon.phase).sin() * 0.10;
+        transform.translation.y = icon.base_y + floating;
 
         // ==========================
         // Billboard
         // หันเฉพาะแกน Y
         // ==========================
 
-        let icon_position =
-            global_transform.translation();
+        let icon_position = global_transform.translation();
 
-        let to_camera =
-            camera_position
-                - icon_position;
+        let to_camera = camera_position - icon_position;
 
         let flat_direction =
             Vec3::new(
