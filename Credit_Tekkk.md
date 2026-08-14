@@ -12,26 +12,34 @@ Mixamo
 # Sound
 
 https://sfbgames.itch.io/chiptone
+(CC0)
 
 https://freesound.org/people/pyro13djt/sounds/331935/
-licensed under CC BY 3.0. 
-Edited and partially used.
+(CC BY 3.0) 
 
 https://freesound.org/people/ArTiX.0/sounds/742717/
-Licensed under Creative Commons Zero (CC0)
-Converted from WAV to OGG to reduce file size.
+(CC0)
 
 https://freesound.org/people/metrostock99/sounds/514479/
-licensed under CC BY 4.0.
-Edited and partially used.
+(CC BY 4.0)
 
 https://freesound.org/people/AncientWarrior/sounds/567989/
-Licensed under Creative Commons Zero (CC0)
-Converted from WAV to OGG to reduce file size.
+(CC0)
 
 https://freesound.org/people/pfranzen/sounds/404327/
-licensed under CC BY 4.0.
-Edited and partially used.
+(CC BY 4.0)
+
+https://freesound.org/people/SoundBiterSFX/sounds/731509/
+(CC BY 4.0)
+
+https://freesound.org/people/Domarius/sounds/459345/
+(CC BY 4.0)
+
+https://freesound.org/people/Corruptinator/sounds/457172/
+(CC BY 4.0)
+
+https://freesound.org/people/chrisbrowne626/sounds/201262/
+(CC BY 3.0)
 
 # Tools
 
