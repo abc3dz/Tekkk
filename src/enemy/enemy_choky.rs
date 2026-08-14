@@ -792,7 +792,7 @@ fn choky_punch_hit_player(
             FloatingDamageKind::PlayerHit,
         );
         hitbox.has_hit = true;
-
+        commands.spawn(AudioPlayer::new(asset_server.load("sounds/enemy/choky_atk.ogg")));
         info!(
             "choky hit Player: damage={}, critical={}, HP={}/{}",
             damage,

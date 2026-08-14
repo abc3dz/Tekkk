@@ -814,7 +814,7 @@ fn muamua_punch_hit_player(
             FloatingDamageKind::PlayerHit,
         );
         hitbox.has_hit = true;
-
+        commands.spawn(AudioPlayer::new(asset_server.load("sounds/enemy/muamua_atk.ogg")));
         info!(
             "Muamua hit Player: damage={}, critical={}, HP={}/{}",
             damage,

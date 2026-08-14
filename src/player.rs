@@ -1,5 +1,4 @@
 use bevy::prelude::*;
-use bevy::gltf::GltfAssetLabel;
 use bevy::animation::graph::AnimationGraph;
 use bevy::animation::AnimationPlayer;
 use avian3d::prelude::*;
@@ -14,6 +13,7 @@ pub struct PlayerPlugin;
 impl Plugin for PlayerPlugin {
     fn build(&self, app: &mut App) {app
         .add_plugins(MaterialPlugin::<PlayerEnergyMaterial>::default())
+        //.add_observer(play_player_footstep)
         .add_systems(Startup,setup_player_energy_assets)
         .add_systems(Startup, (
             setup_player_animation_graph, 
@@ -23,7 +23,6 @@ impl Plugin for PlayerPlugin {
         .add_systems(Update, (
             setup_player_animation_player,
             player_movement,
-            player_footstep_sound,
             player_jump_input,
             player_jump_update,
             player_combo_input,
@@ -34,6 +33,7 @@ impl Plugin for PlayerPlugin {
             player_dash_update,
             update_player_dash_effect,
             update_player_animation,
+            player_footstep_from_animation_time,
             update_player_status_ui,
             rebuild_player_combat_stats_from_exp,
             update_floating_damage_text,
@@ -203,30 +203,30 @@ fn player_movement(
     }
 }
 
-pub fn player_footstep_sound(
-    mut commands: Commands,
-    asset_server: Res<AssetServer>,
-    player_query: Query<&LinearVelocity, With<Player>>,
-    playing_sound_query: Query<(), With<PlayerFootstepSound>>,
-) {
-    let Ok(velocity) = player_query.single()
-    else { return };
+// pub fn player_footstep_sound(
+//     mut commands: Commands,
+//     asset_server: Res<AssetServer>,
+//     player_query: Query<&LinearVelocity, With<Player>>,
+//     playing_sound_query: Query<(), With<PlayerFootstepSound>>,
+// ) {
+//     let Ok(velocity) = player_query.single()
+//     else { return };
 
-    let is_moving = velocity.x.abs() > 0.05 || velocity.z.abs() > 0.05;
-    if !is_moving {
-        return;
-    }
+//     let is_moving = velocity.x.abs() > 0.05 || velocity.z.abs() > 0.05;
+//     if !is_moving {
+//         return;
+//     }
 
-    if !playing_sound_query.is_empty() {
-        return;
-    }
+//     if !playing_sound_query.is_empty() {
+//         return;
+//     }
 
-    commands.spawn((
-        PlayerFootstepSound,
-        AudioPlayer::new(asset_server.load("sounds/sfx_walk.ogg")),
-        PlaybackSettings::DESPAWN,
-    ));
-}
+//     commands.spawn((
+//         PlayerFootstepSound,
+//         AudioPlayer::new(asset_server.load("sounds/sfx_walk.ogg")),
+//         PlaybackSettings::DESPAWN,
+//     ));
+// }
 
 fn setup_player_animation_graph(
     mut commands: Commands,
@@ -315,10 +315,15 @@ fn setup_player_animation_player(
     anim_graph: Res<PlayerAnimationGraph>,
     player_root_query: Query<&Children, With<Player>>,
     children_query: Query<&Children>,
-    mut anim_query: Query<(Entity, &mut AnimationPlayer), Added<AnimationPlayer>>,
+    mut anim_query: Query<
+        (Entity, &mut AnimationPlayer),
+        Added<AnimationPlayer>,
+    >,
 ) {
-    let Ok(player_children) = player_root_query.single() 
-    else { return };
+    let Ok(player_children) = player_root_query.single()
+    else {
+        return;
+    };
 
     let mut player_anim_entity: Option<Entity> = None;
 
@@ -331,18 +336,86 @@ fn setup_player_animation_player(
         );
     }
 
-    let Some(target_entity) = player_anim_entity else {
+    let Some(target_entity) = player_anim_entity
+    else {
         return;
     };
 
-    if let Ok((entity, mut player)) = anim_query.get_mut(target_entity) {
+    if let Ok((entity, mut player)) =
+        anim_query.get_mut(target_entity)
+    {
         commands.entity(entity).insert((
             AnimationGraphHandle(anim_graph.graph.clone()),
             PlayerAnimState::Idle,
             PlayerAnimationTarget,
+            PlayerFootstepTracker::default(),
         ));
 
         player.play(anim_graph.idle).repeat();
+    }
+}
+
+fn player_footstep_from_animation_time(
+    mut commands: Commands,
+    asset_server: Res<AssetServer>,
+    anim_graph: Res<PlayerAnimationGraph>,
+    mut query: Query<
+        (
+            &AnimationPlayer,
+            &PlayerAnimState,
+            &mut PlayerFootstepTracker,
+        ),
+        With<PlayerAnimationTarget>,
+    >,
+) {
+    const LEFT_FOOT_TIME: f32 = 6.0 / 24.0;
+    const RIGHT_FOOT_TIME: f32 = 17.0 / 24.0;
+
+    for (animation_player, anim_state, mut tracker) in &mut query {
+        if *anim_state != PlayerAnimState::Walk {
+            tracker.previous_time = 0.0;
+            continue;
+        }
+
+        let Some(walk_animation) =
+            animation_player.animation(anim_graph.walk)
+        else {
+            tracker.previous_time = 0.0;
+            continue;
+        };
+
+        let current_time = walk_animation.seek_time();
+        let previous_time = tracker.previous_time;
+
+        // ตรวจว่าเวลาแอนิเมชันผ่านจุดเหยียบพื้นหรือยัง
+        // รองรับตอนแอนิเมชันวนกลับไปเริ่มต้นด้วย
+        let crossed = |step_time: f32| {
+            if current_time >= previous_time {
+                previous_time < step_time
+                    && current_time >= step_time
+            } else {
+                // Animation วนจากท้ายกลับไปต้น
+                previous_time < step_time
+                    || current_time >= step_time
+            }
+        };
+
+        if crossed(LEFT_FOOT_TIME)
+            || crossed(RIGHT_FOOT_TIME)
+        {
+            info!("PLAY FOOTSTEP");
+
+            commands.spawn((
+                AudioPlayer::new(
+                    asset_server.load(
+                        "sounds/sfx_walk.ogg",
+                    ),
+                ),
+                PlaybackSettings::DESPAWN,
+            ));
+        }
+
+        tracker.previous_time = current_time;
     }
 }
 
