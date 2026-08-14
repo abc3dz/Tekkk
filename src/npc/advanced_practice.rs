@@ -114,7 +114,7 @@ let minion_entity = commands
 
             MinionLifeDrainTimer(
                 Timer::from_seconds(
-                    2.0,
+                    1.0,
                     TimerMode::Repeating,
                 ),
             ),

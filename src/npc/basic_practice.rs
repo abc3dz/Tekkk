@@ -210,7 +210,7 @@ pub fn basic_practice_gun_shoot_projectile(
 
         let direction = direction.normalize();
         let speed = 5.0;
-        let spawn_pos = gun_tf.translation + direction * 0.8 + Vec3::Y * 0.3;
+        let spawn_pos = gun_tf.translation + direction * 0.3 + Vec3::Y * 0.175;
         let yaw = direction.x.atan2(direction.z);
 
         commands.spawn((
