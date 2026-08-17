@@ -11,7 +11,6 @@ bevy = {
 avian3d = "0.6"
 bevy_framepace = "0.20"
 rand = "0.9"
-bevy_wind_waker_shader = "0.6"
 
 [target.'cfg(target_arch = "wasm32")'.dependencies]
 getrandom = { version = "0.3", features = ["wasm_js"] }
