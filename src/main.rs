@@ -16,6 +16,7 @@ mod element_drop;
 mod element_ui;
 mod enemy;
 mod warp_portal;
+mod cel_shader;
 
 fn main() {
     App::new()
@@ -31,7 +32,7 @@ fn main() {
             PhysicsPlugins::default(),
             //PhysicsDebugPlugin,
             WindWakerShaderPlugin::default(),
-            
+            cel_shader::CelShaderPlugin,
         ))
         .add_plugins((
             world::WorldPlugin,
@@ -43,5 +44,6 @@ fn main() {
             element_drop::ElementDropPlugin,
         ))
         .add_systems(PreStartup, load_fonts)
+        
         .run();
 }

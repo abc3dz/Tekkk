@@ -1,9 +1,9 @@
 use bevy::prelude::*;
 use bevy::gltf::GltfAssetLabel;
 use avian3d::prelude::*;
-use bevy_wind_waker_shader::prelude::*;
 
 use crate::components::*;
+use crate::cel_shader::*;
 
 pub fn spawn_desert(
     mut commands: Commands,
@@ -12,7 +12,7 @@ pub fn spawn_desert(
 ) {
     commands.spawn((
         SceneRoot(asset_server.load(GltfAssetLabel::Scene(0).from_asset("maps/EvrmDesert.glb"))),
-        WindWakerShaderBuilder::default().time_of_day(TimeOfDay::Day).weather(Weather::Rainy).build(),
+        ApplyToonMaterial,
         Transform::from_xyz(0.0, -0.1, 0.0),
         CurrentScene,
     ));

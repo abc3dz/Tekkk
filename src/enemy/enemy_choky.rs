@@ -3,8 +3,8 @@ use bevy::{
     gltf::GltfAssetLabel,
     prelude::*,
 };
-use bevy_wind_waker_shader::prelude::*;
 
+use crate::cel_shader::*;
 use crate::combat::*;
 use crate::components::*;
 use crate::npc::practice_common::*;
@@ -19,34 +19,20 @@ pub struct EnemyChokyPlugin;
 impl Plugin for EnemyChokyPlugin {
     fn build(&self, app: &mut App) {
         app
-        .insert_resource(
-            ChokyRespawnTimer(
-                Timer::from_seconds(
-                    1.0,
-                    TimerMode::Once,
-                ),
-            ),
-        )
-        .add_systems(
-            OnEnter(GameScene::Desert),
-            (
-                setup_enemy_choky_animation_graph,
-                spawn_enemy_choky,
-            ),
-        )
+        .insert_resource(ChokyRespawnTimer(Timer::from_seconds(1.0,TimerMode::Once)))
+        .add_systems(OnEnter(GameScene::Desert),(setup_enemy_choky_animation_graph))
         .add_systems(
             Update,
             (
+                spawn_enemy_choky,
                 setup_enemy_choky_animation_player,
                 enemy_choky_chase_player,
                 update_enemy_choky_animation,
                 debug_enemy_choky_spawn,
                 update_choky_hurt_and_dead,
-
                 spawn_choky_punch_hitbox,
                 choky_punch_hit_player,
                 despawn_choky_punch_hitbox,
-                respawn_enemy_choky_when_defeated
             )
             .chain()
             .run_if(in_state(GameScene::Desert)),
@@ -56,18 +42,23 @@ impl Plugin for EnemyChokyPlugin {
 
 fn spawn_enemy_choky(
     mut commands: Commands,
+    time: Res<Time>,
     asset_server: Res<AssetServer>,
+    mut respawn_timer: ResMut<ChokyRespawnTimer>,
+    choky_query: Query<(), With<EnemyChoky>>,
 ) {
-    spawn_enemy_choky_entity(
-        &mut commands,
-        &asset_server,
-    );
-}
+    // Choky ยังอยู่ ห้าม spawn เพิ่มทุกเฟรม
+    if !choky_query.is_empty() {
+        respawn_timer.0.reset();
+        return;
+    }
 
-fn spawn_enemy_choky_entity(
-    commands: &mut Commands,
-    asset_server: &AssetServer,
-) {
+    respawn_timer.0.tick(time.delta());
+
+    if !respawn_timer.0.just_finished() {
+        return;
+    }
+
     let choky_scene = asset_server.load(
         GltfAssetLabel::Scene(0)
             .from_asset("enemy/EnemyChoky.glb"),
@@ -83,7 +74,6 @@ fn spawn_enemy_choky_entity(
     let enemy_choky = commands
         .spawn((
             Name::new("Enemy Choky"),
-
             Enemy,
             EnemyChoky,
             EnemyState::Idle,
@@ -97,31 +87,18 @@ fn spawn_enemy_choky_entity(
             CombatStats::from(base_stats),
             AtkAndDefElement(Element::Earth),
             ElementExpReward::CHOKY,
-
             RigidBody::Dynamic,
             Collider::capsule(0.45, 1.0),
             LockedAxes::ROTATION_LOCKED,
             LinearVelocity::ZERO,
-
-            Transform::from_translation(
-                spawn_position
-                    + Vec3::Y * CHOKY_BODY_Y,
-            ),
-
+            Transform::from_translation(spawn_position + Vec3::Y * CHOKY_BODY_Y,),
             DespawnOnExit(GameScene::Desert),
         ))
         .with_children(|parent| {
             parent.spawn((
                 SceneRoot(choky_scene),
-                Transform::from_xyz(
-                    0.0,
-                    -CHOKY_BODY_Y,
-                    0.0,
-                ),
-                WindWakerShaderBuilder::default()
-                    .time_of_day(TimeOfDay::Day)
-                    .weather(Weather::Sunny)
-                    .build(),
+                Transform::from_xyz(0.0,-CHOKY_BODY_Y,0.0,),
+                ApplyToonMaterial
             ));
         })
         .id();
@@ -136,7 +113,12 @@ fn spawn_enemy_choky_entity(
         ),
     ));
 
-    spawn_enemy_health_bar(commands,enemy_choky);
+    spawn_enemy_health_bar(
+        &mut commands,
+        enemy_choky,
+    );
+
+    respawn_timer.0.reset();
 }
 
 fn debug_enemy_choky_spawn(
@@ -825,37 +807,4 @@ fn despawn_choky_punch_hitbox(
             commands.entity(entity).despawn();
         }
     }
-}
-
-fn respawn_enemy_choky_when_defeated(
-    mut commands: Commands,
-    time: Res<Time>,
-    asset_server: Res<AssetServer>,
-
-    mut respawn_timer:
-        ResMut<ChokyRespawnTimer>,
-
-    choky_query:
-        Query<(), With<EnemyChoky>>,
-) {
-    // choky ยังอยู่ ไม่ต้อง Respawn
-    if !choky_query.is_empty() {
-        respawn_timer.0.reset();
-        return;
-    }
-
-    respawn_timer.0.tick(time.delta());
-
-    if !respawn_timer.0.just_finished() {
-        return;
-    }
-
-    spawn_enemy_choky_entity(
-        &mut commands,
-        &asset_server,
-    );
-
-    respawn_timer.0.reset();
-
-    info!("Enemy choky respawned");
 }

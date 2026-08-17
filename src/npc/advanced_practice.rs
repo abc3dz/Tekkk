@@ -1,8 +1,9 @@
 use bevy::prelude::*;
 use avian3d::prelude::*;
 use bevy::gltf::GltfAssetLabel;
-use bevy_wind_waker_shader::prelude::*;
+//use bevy_wind_waker_shader::prelude::*;
 use rand::Rng;
+use crate::cel_shader::*;
 use crate::components::*;
 use crate::npc::practice_common::spawn_enemy_health_bar;
 use crate::player::{
@@ -131,26 +132,14 @@ let minion_entity = commands
             GlobalTransform::default(),
         ))
         .with_children(|parent| {
-            parent.spawn((
-                SceneRoot(
-                    asset_server.load(
-                        GltfAssetLabel::Scene(0)
-                            .from_asset(
-                                "npc/MinionChar.glb",
-                            ),
-                    ),
-                ),
+            parent.spawn((SceneRoot(asset_server.load(GltfAssetLabel::Scene(0).from_asset("npc/MinionChar.glb"))),
+                Transform::from_xyz(0.0,-ADVANCED_MINION_BODY_Y,0.0,),
+                ApplyToonMaterial
 
-                Transform::from_xyz(
-                    0.0,
-                    -ADVANCED_MINION_BODY_Y,
-                    0.0,
-                ),
-
-                WindWakerShaderBuilder::default()
-                    .time_of_day(TimeOfDay::Day)
-                    .weather(Weather::Sunny)
-                    .build(),
+                // WindWakerShaderBuilder::default()
+                //     .time_of_day(TimeOfDay::Day)
+                //     .weather(Weather::Sunny)
+                //     .build(),
             ));
         })
         .id();

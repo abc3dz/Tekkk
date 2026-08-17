@@ -1,9 +1,9 @@
 use bevy::prelude::*;
 use bevy::gltf::GltfAssetLabel;
 use avian3d::prelude::*;
-use bevy_wind_waker_shader::prelude::*;
 
 use crate::components::*;
+use crate::cel_shader::*;
 
 pub fn spawn_hub(
     mut commands: Commands,
@@ -11,7 +11,7 @@ pub fn spawn_hub(
 ) {
     commands.spawn((
         SceneRoot(asset_server.load(GltfAssetLabel::Scene(0).from_asset("maps/EvrmHub.glb"))),
-        WindWakerShaderBuilder::default().time_of_day(TimeOfDay::Day).weather(Weather::Sunny).build(),
+        ApplyToonMaterial,
         CurrentScene,
 
     ));

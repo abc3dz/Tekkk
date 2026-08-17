@@ -2,18 +2,16 @@ use bevy::prelude::*;
 use bevy::animation::graph::AnimationGraph;
 use bevy::animation::AnimationPlayer;
 use avian3d::prelude::*;
-use bevy_wind_waker_shader::prelude::*;
 
 use crate::components::*;
 use crate::camera::*;
 use crate::element_drop::*;
-
+use crate::cel_shader::*;
 pub struct PlayerPlugin;
 
 impl Plugin for PlayerPlugin {
     fn build(&self, app: &mut App) {app
         .add_plugins(MaterialPlugin::<PlayerEnergyMaterial>::default())
-        //.add_observer(play_player_footstep)
         .add_systems(Startup,setup_player_energy_assets)
         .add_systems(Startup, (
             setup_player_animation_graph, 
@@ -95,7 +93,7 @@ fn spawn_player(
     )).with_children(|parent| {
         parent.spawn((SceneRoot(asset_server.load(GltfAssetLabel::Scene(0).from_asset("player/PlayerMoya.glb"))),
             Transform::from_xyz(0.0, -0.83, 0.0),
-            WindWakerShaderBuilder::default().time_of_day(TimeOfDay::Day).weather(Weather::Sunny).build(),
+            ApplyToonMaterial,
         ));
     });
 }
@@ -359,14 +357,7 @@ fn player_footstep_from_animation_time(
     mut commands: Commands,
     asset_server: Res<AssetServer>,
     anim_graph: Res<PlayerAnimationGraph>,
-    mut query: Query<
-        (
-            &AnimationPlayer,
-            &PlayerAnimState,
-            &mut PlayerFootstepTracker,
-        ),
-        With<PlayerAnimationTarget>,
-    >,
+    mut query: Query<(&AnimationPlayer,&PlayerAnimState,&mut PlayerFootstepTracker),With<PlayerAnimationTarget>>,
 ) {
     const LEFT_FOOT_TIME: f32 = 6.0 / 24.0;
     const RIGHT_FOOT_TIME: f32 = 17.0 / 24.0;
@@ -377,8 +368,7 @@ fn player_footstep_from_animation_time(
             continue;
         }
 
-        let Some(walk_animation) =
-            animation_player.animation(anim_graph.walk)
+        let Some(walk_animation) = animation_player.animation(anim_graph.walk)
         else {
             tracker.previous_time = 0.0;
             continue;
@@ -400,19 +390,10 @@ fn player_footstep_from_animation_time(
             }
         };
 
-        if crossed(LEFT_FOOT_TIME)
-            || crossed(RIGHT_FOOT_TIME)
-        {
+        if crossed(LEFT_FOOT_TIME) || crossed(RIGHT_FOOT_TIME) {
             info!("PLAY FOOTSTEP");
 
-            commands.spawn((
-                AudioPlayer::new(
-                    asset_server.load(
-                        "sounds/sfx_walk.ogg",
-                    ),
-                ),
-                PlaybackSettings::DESPAWN,
-            ));
+            commands.spawn((AudioPlayer::new(asset_server.load("sounds/sfx_walk.ogg")),PlaybackSettings::DESPAWN));
         }
 
         tracker.previous_time = current_time;
@@ -633,7 +614,8 @@ pub fn spawn_player_dash_trail_during_dash(
                 scale: Vec3::splat(1.0),
             },
             GlobalTransform::default(),
-            WindWakerShaderBuilder::default().time_of_day(TimeOfDay::Day).weather(Weather::Sunny).build(),
+            ApplyToonMaterial,
+
         ));
         
         commands.spawn(AudioPlayer::new(asset_server.load("sounds/moya_dash.ogg")));

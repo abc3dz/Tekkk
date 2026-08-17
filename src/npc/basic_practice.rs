@@ -1,9 +1,9 @@
 use bevy::prelude::*;
 use avian3d::prelude::*;
 use bevy::gltf::GltfAssetLabel;
-use bevy_wind_waker_shader::prelude::*;
+//use bevy_wind_waker_shader::prelude::*;
 use rand::Rng;
-
+use crate::cel_shader::*;
 use crate::components::*;
 use crate::npc::practice_common::spawn_enemy_health_bar;
 use crate::player::{
@@ -106,11 +106,11 @@ let gun_entity = commands
                     -BASIC_GUN_BODY_Y,
                     0.0,
                 ),
-
-                WindWakerShaderBuilder::default()
-                    .time_of_day(TimeOfDay::Day)
-                    .weather(Weather::Sunny)
-                    .build(),
+                ApplyToonMaterial
+                // WindWakerShaderBuilder::default()
+                //     .time_of_day(TimeOfDay::Day)
+                //     .weather(Weather::Sunny)
+                //     .build(),
             ));
         })
         .id();
@@ -210,7 +210,8 @@ pub fn basic_practice_gun_shoot_projectile(
 
         let direction = direction.normalize();
         let speed = 5.0;
-        let spawn_pos = gun_tf.translation + direction * 0.3 + Vec3::Y * 0.175;
+        let mut spawn_pos = gun_tf.translation + direction * 0.3;
+        spawn_pos.y = 0.5;
         let yaw = direction.x.atan2(direction.z);
 
         commands.spawn((

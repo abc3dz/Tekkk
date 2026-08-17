@@ -1,7 +1,6 @@
 use bevy::prelude::*;
 use bevy::gltf::GltfAssetLabel;
 use avian3d::prelude::*;
-use bevy_wind_waker_shader::prelude::*;
 use bevy::animation::graph::AnimationGraph;
 use bevy::animation::AnimationPlayer;
 use crate::components::*;
@@ -10,7 +9,7 @@ use crate::npc::{
     basic_practice::BasicPracticePlugin,
     practice_common::PracticeCommonPlugin,
 };
-
+use crate::cel_shader::*;
 pub struct GuardianPlugin;
 
 impl Plugin for GuardianPlugin {
@@ -57,16 +56,9 @@ pub fn spawn_guardian_npc(
     ))
     .with_children(|parent| {
         parent.spawn((
-            SceneRoot(
-                asset_server.load(
-                    GltfAssetLabel::Scene(0).from_asset("npc/Guardian.glb")
-                )
-            ),
+            SceneRoot(asset_server.load(GltfAssetLabel::Scene(0).from_asset("npc/Guardian.glb"))),
             Transform::from_xyz(0.0, -1.25, 0.0),
-            WindWakerShaderBuilder::default()
-            .time_of_day(TimeOfDay::Day)
-            .weather(Weather::Sunny)
-            .build(),
+            ApplyToonMaterial
         ));
         parent.spawn((
             GuardianInteractArea,
@@ -364,7 +356,7 @@ pub fn guardian_dialog_exit_input(
         commands.entity(entity).despawn();
     }
 
-    commands.spawn(AudioPlayer::new(asset_server.load("sounds/npc/exit_pt.ogg")));
+commands.spawn(AudioPlayer::new(asset_server.load("sounds/npc/exit_pt.ogg")));
     transform.translation.z += 3.5;
 
     basic_practice_active.0 = false;

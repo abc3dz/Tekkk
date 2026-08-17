@@ -3,8 +3,8 @@ use bevy::{
     gltf::GltfAssetLabel,
     prelude::*,
 };
-use bevy_wind_waker_shader::prelude::*;
 
+use crate::cel_shader::*;
 use crate::components::*;
 use crate::npc::practice_common::*;
 use crate::player::*;
@@ -18,34 +18,18 @@ pub struct EnemyMuamuaPlugin;
 impl Plugin for EnemyMuamuaPlugin {
     fn build(&self, app: &mut App) {
         app
-        .insert_resource(
-            MuamuaRespawnTimer(
-                Timer::from_seconds(
-                    1.0,
-                    TimerMode::Once,
-                ),
-            ),
-        )
-        .add_systems(
-            OnEnter(GameScene::Desert),
-            (
-                setup_enemy_muamua_animation_graph,
+        .insert_resource(MuamuaRespawnTimer(Timer::from_seconds(1.0,TimerMode::Once)))
+        .add_systems(OnEnter(GameScene::Desert),setup_enemy_muamua_animation_graph)
+        .add_systems(Update,(
                 spawn_enemy_muamua,
-            ),
-        )
-        .add_systems(
-            Update,
-            (
                 setup_enemy_muamua_animation_player,
                 enemy_muamua_chase_player,
                 update_enemy_muamua_animation,
                 debug_enemy_muamua_spawn,
                 update_muamua_hurt_and_dead,
-
                 spawn_muamua_punch_hitbox,
                 muamua_punch_hit_player,
                 despawn_muamua_punch_hitbox,
-                respawn_enemy_muamua_when_defeated
             )
             .chain()
             .run_if(in_state(GameScene::Desert)),
@@ -53,33 +37,38 @@ impl Plugin for EnemyMuamuaPlugin {
     }
 }
 
+const MUAMUA_SPAWN_POSITION: Vec3 = Vec3::new(5.0, 1.0, 5.0);
 fn spawn_enemy_muamua(
     mut commands: Commands,
+    time: Res<Time>,
     asset_server: Res<AssetServer>,
+    mut respawn_timer: ResMut<MuamuaRespawnTimer>,
+    muamua_query: Query<(), With<EnemyMuamua>>,
 ) {
-    spawn_enemy_muamua_entity(
-        &mut commands,
-        &asset_server,
-    );
-}
-const MUAMUA_SPAWN_POSITION: Vec3 = Vec3::new(5.0, 1.0, 5.0);
-fn spawn_enemy_muamua_entity(
-    commands: &mut Commands,
-    asset_server: &AssetServer,
-) {
+    // ถ้า Muamua ยังอยู่ ไม่ต้องสร้างเพิ่ม
+    if !muamua_query.is_empty() {
+        respawn_timer.0.reset();
+        return;
+    }
+
+    // Muamua ไม่มีแล้ว เริ่มนับเวลารอ respawn
+    respawn_timer.0.tick(time.delta());
+
+    if !respawn_timer.0.just_finished() {
+        return;
+    }
+
     let muamua_scene = asset_server.load(
         GltfAssetLabel::Scene(0)
             .from_asset("enemy/EnemyMuamua.glb"),
     );
 
     const MUAMUA_BODY_Y: f32 = 1.0;
-
     let base_stats = BaseStats::MUAMUA;
 
     let enemy_muamua = commands
         .spawn((
             Name::new("Enemy Muamua"),
-
             Enemy,
             EnemyMuamua,
             EnemyState::Idle,
@@ -99,7 +88,10 @@ fn spawn_enemy_muamua_entity(
             LockedAxes::ROTATION_LOCKED,
             LinearVelocity::ZERO,
 
-            Transform::from_translation(MUAMUA_SPAWN_POSITION + Vec3::Y * MUAMUA_BODY_Y,),
+            Transform::from_translation(
+                MUAMUA_SPAWN_POSITION
+                    + Vec3::Y * MUAMUA_BODY_Y,
+            ),
 
             DespawnOnExit(GameScene::Desert),
         ))
@@ -111,28 +103,27 @@ fn spawn_enemy_muamua_entity(
                     -MUAMUA_BODY_Y,
                     0.0,
                 ),
-                WindWakerShaderBuilder::default()
-                    .time_of_day(TimeOfDay::Day)
-                    .weather(Weather::Sunny)
-                    .build(),
+                ApplyToonMaterial,
             ));
         })
         .id();
 
     commands.entity(enemy_muamua).insert((
         CombatTarget,
-        MuamuaAttackTimer(
-            Timer::from_seconds(
-                0.3,
-                TimerMode::Repeating,
-            ),
-        ),
+        MuamuaAttackTimer(Timer::from_seconds(
+            0.3,
+            TimerMode::Repeating,
+        )),
     ));
 
     spawn_enemy_health_bar(
-        commands,
+        &mut commands,
         enemy_muamua,
     );
+
+    respawn_timer.0.reset();
+
+    info!("Enemy Muamua spawned");
 }
 
 fn debug_enemy_muamua_spawn(
@@ -847,33 +838,4 @@ fn despawn_muamua_punch_hitbox(
             commands.entity(entity).despawn();
         }
     }
-}
-
-fn respawn_enemy_muamua_when_defeated(
-    mut commands: Commands,
-    time: Res<Time>,
-    asset_server: Res<AssetServer>,
-    mut respawn_timer: ResMut<MuamuaRespawnTimer>,
-    muamua_query: Query<(), With<EnemyMuamua>>,
-) {
-    // Muamua ยังอยู่ ไม่ต้อง Respawn
-    if !muamua_query.is_empty() {
-        respawn_timer.0.reset();
-        return;
-    }
-
-    respawn_timer.0.tick(time.delta());
-
-    if !respawn_timer.0.just_finished() {
-        return;
-    }
-
-    spawn_enemy_muamua_entity(
-        &mut commands,
-        &asset_server,
-    );
-
-    respawn_timer.0.reset();
-
-    info!("Enemy Muamua respawned");
 }
