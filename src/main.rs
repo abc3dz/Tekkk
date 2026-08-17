@@ -1,7 +1,6 @@
 use bevy::window::PresentMode;
 use bevy::prelude::*;
 use avian3d::prelude::*;
-use bevy_wind_waker_shader::prelude::*;
 
 mod player;
 mod camera;
@@ -31,7 +30,6 @@ fn main() {
             }),
             PhysicsPlugins::default(),
             //PhysicsDebugPlugin,
-            WindWakerShaderPlugin::default(),
             cel_shader::CelShaderPlugin,
         ))
         .add_plugins((
