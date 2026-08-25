@@ -16,6 +16,7 @@ mod element_ui;
 mod enemy;
 mod warp_portal;
 mod cel_shader;
+mod pause_menu;
 
 fn main() {
     App::new()
@@ -36,12 +37,11 @@ fn main() {
             world::WorldPlugin,
             player::PlayerPlugin,
             camera::CameraPlugin,
-            //fps::FpsPlugin, 
-            //enemy::EnemyPlugin,
+            //fps::FpsPlugin,
             element_ui::ElementUiPlugin,
             element_drop::ElementDropPlugin,
+            pause_menu::PauseMenuPlugin
         ))
         .add_systems(PreStartup, load_fonts)
-        
         .run();
 }

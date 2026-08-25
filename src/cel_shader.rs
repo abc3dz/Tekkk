@@ -42,7 +42,7 @@ impl Default for ToonExtension {
 }
 
 #[derive(Component)]
-struct ApplyToonMaterial;
+pub struct ApplyToonMaterial;
 
 impl MaterialExtension for ToonExtension {
     fn fragment_shader() -> ShaderRef {
@@ -53,12 +53,12 @@ pub struct CelShaderPlugin;
 impl Plugin for CelShaderPlugin {
     fn build(&self, app: &mut App) {app
         .add_plugins(MaterialPlugin::<ToonMaterial>::default())
-        .add_systems(Startup, setup)
+        //.add_systems(Startup, test_spawn)
         .add_observer(apply_toon_material);
     }
 }
 
-pub fn setup(
+pub fn test_spawn(
     mut commands: Commands,
     asset_server: Res<AssetServer>,
 ) {
@@ -74,16 +74,8 @@ pub fn setup(
         ))
         .with_children(|parent| {
             parent.spawn((
-                SceneRoot(
-                    asset_server.load(
-                        GltfAssetLabel::Scene(0)
-                            .from_asset("npc/Guardian.glb"),
-                    ),
-                ),
-
-                // ใส่ marker ที่ SceneRoot
+                SceneRoot(asset_server.load(GltfAssetLabel::Scene(0).from_asset("npc/Guardian.glb"))),
                 ApplyToonMaterial,
-
                 Transform::from_xyz(0.0, -1.25, 0.0),
             ));
         });
@@ -94,16 +86,9 @@ fn apply_toon_material(
     mut commands: Commands,
     children: Query<&Children>,
     toon_scenes: Query<(), With<ApplyToonMaterial>>,
-
-    mesh_materials: Query<
-        &MeshMaterial3d<StandardMaterial>
-    >,
-
+    mesh_materials: Query<&MeshMaterial3d<StandardMaterial>>,
     standard_materials: Res<Assets<StandardMaterial>>,
-
-    mut toon_materials: ResMut<
-        Assets<ToonMaterial>
-    >,
+    mut toon_materials: ResMut<Assets<ToonMaterial>>,
 ) {
     let scene_root = scene_ready.entity;
 
@@ -113,14 +98,12 @@ fn apply_toon_material(
     }
 
     for descendant in children.iter_descendants(scene_root) {
-        let Ok(old_handle) =
-            mesh_materials.get(descendant)
+        let Ok(old_handle) = mesh_materials.get(descendant)
         else {
             continue;
         };
 
-        let Some(old_material) =
-            standard_materials.get(old_handle.id())
+        let Some(old_material) = standard_materials.get(old_handle.id())
         else {
             continue;
         };

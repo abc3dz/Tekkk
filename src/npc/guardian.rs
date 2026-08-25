@@ -10,6 +10,8 @@ use crate::npc::{
     practice_common::PracticeCommonPlugin,
 };
 use crate::cel_shader::*;
+use crate::pause_menu::GameMode;
+
 pub struct GuardianPlugin;
 
 impl Plugin for GuardianPlugin {
@@ -31,7 +33,7 @@ impl Plugin for GuardianPlugin {
             check_guardian_interaction_area_exit,
             show_guardian_dialog,
             cleanup_guardian_ui_when_player_leave,
-        ).run_if(in_state(GameScene::Hub)))
+        ).run_if(in_state(GameScene::Hub).and(in_state(GameMode::Playing))))
         .add_systems(Update, guardian_dialog_exit_input.run_if(in_state(GameScene::Hub)))
         .add_systems(OnExit(GameScene::Hub), despawn_hub_only_entities);
     }

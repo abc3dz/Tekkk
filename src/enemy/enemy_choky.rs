@@ -10,6 +10,7 @@ use crate::components::*;
 use crate::npc::practice_common::*;
 use crate::player::*;
 use crate::camera::*;
+use crate::pause_menu::GameMode;
 
 #[derive(Component, Debug)]
 pub struct EnemyChoky;
@@ -20,10 +21,8 @@ impl Plugin for EnemyChokyPlugin {
     fn build(&self, app: &mut App) {
         app
         .insert_resource(ChokyRespawnTimer(Timer::from_seconds(1.0,TimerMode::Once)))
-        .add_systems(OnEnter(GameScene::Desert),(setup_enemy_choky_animation_graph))
-        .add_systems(
-            Update,
-            (
+        .add_systems(OnEnter(GameScene::Desert),setup_enemy_choky_animation_graph)
+        .add_systems(Update,(
                 spawn_enemy_choky,
                 setup_enemy_choky_animation_player,
                 enemy_choky_chase_player,
@@ -33,9 +32,7 @@ impl Plugin for EnemyChokyPlugin {
                 spawn_choky_punch_hitbox,
                 choky_punch_hit_player,
                 despawn_choky_punch_hitbox,
-            )
-            .chain()
-            .run_if(in_state(GameScene::Desert)),
+            ).chain().run_if(in_state(GameScene::Desert).and(in_state(GameMode::Playing)))
         );
     }
 }
@@ -64,8 +61,7 @@ fn spawn_enemy_choky(
             .from_asset("enemy/EnemyChoky.glb"),
     );
 
-    let spawn_position =
-        Vec3::new(-13.0, 0.0, -40.0);
+    let spawn_position = Vec3::new(-13.0, 0.0, -40.0);
 
     const CHOKY_BODY_Y: f32 = 1.0;
 

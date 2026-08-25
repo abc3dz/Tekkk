@@ -11,6 +11,7 @@ use crate::player::{
     spawn_floating_damage_text,
 };
 use crate::camera::*;
+use crate::pause_menu::GameMode;
 
 pub struct BasicPracticePlugin;
 
@@ -25,21 +26,14 @@ impl Plugin for BasicPracticePlugin {
                     ),
                 ),
             )
-            .add_systems(
-                Update,
-                guardian_dialog_basic_input
-                    .run_if(in_state(GameScene::Hub)),
-            )
-            .add_systems(
-                Update,
-                (
+            .add_systems(Update,guardian_dialog_basic_input.run_if(in_state(GameScene::Hub)),)
+            .add_systems(Update,(
                     rotate_basic_practice_gun_to_player,
                     basic_practice_gun_shoot_projectile,
                     move_basic_practice_projectiles,
                     basic_projectile_hit_player,
                     respawn_basic_gun_when_defeated,
-                )
-                    .run_if(in_state(GameScene::Hub)),
+                ).run_if(in_state(GameScene::Hub).and(in_state(GameMode::Playing))),
             );
     }
 }

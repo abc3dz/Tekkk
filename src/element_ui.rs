@@ -19,18 +19,20 @@ pub struct ElementUiPlugin;
 
 impl Plugin for ElementUiPlugin {
     fn build(&self, app: &mut App) {app
-        .add_systems(Startup,setup_element_status_ui,)
+        //.add_systems(Startup,setup_element_status_ui)
         .add_systems(Update,(
-                pause_and_status_input,
-                update_element_status_ui,
-            )
-                .chain(),
-        );
+            element_status_input,
+            update_element_status_ui,
+            game_controls_input
+        ));
     }
 }
 
 #[derive(Component)]
 struct ElementStatusUi;
+
+#[derive(Component)]
+struct ControlsUiRoot;
 
 #[derive(Component, Clone, Copy)]
 enum PlayerStatusValueText {
@@ -62,55 +64,54 @@ enum ElementExpText {
     Inw,
 }
 
-fn setup_element_status_ui(
-    mut commands: Commands,
-    fonts: Res<GameFonts>,
-) {
-    commands.spawn((
+fn spawn_element_status_ui(commands: &mut Commands, fonts: &GameFonts) {
+    commands
+        .spawn((
             ElementStatusUi,
             Node {
                 position_type: PositionType::Absolute,
-                width: Val::Percent(100.0),
-                height: Val::Percent(100.0),
-                justify_content: JustifyContent::Center,
-                align_items: AlignItems::Center,
-                display: Display::None,
+                width: Val::Px(600.0),
+                top: Val::Px(25.0),
+                right: Val::Px(10.0),
+                flex_direction: FlexDirection::Column,
+                row_gap: Val::Px(12.0),
+                padding: UiRect::all(Val::Px(20.0)),
+                justify_content: JustifyContent::Start,
+                align_items: AlignItems::Start,
                 ..default()
             },
             BackgroundColor(Color::srgba(0.0, 0.0, 0.0, 0.72)),
         ))
-        .with_children(|root| {
-            root.spawn((
-                Node {
-                    width: Val::Px(950.0),
-                    min_height: Val::Px(620.0),
-                    flex_direction: FlexDirection::Column,
-                    row_gap: Val::Px(6.0),
-                    padding: UiRect::all(Val::Px(24.0)),
-                    ..default()
-                },
-                BackgroundColor(Color::srgba(0.05, 0.05, 0.08, 0.95)),
-            ))
+        // .with_children(|root| {
+        //     root.spawn((
+        //         Node {
+        //             width: Val::Px(950.0),
+        //             min_height: Val::Px(620.0),
+        //             flex_direction: FlexDirection::Column,
+        //             row_gap: Val::Px(6.0),
+        //             padding: UiRect::all(Val::Px(24.0)),
+        //             ..default()
+        //         },
+        //         BackgroundColor(Color::srgba(0.05, 0.05, 0.08, 0.95)),
+        //     ))
             .with_children(|panel| {
                 panel.spawn((
-                    Text::new("PAUSED"),
-                    TextFont {font: fonts.abc3dz.clone(),font_size: 38.0, ..default()},
-                    TextColor(Color::srgb(1.0,0.82,0.20,),),
+                    Text::new("PLAYER STATUS"),
+                    TextFont { font: fonts.abc3dz.clone(), font_size: 28.0, ..default() },
+                    TextColor(Color::srgb(1.0, 0.82, 0.20)),
                     Node {
                         width: Val::Percent(100.0),
-                        margin: UiRect {
-                            bottom: Val::Px(18.0),
-                            ..default()
-                        },
+                        margin: UiRect { bottom: Val::Px(18.0), ..default() },
                         ..default()
                     },
                 ));
-                panel.spawn((
-                    Text::new("PLAYER STATUS"),
-                    TextFont {font: fonts.abc3dz.clone(), font_size: 28.0, ..default()},
-                    TextColor(Color::WHITE),
-                    Node {margin: UiRect::bottom(Val::Px(12.0)), ..default()},
-                ));
+                // panel.spawn((
+                //     Text::new("PLAYER STATUS"),
+                //     TextFont { font: fonts.abc3dz.clone(), font_size: 28.0, ..default() },
+                //     TextColor(Color::WHITE),
+                //     Node { width: Val::Percent(100.0), margin: UiRect::bottom(Val::Px(12.0)), ..default() },
+                // ));
+
                 let status_rows = [
                     ("HP: ", PlayerStatusValueText::Hp, Some(PlayerStatusBonusText::Hp)),
                     ("MP: ", PlayerStatusValueText::Mp, Some(PlayerStatusBonusText::Mp)),
@@ -122,19 +123,16 @@ fn setup_element_status_ui(
                 ];
 
                 for (label, value_marker, bonus_marker) in status_rows {
-                    panel.spawn((
+                    panel
+                        .spawn((
                             Text::new(label),
-                            TextFont {
-                                font: fonts.abc3dz.clone(),
-                                font_size: 23.0,
-                                ..default()
-                            },
+                            TextFont { font: fonts.abc3dz.clone(), font_size: 23.0, ..default() },
                             TextColor(Color::WHITE),
                         ))
                         .with_children(|text| {
                             text.spawn((
                                 TextSpan::default(),
-                                TextFont { font: fonts.abc3dz.clone(), font_size: 23.0, ..default()},
+                                TextFont { font: fonts.abc3dz.clone(), font_size: 23.0, ..default() },
                                 TextColor(Color::WHITE),
                                 value_marker,
                             ));
@@ -142,23 +140,21 @@ fn setup_element_status_ui(
                             if let Some(bonus_marker) = bonus_marker {
                                 text.spawn((
                                     TextSpan::default(),
-                                    TextFont {font: fonts.abc3dz.clone(), font_size: 23.0, ..default()},
-                                    TextColor(Color::srgb(0.25,1.0,0.35,)),
+                                    TextFont { font: fonts.abc3dz.clone(), font_size: 23.0, ..default() },
+                                    TextColor(Color::srgb(0.25, 1.0, 0.35)),
                                     bonus_marker,
                                 ));
                             }
                         });
                 }
+
                 panel.spawn((
                     Text::new("ELEMENT EXP"),
-                    TextFont {font: fonts.abc3dz.clone(), font_size: 28.0, ..default()},
-                    TextColor(Color::WHITE),
+                    TextFont { font: fonts.abc3dz.clone(), font_size: 28.0, ..default() },
+                    TextColor(Color::srgb(1.0, 0.82, 0.20)),
                     Node {
-                        margin: UiRect {
-                            top: Val::Px(22.0),
-                            bottom: Val::Px(8.0),
-                            ..default()
-                        },
+                        width: Val::Percent(100.0),
+                        margin: UiRect { top: Val::Px(22.0), bottom: Val::Px(8.0), ..default() },
                         ..default()
                     },
                 ));
@@ -172,124 +168,51 @@ fn setup_element_status_ui(
                 ];
 
                 for (label, marker) in element_rows {
-                    panel.spawn((
+                    panel
+                        .spawn((
                             Text::new(label),
-                            TextFont {font: fonts.abc3dz.clone(), font_size: 23.0, ..default()},
-                            TextColor(Color::WHITE)))
+                            TextFont { font: fonts.abc3dz.clone(), font_size: 23.0, ..default() },
+                            TextColor(Color::WHITE),
+                        ))
                         .with_child((
                             TextSpan::default(),
-                            TextFont {font: fonts.abc3dz.clone(), font_size: 23.0, ..default()},
+                            TextFont { font: fonts.abc3dz.clone(), font_size: 23.0, ..default() },
                             TextColor(Color::WHITE),
                             marker,
                         ));
                 }
-                panel.spawn((
-                    Node {
-                        position_type: PositionType::Absolute,
-                        width: Val::Px(330.0),
-                        top: Val::Px(95.0),
-                        right: Val::Px(24.0),
-                        flex_direction: FlexDirection::Column,
-                        row_gap: Val::Px(12.0),
-                        padding: UiRect::all(Val::Px(20.0)),
-                        ..default()
-                    },
-                    BackgroundColor(
-                        Color::srgba(0.10, 0.10, 0.14, 0.90),
-                    ),
-                ))
-                .with_children(|controls| {
-                    controls.spawn((
-                        Text::new("CONTROLS"),
-                        TextFont {
-                            font: fonts.abc3dz.clone(),
-                            font_size: 28.0,
-                            ..default()
-                        },
-                        TextColor(Color::WHITE),
-                        Node {
-                            margin: UiRect::bottom(
-                                Val::Px(10.0),
-                            ),
-                            ..default()
-                        },
-                    ));
-
-                    let control_rows = [
-                        "Move",
-                        "  W A S D / D-Pad",
-                        "",
-                        "Jump",
-                        "  K / Gamepad South",
-                        "",
-                        "Slap",
-                        "  J / Gamepad West",
-                        "",
-                        "Dash",
-                        "  L / Gamepad East",
-                        "",
-                        "Power",
-                        " I / Gamepad North",
-                        "",
-                    ];
-
-                    for control in control_rows {
-                            controls.spawn((
-                                Text::new(control),
-                            TextFont {
-                                font: fonts.abc3dz.clone(),
-                                font_size: 20.0,
-                                ..default()
-                            },
-                            TextColor(Color::srgb(
-                                0.85,
-                                0.85,
-                                0.90,
-                            )),
-                        ));
-                    }
-                });
-
-                panel.spawn((
-                    Text::new("Esc: Resume"),
-                    TextFont {font: fonts.abc3dz.clone(), font_size: 21.0, ..default()},
-                    TextColor(Color::srgb(0.75,0.75,0.80,)),
-                    Node {margin: UiRect::top(Val::Px(18.0)), ..default()},
-                ));
             });
-        });
+        //});
 }
-fn pause_and_status_input(
+
+fn element_status_input(
+    mut commands: Commands,
     keyboard: Res<ButtonInput<KeyCode>>,
     gamepads: Query<&Gamepad>,
     dialog_query: Query<(), With<GuardianDialogUI>>,
-    mut ui_query: Query<&mut Node, With<ElementStatusUi>>,
-    mut virtual_time: ResMut<Time<Virtual>>,
+    ui_query: Query<Entity, With<ElementStatusUi>>,
+    fonts: Res<GameFonts>,
 ) {
     if !dialog_query.is_empty() {
         return;
     }
 
-    let keyboard_pause_pressed = keyboard.just_pressed(KeyCode::Escape);
-    let gamepad_pause_pressed = gamepads.iter().any(|gamepad| {gamepad.just_pressed(GamepadButton::Start)});
+    let keyboard_pause_pressed = keyboard.just_pressed(KeyCode::KeyU);
+    let gamepad_pause_pressed = gamepads.iter().any(|gamepad| {gamepad.just_pressed(GamepadButton::RightTrigger)});
 
     if !keyboard_pause_pressed && !gamepad_pause_pressed{
         return;
     }
 
-    let Ok(mut ui_node) = ui_query.single_mut()
-    else { return };
-
-    if virtual_time.is_paused() {
-        virtual_time.unpause();
-        ui_node.display = Display::None;
-        println!("Game resumed");
+    if let Ok(entity) = ui_query.single() {
+        // มีอยู่แล้ว -> despawn
+        commands.entity(entity).despawn();
     } else {
-        virtual_time.pause();
-        ui_node.display = Display::Flex;
-        println!("Game paused");
+        // ยังไม่มี -> spawn
+        spawn_element_status_ui(&mut commands, &fonts);
     }
 }
+
 fn update_element_status_ui(
     player_query: Query<(&Health, &Mana, &BaseStats, &CombatStats, &ElementMastery, &AtkAndDefElement), With<Player>>,
     ui_query: Query<&Node, With<ElementStatusUi>>,
@@ -351,5 +274,86 @@ fn update_element_status_ui(
             ElementExpText::Earth => {mastery.earth.exp.to_string()}
             ElementExpText::Inw => {mastery.inw.exp.to_string()}
         };
+    }
+}
+
+fn spawn_controls_ui(commands: &mut Commands, fonts: &GameFonts) {
+    commands
+        .spawn((
+            ControlsUiRoot, // <-- marker ใส่ตรงนี้
+            Node {
+                position_type: PositionType::Absolute,
+                width: Val::Px(330.0),
+                top: Val::Px(95.0),
+                right: Val::Px(24.0),
+                flex_direction: FlexDirection::Column,
+                row_gap: Val::Px(12.0),
+                padding: UiRect::all(Val::Px(20.0)),
+                ..default()
+            },
+            BackgroundColor(Color::srgba(0.10, 0.10, 0.14, 0.90)),
+        ))
+        .with_children(|controls| {
+            controls.spawn((
+                Text::new("CONTROLS"),
+                TextFont {
+                    font: fonts.abc3dz.clone(),
+                    font_size: 28.0,
+                    ..default()
+                },
+                TextColor(Color::WHITE),
+                Node {
+                    margin: UiRect::bottom(Val::Px(10.0)),
+                    ..default()
+                },
+            ));
+
+            let control_rows = [
+                "Move", "  W A S D / D-Pad", "",
+                "Jump", "  K / Gamepad South", "",
+                "Slap", "  J / Gamepad West", "",
+                "Dash", "  L / Gamepad East", "",
+                "Power", " I / Gamepad North", "",
+            ];
+
+            for control in control_rows {
+                controls.spawn((
+                    Text::new(control),
+                    TextFont {
+                        font: fonts.abc3dz.clone(),
+                        font_size: 20.0,
+                        ..default()
+                    },
+                    TextColor(Color::srgb(0.85, 0.85, 0.90)),
+                ));
+            }
+        });
+}
+
+fn game_controls_input(
+    mut commands: Commands,
+    keyboard: Res<ButtonInput<KeyCode>>,
+    gamepads: Query<&Gamepad>,
+    dialog_query: Query<(), With<GuardianDialogUI>>,
+    controls_ui_query: Query<Entity, With<ControlsUiRoot>>,
+    fonts: Res<GameFonts>,
+) {
+    if !dialog_query.is_empty() {
+        return;
+    }
+
+    let keyboard_pressed = keyboard.just_pressed(KeyCode::KeyO);
+    let gamepad_pressed = gamepads
+        .iter()
+        .any(|gamepad| gamepad.just_pressed(GamepadButton::RightTrigger2));
+
+    if !keyboard_pressed && !gamepad_pressed {
+        return;
+    }
+
+    if let Ok(entity) = controls_ui_query.single() {
+        commands.entity(entity).despawn();
+    } else {
+        spawn_controls_ui(&mut commands, &fonts);
     }
 }

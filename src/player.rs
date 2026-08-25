@@ -7,6 +7,8 @@ use crate::components::*;
 use crate::camera::*;
 use crate::element_drop::*;
 use crate::cel_shader::*;
+use crate::pause_menu::GameMode;
+
 pub struct PlayerPlugin;
 
 impl Plugin for PlayerPlugin {
@@ -38,23 +40,20 @@ impl Plugin for PlayerPlugin {
             update_defeat_particles,
             player_return_after_hurt,
             respawn_player_when_defeated,
-            ).chain()
-        )
+            ).chain().run_if(in_state(GameMode::Playing)))
         .add_systems(Update,(
                 tag_player_hand_bones,
                 spawn_requested_player_punch_hitboxes,
                 update_player_punch_hitbox_lifetime,
             ).chain())
         .add_systems(
-            Update,
-            (
+            Update,(
                 spawn_player_slap_hitbox,
                 player_slap_hit_enemy,
                 despawn_player_slap_hitbox,
             ).chain())
         .add_systems(
-            Update,
-            (
+            Update,(
                 player_energy_input,
                 player_power_update,
                 update_player_energy_ball,
@@ -763,8 +762,7 @@ pub fn player_combo_update(
     mut commands: Commands,
     asset_server: Res<AssetServer>,
 ) {
-    let Ok((player_entity, mut combo)) =
-        combo_query.single_mut()
+    let Ok((player_entity, mut combo)) = combo_query.single_mut()
     else {
         return;
     };

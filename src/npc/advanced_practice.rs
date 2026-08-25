@@ -11,6 +11,7 @@ use crate::player::{
     spawn_floating_damage_text,
 };
 use crate::camera::*;
+use crate::pause_menu::GameMode;
 
 pub struct AdvancedPracticePlugin;
 
@@ -26,18 +27,13 @@ impl Plugin for AdvancedPracticePlugin {
                 ),
             )
             .add_systems(
-                Update,
-                guardian_dialog_advanced_input
-                    .run_if(in_state(GameScene::Hub)),
-            )
-            .add_systems(
-                Update,
-                (
+                Update,guardian_dialog_advanced_input.run_if(in_state(GameScene::Hub)))
+            .add_systems(Update,(
                     minion_chase_player,
                     minion_drain_player_life,
                     respawn_advanced_minion_when_defeated,
-                )
-                    .run_if(in_state(GameScene::Hub)),
+                ).run_if(in_state(GameScene::Hub).and(in_state(GameMode::Playing))),
+                    
             );
     }
 }

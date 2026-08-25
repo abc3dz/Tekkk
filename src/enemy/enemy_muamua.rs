@@ -9,6 +9,7 @@ use crate::components::*;
 use crate::npc::practice_common::*;
 use crate::player::*;
 use crate::camera::*;
+use crate::pause_menu::GameMode;
 
 #[derive(Component, Debug)]
 pub struct EnemyMuamua;
@@ -32,7 +33,7 @@ impl Plugin for EnemyMuamuaPlugin {
                 despawn_muamua_punch_hitbox,
             )
             .chain()
-            .run_if(in_state(GameScene::Desert)),
+            .run_if(in_state(GameScene::Desert).and(in_state(GameMode::Playing))),
         );
     }
 }
