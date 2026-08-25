@@ -7,6 +7,8 @@ use crate::components::*;
 use crate::npc::{
     advanced_practice::AdvancedPracticePlugin,
     basic_practice::BasicPracticePlugin,
+    basic_practice::spawn_basic_practice_gun,
+    advanced_practice::spawn_advanced_minion,
     practice_common::PracticeCommonPlugin,
 };
 use crate::cel_shader::*;
@@ -23,8 +25,10 @@ impl Plugin for GuardianPlugin {
         ))
         .init_resource::<BasicPracticeActive>()
         .init_resource::<AdvancedPracticeActive>()
+        .init_resource::<GuardianMenuSelection>()
         .insert_resource(BasicGunRespawnTimer(Timer::from_seconds(1.0, TimerMode::Once)))
         .insert_resource(AdvancedMinionRespawnTimer(Timer::from_seconds(1.0, TimerMode::Once)))
+        
         .add_systems(Startup, setup_guardian_animation_graph)
         .add_systems(OnEnter(GameScene::Hub), spawn_guardian_npc)
         .add_systems(Update,setup_guardian_animation_player.run_if(in_state(GameScene::Hub)))
@@ -32,9 +36,11 @@ impl Plugin for GuardianPlugin {
             check_guardian_interaction_area,
             check_guardian_interaction_area_exit,
             show_guardian_dialog,
+            guardian_menu_keyboard,
+            guardian_menu_button_interaction,
             cleanup_guardian_ui_when_player_leave,
         ).run_if(in_state(GameScene::Hub).and(in_state(GameMode::Playing))))
-        .add_systems(Update, guardian_dialog_exit_input.run_if(in_state(GameScene::Hub)))
+        //.add_systems(Update, guardian_dialog_exit_input.run_if(in_state(GameScene::Hub)))
         .add_systems(OnExit(GameScene::Hub), despawn_hub_only_entities);
     }
 }
@@ -241,6 +247,7 @@ pub fn show_guardian_dialog(
     asset_server: Res<AssetServer>,
     player_query: Query<(), With<PlayerInGuardianArea>>,
     dialog_query: Query<Entity, With<GuardianDialogUI>>,
+    mut selection: ResMut<GuardianMenuSelection>,
 ) {
     if player_query.is_empty() {
         return;
@@ -249,6 +256,8 @@ pub fn show_guardian_dialog(
     if !dialog_query.is_empty() {
         return;
     }
+
+    selection.index = 0;
 
     commands
         .spawn((
@@ -264,14 +273,13 @@ pub fn show_guardian_dialog(
                 padding: UiRect::bottom(Val::Px(40.0)),
                 ..default()
             },
-            // อันนี้คือ blur ปลอม / dim background
             BackgroundColor(Color::srgba(0.0, 0.0, 0.0, 0.60)),
         ))
         .with_children(|root| {
             root.spawn((
                 Node {
                     width: Val::Percent(80.0),
-                    height: Val::Px(220.0),
+                    height: Val::Px(300.0),
                     flex_direction: FlexDirection::Row,
                     align_items: AlignItems::Center,
                     column_gap: Val::Px(24.0),
@@ -281,88 +289,285 @@ pub fn show_guardian_dialog(
                 BackgroundColor(Color::srgba(0.0, 0.0, 0.0, 0.78)),
             ))
             .with_children(|parent| {
+                // Guardian image
                 parent.spawn((
-                    ImageNode::new(asset_server.load("npc/GuardianWelcome.png")),
+                    ImageNode::new(
+                        asset_server.load("npc/GuardianWelcome.png")
+                    ),
                     Node {
                         width: Val::Px(150.0),
                         height: Val::Px(150.0),
                         ..default()
                     },
                 ));
-                parent.spawn((
-                    Text::new(
-                        "Guardian: What kind of practice do you want?\n1 / A: Basic Practice\n2 / X: Advanced Practice\n3 / Y: Full HP / Mana\nEsc / B: Stop Practice"),
-                    TextFont {font_size: 26.0, ..default()},
-                    TextColor(Color::WHITE),
-                ));
+
+                // Menu
+                parent
+                    .spawn((
+                        Node {
+                            flex_direction: FlexDirection::Column,
+                            row_gap: Val::Px(10.0),
+                            flex_grow: 1.0,
+                            ..default()
+                        },
+                    ))
+                    .with_children(|menu| {
+                        spawn_guardian_button(
+                            menu,
+                            "Basic Practice",
+                            GuardianMenuAction::BasicPractice,
+                        );
+
+                        spawn_guardian_button(
+                            menu,
+                            "Advanced Practice",
+                            GuardianMenuAction::AdvancedPractice,
+                        );
+
+                        spawn_guardian_button(
+                            menu,
+                            "Full HP / Mana",
+                            GuardianMenuAction::FullHpMana,
+                        );
+
+                        spawn_guardian_button(
+                            menu,
+                            "Stop Practice",
+                            GuardianMenuAction::StopPractice,
+                        );
+                    });
             });
         });
 }
 
-pub fn guardian_dialog_exit_input(
+fn spawn_guardian_button(
+    parent: &mut ChildSpawnerCommands,
+    text: &str,
+    action: GuardianMenuAction,
+) {
+    parent
+        .spawn((
+            Button,
+            GuardianMenuButton,
+            action,
+            Node {
+                width: Val::Percent(100.0),
+                height: Val::Px(50.0),
+                justify_content: JustifyContent::Center,
+                align_items: AlignItems::Center,
+                padding: UiRect::all(Val::Px(10.0)),
+                ..default()
+            },
+            BackgroundColor(Color::srgb(0.15, 0.15, 0.15)),
+        ))
+        .with_children(|button| {
+            button.spawn((
+                Text::new(text),
+                TextFont {
+                    font_size: 24.0,
+                    ..default()
+                },
+                TextColor(Color::WHITE),
+            ));
+        });
+}
+
+pub fn guardian_menu_keyboard(
+    keyboard: Res<ButtonInput<KeyCode>>,
+    mut selection: ResMut<GuardianMenuSelection>,
+    mut button_query: Query<
+        (&GuardianMenuAction, &mut BackgroundColor),
+        With<GuardianMenuButton>,
+    >,
+) {
+    if keyboard.just_pressed(KeyCode::ArrowUp) {
+        if selection.index == 0 {
+            selection.index = 3;
+        } else {
+            selection.index -= 1;
+        }
+    }
+
+    if keyboard.just_pressed(KeyCode::ArrowDown) {
+        selection.index = (selection.index + 1) % 4;
+    }
+
+    for (action, mut background) in &mut button_query {
+        let index = match action {
+            GuardianMenuAction::BasicPractice => 0,
+            GuardianMenuAction::AdvancedPractice => 1,
+            GuardianMenuAction::FullHpMana => 2,
+            GuardianMenuAction::StopPractice => 3,
+        };
+
+        if index == selection.index {
+            *background = BackgroundColor(
+                Color::srgb(0.35, 0.35, 0.35)
+            );
+        } else {
+            *background = BackgroundColor(
+                Color::srgb(0.15, 0.15, 0.15)
+            );
+        }
+    }
+}
+
+pub fn guardian_menu_button_interaction(
+    keyboard: Res<ButtonInput<KeyCode>>,
+    gamepads: Query<&Gamepad>, 
+    mut selection: ResMut<GuardianMenuSelection>,
+
+    mut interaction_query: Query<
+        (
+            &GuardianMenuAction,
+            &Interaction,
+            &mut BackgroundColor,
+        ),
+        With<GuardianMenuButton>,
+    >,
+
     mut commands: Commands,
     asset_server: Res<AssetServer>,
-    keyboard: Res<ButtonInput<KeyCode>>,
-    gamepads: Query<&Gamepad>,
-    dialog_query: Query<Entity, With<GuardianDialogUI>,>,
-    practice_query: Query<Entity, With<PracticeEntity>,>,
-    mut player_query: Query<(&mut Health, &mut Mana, &mut Transform,), With<Player>,>,
+
+    practice_query: Query<Entity, With<PracticeEntity>>,
+
+    mut player_query: Query<
+        (&mut Health, &mut Mana, &mut Transform),
+        With<Player>,
+    >,
+
     mut basic_practice_active: ResMut<BasicPracticeActive>,
     mut advanced_practice_active: ResMut<AdvancedPracticeActive>,
+    mut respawn_timer: ResMut<BasicGunRespawnTimer>,
+    mut advanced_respawn_timer: ResMut<AdvancedMinionRespawnTimer>,
 ) {
-    if dialog_query.is_empty() {
-        return;
+    let enter_pressed = keyboard.just_pressed(KeyCode::Enter);
+
+    for (action, interaction, mut background) in
+        &mut interaction_query
+    {
+        let mouse_pressed =
+            *interaction == Interaction::Pressed;
+
+        let action_pressed =
+            mouse_pressed || enter_pressed && is_selected(*action, selection.index);
+
+        if !action_pressed {
+            continue;
+        }
+
+        *background = BackgroundColor(
+            Color::srgb(0.5, 0.5, 0.5)
+        );
+
+        match action {
+            GuardianMenuAction::BasicPractice => {
+                println!("Basic Practice selected");
+
+                // ตรงนี้ค่อยเรียก logic Basic Practice
+                commands.spawn(AudioPlayer::new(asset_server.load("sounds/npc/basic_pt.ogg")));
+                basic_practice_active.0 = true;
+                advanced_practice_active.0 = false;
+                respawn_timer.0.reset();
+
+                for entity in &practice_query {
+                    commands.entity(entity).despawn();
+                }
+
+                if let Ok((_, _, mut transform)) = player_query.single_mut() {
+                    transform.translation = Vec3::new(0.0, 0.0, 0.0);
+                }
+
+                spawn_basic_practice_gun(
+                    &mut commands,
+                    &asset_server,
+                );
+            }
+
+            GuardianMenuAction::AdvancedPractice => {
+                println!("Advanced Practice selected");
+
+                // ตรงนี้ค่อยเรียก logic Advanced Practice
+                commands.spawn(AudioPlayer::new(asset_server.load("sounds/npc/advance_pt.ogg")));
+
+                basic_practice_active.0 = false;
+                advanced_practice_active.0 = true;
+                advanced_respawn_timer.0.reset();
+
+                for entity in &practice_query {
+                    commands.entity(entity).despawn();
+                }
+
+                spawn_advanced_minion(
+                    &mut commands,
+                    &asset_server,
+                );
+
+               if let Ok((_, _, mut transform)) = player_query.single_mut() {
+                    transform.translation = Vec3::new(0.0, 0.0, 0.0);
+                }
+            }
+
+            GuardianMenuAction::FullHpMana => {
+                let Ok((
+                    mut health,
+                    mut mana,
+                    mut transform,
+                )) = player_query.single_mut()
+                else {
+                    continue;
+                };
+
+                health.current = health.max;
+                mana.current = mana.max;
+
+                commands.spawn(
+                    AudioPlayer::new(
+                        asset_server.load(
+                            "sounds/npc/fullhpmp.ogg"
+                        )
+                    )
+                );
+
+                transform.translation.z += 3.5;
+            }
+
+            GuardianMenuAction::StopPractice => {
+                for entity in &practice_query {
+                    commands.entity(entity).despawn();
+                }
+
+                commands.spawn(
+                    AudioPlayer::new(
+                        asset_server.load(
+                            "sounds/npc/exit_pt.ogg"
+                        )
+                    )
+                );
+
+                basic_practice_active.0 = false;
+                advanced_practice_active.0 = false;
+
+                if let Ok((_, _, mut transform)) = player_query.single_mut() {
+                    transform.translation.z += 3.5;
+                }
+
+                println!("Practice stopped");
+            }
+        }
     }
+}
 
-    let Ok((
-        mut health,
-        mut mana,
-        mut transform,
-    )) = player_query.single_mut()
-    else {
-        return;
-    };
-
-    let gamepad_full_pressed =
-        gamepads.iter().any(|gamepad| {
-            gamepad.just_pressed(
-                GamepadButton::North,
-            )
-        });
-
-    let full_pressed =
-        keyboard.just_pressed(KeyCode::Digit3)
-            || gamepad_full_pressed;
-
-    if full_pressed {
-        health.current = health.max;
-        mana.current = mana.max;
-
-        commands.spawn(AudioPlayer::new(asset_server.load("sounds/npc/fullhpmp.ogg")));
-        transform.translation.z += 3.5;
+fn is_selected(
+    action: GuardianMenuAction,
+    index: usize,
+) -> bool {
+    match action {
+        GuardianMenuAction::BasicPractice => index == 0,
+        GuardianMenuAction::AdvancedPractice => index == 1,
+        GuardianMenuAction::FullHpMana => index == 2,
+        GuardianMenuAction::StopPractice => index == 3,
     }
-
-    let gamepad_stop_pressed =
-        gamepads.iter().any(|gamepad| {
-            gamepad.just_pressed(
-                GamepadButton::East,
-            )
-        });
-
-    let stop_pressed =keyboard.just_pressed(KeyCode::Escape)|| gamepad_stop_pressed;
-    if !stop_pressed {
-        return;
-    }
-
-    for entity in &practice_query {
-        commands.entity(entity).despawn();
-    }
-
-commands.spawn(AudioPlayer::new(asset_server.load("sounds/npc/exit_pt.ogg")));
-    transform.translation.z += 3.5;
-
-    basic_practice_active.0 = false;
-    advanced_practice_active.0 = false;
 }
 
 pub fn cleanup_guardian_ui_when_player_leave(
