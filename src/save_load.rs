@@ -2,6 +2,7 @@ use bevy::prelude::*;
 use serde::{Deserialize, Serialize};
 use std::fs;
 use std::path::PathBuf;
+use chrono::Local;
 
 use crate::combat::ElementMastery;
 use crate::components::{Health, Mana, Player};
@@ -18,6 +19,9 @@ pub struct SaveData {
     pub element_wind_exp: i32,
     pub element_earth_exp: i32,
     pub element_inw_exp: i32,
+
+    #[serde(default)]
+    pub saved_at: String,
 }
 
 #[derive(Resource, Default)]
@@ -86,6 +90,8 @@ pub fn save_game(
         element_wind_exp: mastery.wind.exp as i32,
         element_earth_exp: mastery.earth.exp as i32,
         element_inw_exp: mastery.inw.exp as i32,
+
+        saved_at: Local::now().format("%Y-%m-%d %H:%M:%S").to_string(),
     };
 
     let json = match serde_json::to_string_pretty(&save_data) {

@@ -1,4 +1,5 @@
 use bevy::prelude::*;
+use chrono::Local;
 
 use crate::components::*;
 use crate::save_load::*;
@@ -295,72 +296,47 @@ fn spawn_slot_menu(
             Some(data) => {
 
                 menu.spawn((
-                    Text::new(
-                        format!(
-                            "{}Slot {}",
-                            prefix,
-                            slot
-                        )
-                    ),
-                    TextFont {
-                        font: fonts.abc3dz.clone(),
-                        font_size: 28.0,
-                        ..default()
-                    },
+                    Text::new(format!("{}Slot {}",prefix,slot)),
+                    TextFont {font: fonts.abc3dz.clone(),font_size: 28.0,..default()},
                     TextColor(
                         if selected {
-                            Color::srgb(
-                                1.0,
-                                0.82,
-                                0.20,
-                            )
+                            Color::srgb(1.0,0.82,0.20,)
                         } else {
                             Color::WHITE
                         }
                     ),
                 ));
-
+                let date_time = if data.saved_at.is_empty() {
+                    "Unknown".to_string()
+                } else {
+                    data.saved_at.clone()
+                };
                 menu.spawn((
-                    Text::new(
-                        format!(
-                            "    HP: {}",
-                            data.hp
-                        )
-                    ),
-                    TextFont {
-                        font: fonts.abc3dz.clone(),
-                        font_size: 19.0,
-                        ..default()
-                    },
-                    TextColor(
-                        Color::srgb(
-                            0.70,
-                            0.70,
-                            0.75,
-                        )
-                    ),
+                    Text::new(format!("Date/Time: {}",date_time)),
+                    TextFont {font: fonts.abc3dz.clone(),font_size: 19.0,..default()},
+                    TextColor(Color::srgb(0.70,0.70,0.75,)),
                 ));
 
-                menu.spawn((
-                    Text::new(
-                        format!(
-                            "    MP: {}",
-                            data.mp
-                        )
-                    ),
-                    TextFont {
-                        font: fonts.abc3dz.clone(),
-                        font_size: 19.0,
-                        ..default()
-                    },
-                    TextColor(
-                        Color::srgb(
-                            0.70,
-                            0.70,
-                            0.75,
-                        )
-                    ),
-                ));
+                // menu.spawn((
+                //     Text::new(
+                //         format!(
+                //             "    MP: {}",
+                //             data.mp
+                //         )
+                //     ),
+                //     TextFont {
+                //         font: fonts.abc3dz.clone(),
+                //         font_size: 19.0,
+                //         ..default()
+                //     },
+                //     TextColor(
+                //         Color::srgb(
+                //             0.70,
+                //             0.70,
+                //             0.75,
+                //         )
+                //     ),
+                // ));
             }
 
             // =========================
@@ -672,12 +648,3 @@ fn cleanup_pause_menu(
             .despawn();
     }
 }
-
-fn get_save_slot_status() -> [bool; 3] {
-    [
-        read_save_slot(1).is_some(),
-        read_save_slot(2).is_some(),
-        read_save_slot(3).is_some(),
-    ]
-}
-
