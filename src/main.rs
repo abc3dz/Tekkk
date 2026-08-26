@@ -17,6 +17,7 @@ mod enemy;
 mod warp_portal;
 mod cel_shader;
 mod pause_menu;
+mod save_load;
 
 fn main() {
     App::new()
@@ -40,7 +41,8 @@ fn main() {
             //fps::FpsPlugin,
             element_ui::ElementUiPlugin,
             element_drop::ElementDropPlugin,
-            pause_menu::PauseMenuPlugin
+            pause_menu::PauseMenuPlugin,
+            save_load::SaveLoadPlugin,
         ))
         .add_systems(PreStartup, load_fonts)
         .run();
