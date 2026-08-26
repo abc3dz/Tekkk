@@ -380,7 +380,7 @@ pub fn guardian_menu_keyboard(
         With<GuardianMenuButton>,
     >,
 ) {
-    if keyboard.just_pressed(KeyCode::ArrowUp) {
+    if keyboard.just_pressed(KeyCode::ArrowUp) || keyboard.just_pressed(KeyCode::KeyW) {
         if selection.index == 0 {
             selection.index = 3;
         } else {
@@ -388,7 +388,7 @@ pub fn guardian_menu_keyboard(
         }
     }
 
-    if keyboard.just_pressed(KeyCode::ArrowDown) {
+    if keyboard.just_pressed(KeyCode::ArrowDown) || keyboard.just_pressed(KeyCode::KeyS) {
         selection.index = (selection.index + 1) % 4;
     }
 
