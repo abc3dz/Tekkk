@@ -1,3 +1,4 @@
+use bevy::input::gamepad;
 use bevy::prelude::*;
 
 use crate::combat::{
@@ -283,11 +284,11 @@ fn spawn_controls_ui(commands: &mut Commands, fonts: &GameFonts) {
             ControlsUiRoot, // <-- marker ใส่ตรงนี้
             Node {
                 position_type: PositionType::Absolute,
-                width: Val::Px(330.0),
-                top: Val::Px(95.0),
-                right: Val::Px(24.0),
+                width: Val::Px(500.0),
+                top: Val::Px(5.0),
+                right: Val::Px(5.0),
                 flex_direction: FlexDirection::Column,
-                row_gap: Val::Px(12.0),
+                row_gap: Val::Px(8.0),
                 padding: UiRect::all(Val::Px(20.0)),
                 ..default()
             },
@@ -295,10 +296,10 @@ fn spawn_controls_ui(commands: &mut Commands, fonts: &GameFonts) {
         ))
         .with_children(|controls| {
             controls.spawn((
-                Text::new("CONTROLS"),
+                Text::new("CONTROLS\nKeyboard / Gamepad"),
                 TextFont {
                     font: fonts.abc3dz.clone(),
-                    font_size: 28.0,
+                    font_size: 20.0,
                     ..default()
                 },
                 TextColor(Color::WHITE),
@@ -309,19 +310,22 @@ fn spawn_controls_ui(commands: &mut Commands, fonts: &GameFonts) {
             ));
 
             let control_rows = [
-                "Move", "  W A S D / D-Pad", "",
-                "Jump", "  K / Gamepad South", "",
-                "Slap", "  J / Gamepad West", "",
-                "Dash", "  L / Gamepad East", "",
-                "Power", " I / Gamepad North", "",
+                "Move",       "W A S D / D-Pad", "",
+                "Jump",       "K / A Button", "",
+                "Attack",     "J / X Button", "",
+                "Dash",       "L / B Button", "",
+                "Power",      "I / Y Button", "",
+                "Status",     "U / RB", "",
+                "Controls",   "O / RT", "",
             ];
 
             for control in control_rows {
                 controls.spawn((
                     Text::new(control),
                     TextFont {
-                        font: fonts.abc3dz.clone(),
-                        font_size: 20.0,
+                        font: fonts.
+                        abc3dz.clone(),
+                        font_size: 18.0,
                         ..default()
                     },
                     TextColor(Color::srgb(0.85, 0.85, 0.90)),
