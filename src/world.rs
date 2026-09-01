@@ -122,14 +122,14 @@ fn check_warp_to_hub(
 fn setup_hub_light(mut commands: Commands) {
     commands.spawn((
         DirectionalLight {
-            illuminance: 8_000.0,
+            illuminance: 50_000.0,
             shadows_enabled: true,
             ..default()
         },
         Transform::from_rotation(Quat::from_euler(
             EulerRot::XYZ,
-            -1.0,
-            -0.5,
+            -0.8,
+            -0.3,
             0.0,
         )),
         CurrentScene,
