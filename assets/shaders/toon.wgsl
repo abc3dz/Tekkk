@@ -31,25 +31,23 @@ fn fragment(
         pbr_input.material.base_color,
     );
 
-    let normal = normalize(pbr_input.N);
-
-    // ทิศทางแสงปลอมสำหรับทดสอบ Cel Shader
-    let light_direction =
-        normalize(vec3<f32>(-0.5, 0.8, 0.3));
-
-    let light = max(
-        dot(normal, light_direction),
-        0.0,
+    // ให้ Bevy คำนวณแสงจริงจาก light ทุกดวงในฉาก (ทิศทาง, สี, ความเข้ม)
+    // รวมถึง sample shadow map ให้ครบตามปกติก่อน แล้วค่อยเอาความสว่าง
+    // ที่ได้ (ซึ่งมีเงาจริงติดมาด้วยแล้ว) มาบีบเป็นแถบสีแบบ cel shading
+    let lit_color = apply_pbr_lighting(pbr_input);
+    let luminance = dot(
+        lit_color.rgb,
+        vec3<f32>(0.2126, 0.7152, 0.0722),
     );
 
-    // แบ่งแสงแข็ง ๆ เป็น 3 ระดับ
-    var shade = 0.25;
+    // แบ่งแสงแข็ง ๆ เป็น 3 ระดับ ตามค่าที่ตั้งมาจากฝั่ง Rust
+    var shade = toon_material.shadow_brightness;
 
-    if light > 0.4 {
-        shade = 0.6;
+    if luminance > toon_material.shadow_cutoff {
+        shade = toon_material.mid_brightness;
     }
 
-    if light > 0.75 {
+    if luminance > toon_material.mid_cutoff {
         shade = 1.0;
     }
 
