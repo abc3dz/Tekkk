@@ -414,7 +414,7 @@ pub fn guardian_menu_keyboard(
 
 pub fn guardian_menu_button_interaction(
     keyboard: Res<ButtonInput<KeyCode>>,
-    gamepads: Query<&Gamepad>, 
+    // gamepads: Query<&Gamepad>, 
     mut selection: ResMut<GuardianMenuSelection>,
 
     mut interaction_query: Query<
@@ -425,17 +425,13 @@ pub fn guardian_menu_button_interaction(
         ),
         With<GuardianMenuButton>,
     >,
-
     mut commands: Commands,
     asset_server: Res<AssetServer>,
-
     practice_query: Query<Entity, With<PracticeEntity>>,
-
     mut player_query: Query<
         (&mut Health, &mut Mana, &mut Transform),
         With<Player>,
     >,
-
     mut basic_practice_active: ResMut<BasicPracticeActive>,
     mut advanced_practice_active: ResMut<AdvancedPracticeActive>,
     mut respawn_timer: ResMut<BasicGunRespawnTimer>,
@@ -509,26 +505,30 @@ pub fn guardian_menu_button_interaction(
             }
 
             GuardianMenuAction::FullHpMana => {
-                let Ok((
-                    mut health,
-                    mut mana,
-                    mut transform,
-                )) = player_query.single_mut()
+                let Ok((mut health,mut mana,mut transform,)) = player_query.single_mut()
                 else {
                     continue;
                 };
+                let hp_healed = health.max - health.current;
+                let mp_healed = mana.max - mana.current;
 
                 health.current = health.max;
                 mana.current = mana.max;
 
-                commands.spawn(
-                    AudioPlayer::new(
-                        asset_server.load(
-                            "sounds/npc/fullhpmp.ogg"
-                        )
-                    )
+                crate::player::spawn_floating_damage_text(
+                    &mut commands,
+                    hp_healed,
+                    transform.translation + Vec3::new(0.0, 2.0, 0.0),
+                    FloatingDamageKind::Heal,
+                );
+                crate::player::spawn_floating_damage_text(
+                    &mut commands,
+                    mp_healed,
+                    transform.translation + Vec3::new(0.2, 2.3, 0.0),
+                    FloatingDamageKind::Heal,
                 );
 
+                commands.spawn(AudioPlayer::new(asset_server.load("sounds/npc/fullhpmp.ogg")));
                 transform.translation.z += 3.5;
             }
 

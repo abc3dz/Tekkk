@@ -200,31 +200,6 @@ fn player_movement(
     }
 }
 
-// pub fn player_footstep_sound(
-//     mut commands: Commands,
-//     asset_server: Res<AssetServer>,
-//     player_query: Query<&LinearVelocity, With<Player>>,
-//     playing_sound_query: Query<(), With<PlayerFootstepSound>>,
-// ) {
-//     let Ok(velocity) = player_query.single()
-//     else { return };
-
-//     let is_moving = velocity.x.abs() > 0.05 || velocity.z.abs() > 0.05;
-//     if !is_moving {
-//         return;
-//     }
-
-//     if !playing_sound_query.is_empty() {
-//         return;
-//     }
-
-//     commands.spawn((
-//         PlayerFootstepSound,
-//         AudioPlayer::new(asset_server.load("sounds/sfx_walk.ogg")),
-//         PlaybackSettings::DESPAWN,
-//     ));
-// }
-
 fn setup_player_animation_graph(
     mut commands: Commands,
     asset_server: Res<AssetServer>,
@@ -880,7 +855,7 @@ pub fn setup_player_status_ui(mut commands: Commands) {
                             height: Val::Percent(100.0),
                             ..default()
                         },
-                        BackgroundColor(Color::srgb(0.8, 0.1, 0.1)),
+                        BackgroundColor(Color::srgb(0.1, 0.8, 0.1)),
                     ));
                 });
                     parent.spawn((
@@ -1102,8 +1077,8 @@ fn spawn_requested_player_punch_hitboxes(
                     Name::new("Player Punch Hitbox"),
 
                     PlayerPunchHitbox {
-                        owner: request.owner,
-                        already_hit: Vec::new(),
+                        // owner: request.owner,
+                        // already_hit: Vec::new(),
                     },
 
                     PlayerPunchHitboxLifetime(
@@ -1166,15 +1141,15 @@ pub fn spawn_floating_damage_text(
     let (text, font_size, color, velocity, lifetime) =
         match kind {
             FloatingDamageKind::EnemyNormal => (
-                format!("-{}", damage),
+                format!("{}", damage),
                 32.0,
-                Color::srgb(1.0, 0.35, 0.1),
+                Color::srgb(1.0, 1.0, 1.0),
                 Vec3::new(0.0, 1.5, 0.0),
                 0.8,
             ),
 
             FloatingDamageKind::EnemyCritical => (
-                format!("CRIT -{}", damage),
+                format!("{}", damage),
                 52.0,
                 Color::srgb(1.0, 0.85, 0.1),
                 Vec3::new(0.0, 2.0, 0.0),
@@ -1182,7 +1157,7 @@ pub fn spawn_floating_damage_text(
             ),
 
             FloatingDamageKind::PlayerHit => (
-                format!("HP -{}", damage),
+                format!("{}", damage),
                 40.0,
                 Color::srgb(1.0, 0.05, 0.05),
                 Vec3::new(-0.5, 1.7, 0.0),
@@ -1190,10 +1165,24 @@ pub fn spawn_floating_damage_text(
             ),
 
             FloatingDamageKind::PlayerDrain => (
-                format!("DRAIN -{}", damage),
+                format!("{}", damage),
                 40.0,
-                Color::srgb(0.85, 0.2, 1.0),
+                Color::srgb(0.85, 0.0, 0.0),
                 Vec3::new(0.5, 1.7, 0.0),
+                1.0,
+            ),
+            FloatingDamageKind::Heal => (
+                format!("{}", damage),
+                36.0,
+                Color::srgb(0.2, 1.0, 0.3),
+                Vec3::new(0.0, 1.3, 0.0),
+                1.0,
+            ),
+            FloatingDamageKind::Mana => (
+                format!("{}", damage),
+                36.0,
+                Color::srgb(0.1, 0.2, 0.9),
+                Vec3::new(0.0, 1.2, 0.0),
                 1.0,
             ),
         };
@@ -1326,10 +1315,7 @@ fn spawn_defeat_particles(
 pub fn update_defeat_particles(
     mut commands: Commands,
     time: Res<Time>,
-
-    player_query:
-        Query<&GlobalTransform, With<Player>>,
-
+    player_query: Query<&GlobalTransform, With<Player>>,
     mut particle_query: Query<
         (
             Entity,
@@ -1340,98 +1326,38 @@ pub fn update_defeat_particles(
     >,
 ) {
     let delta_seconds = time.delta_secs();
-
-    // ตำแหน่งเป้าหมายบริเวณกลางตัว Player
-    let player_target = player_query
-        .single()
-        .ok()
-        .map(|player_transform| {
-            player_transform.translation()
-                + Vec3::Y * 0.4
-        });
-
-    for (
-        particle_entity,
-        mut particle_transform,
-        mut particle,
-    ) in &mut particle_query
-    {
+    let player_target = player_query.single().ok().map(|player_transform| {player_transform.translation()+ Vec3::Y * 0.4});
+    for (particle_entity, mut particle_transform, mut particle,) in &mut particle_query {
         particle.lifetime.tick(time.delta());
-
-        // กัน Particle ค้างอยู่ใน Scene
         if particle.lifetime.is_finished() {
-            commands
-                .entity(particle_entity)
-                .despawn();
-
+            commands.entity(particle_entity).despawn();
             continue;
         }
-
         match particle.state {
             DefeatParticleState::Rising => {
-                particle
-                    .state_timer
-                    .tick(time.delta());
-
+                particle.state_timer.tick(time.delta());
                 // ช่วงแรกยังใช้ความเร็วลอยขึ้นแบบเดิม
-                particle_transform.translation +=
-                    particle.velocity
-                        * delta_seconds;
-
-                if particle
-                    .state_timer
-                    .is_finished()
-                {
-                    particle.state =
-                        DefeatParticleState::
-                            ChasingPlayer;
+                particle_transform.translation += particle.velocity * delta_seconds;
+                if particle.state_timer.is_finished() {
+                    particle.state = DefeatParticleState::ChasingPlayer;
                 }
             }
-
             DefeatParticleState::ChasingPlayer => {
-                let Some(target_position) =
-                    player_target
+                let Some(target_position) = player_target
                 else {
                     continue;
                 };
-
-                let to_player =
-                    target_position
-                        - particle_transform.translation;
-
-                let distance =
-                    to_player.length();
-
-                // เข้าใกล้ Player แล้วถือว่าถูกเก็บ
+                let to_player = target_position - particle_transform.translation;
+                let distance = to_player.length();
                 if distance <= 0.35 {
-                    commands
-                        .entity(particle_entity)
-                        .despawn();
-
+                    commands.entity(particle_entity).despawn();
                     continue;
                 }
-
-                let direction =
-                    to_player.normalize();
-
-                let desired_velocity =
-                    direction * 7.0;
-
-                // ค่อย ๆ เลี้ยวหา Player
-                // ไม่หักมุมทันที
-                let turn_amount =
-                    (8.0 * delta_seconds)
-                        .clamp(0.0, 1.0);
-
-                particle.velocity =
-                    particle.velocity.lerp(
-                        desired_velocity,
-                        turn_amount,
-                    );
-
-                particle_transform.translation +=
-                    particle.velocity
-                        * delta_seconds;
+                let direction = to_player.normalize();
+                let desired_velocity = direction * 7.0;
+                let turn_amount = (8.0 * delta_seconds).clamp(0.0, 1.0);
+                particle.velocity = particle.velocity.lerp(desired_velocity,turn_amount,);
+                particle_transform.translation += particle.velocity * delta_seconds;
             }
         }
     }
@@ -1611,10 +1537,7 @@ fn tag_player_hand_bones(
             _ => continue,
         };
 
-        commands
-            .entity(entity)
-            .insert(PlayerHandBone(hand));
-
+        commands.entity(entity).insert(PlayerHandBone(hand));
         info!("Found player hand bone: {}", name.as_str());
     }
 }
@@ -1624,22 +1547,18 @@ fn belongs_to_player(
     player_query: &Query<(), With<Player>>,
 ) -> bool {
     let mut current = entity;
-
     loop {
         if player_query.get(current).is_ok() {
             return true;
         }
-
         let Ok(child_of) = child_of_query.get(current) else {
             return false;
         };
-
         current = child_of.parent();
     }
 }
 fn spawn_player_slap_hitbox(
     mut commands: Commands,
-
     anim_query: Query<
         &PlayerAnimState,
         (
@@ -1647,9 +1566,7 @@ fn spawn_player_slap_hitbox(
             Changed<PlayerAnimState>,
         ),
     >,
-
     bone_query: Query<(Entity, &Name)>,
-
     child_of_query: Query<&ChildOf>,
     player_query: Query<(), With<Player>>,
 ) {
@@ -1658,47 +1575,22 @@ fn spawn_player_slap_hitbox(
         return;
     };
 
-    let is_slap = matches!(
-        *anim_state,
-        PlayerAnimState::SlapR
-            | PlayerAnimState::SlapL
-            | PlayerAnimState::SlapLR
-    );
-
+    let is_slap = matches!(*anim_state,PlayerAnimState::SlapR | PlayerAnimState::SlapL | PlayerAnimState::SlapLR);
     if !is_slap {
         return;
     }
-
     let mut spawned_count = 0;
 
     for (bone_entity, bone_name) in &bone_query {
-        if !belongs_to_player(
-            bone_entity,
-            &child_of_query,
-            &player_query,
-        ) {
+        if !belongs_to_player(bone_entity,&child_of_query,&player_query,) {
             continue;
         }
 
         let correct_hand = match *anim_state {
-            PlayerAnimState::SlapR => {
-                bone_name.as_str()
-                    == PLAYER_RIGHT_HAND_BONE
-            }
-
-            PlayerAnimState::SlapL => {
-                bone_name.as_str()
-                    == PLAYER_LEFT_HAND_BONE
-            }
-
+            PlayerAnimState::SlapR => {bone_name.as_str() == PLAYER_RIGHT_HAND_BONE}
+            PlayerAnimState::SlapL => {bone_name.as_str() == PLAYER_LEFT_HAND_BONE}
             // SlapLR ให้ Collider ออกทั้งสองมือ
-            PlayerAnimState::SlapLR => {
-                bone_name.as_str()
-                    == PLAYER_RIGHT_HAND_BONE
-                    || bone_name.as_str()
-                        == PLAYER_LEFT_HAND_BONE
-            }
-
+            PlayerAnimState::SlapLR => {bone_name.as_str() == PLAYER_RIGHT_HAND_BONE || bone_name.as_str() == PLAYER_LEFT_HAND_BONE}
             _ => false,
         };
 
@@ -1706,41 +1598,25 @@ fn spawn_player_slap_hitbox(
             continue;
         }
 
-        commands
-            .entity(bone_entity)
+        commands.entity(bone_entity)
             .with_children(|parent| {
                 parent.spawn((
                     Name::new("Player Slap Hitbox"),
-
-                    PlayerSlapHitbox {
-                        lifetime: Timer::from_seconds(
-                            0.30,
-                            TimerMode::Once,
-                        ),
-                        has_hit: false,
-                    },
-
+                    PlayerSlapHitbox {lifetime: Timer::from_seconds(0.30,TimerMode::Once,),has_hit: false},
                     // ขนาด Collider ที่มือ
                     Collider::sphere(0.22),
-
                     // ตรวจชนแต่ไม่ผลัก Enemy
                     Sensor,
-
                     // จำเป็นสำหรับ CollisionStart
                     CollisionEventsEnabled,
-
                     // Collider อยู่ตรง origin ของกระดูกมือ
                     Transform::IDENTITY,
                 ));
             });
-
         spawned_count += 1;
     }
-
     if spawned_count == 0 {
-        warn!(
-            "Slap hitbox not spawned: hand bone not found"
-        );
+        warn!("Slap hitbox not spawned: hand bone not found");
     }
 }
 
@@ -1790,45 +1666,25 @@ fn player_slap_hit_enemy(
     else {
         return;
     };
-
     let mut rng = rand::rng();
-
     for event in collision_reader.read() {
         // เช็กว่าฝั่งไหนคือ Hitbox ของ Player
-        let (
-            hitbox_entity,
-            target_entity,
-        ) = if hitbox_query.contains(
-            event.collider1,
-        ) {
-            (
-                event.collider1,
-                event.body2
-                    .unwrap_or(event.collider2),
-            )
-        } else if hitbox_query.contains(
-            event.collider2,
-        ) {
-            (
-                event.collider2,
-                event.body1
-                    .unwrap_or(event.collider1),
-            )
+        let (hitbox_entity,target_entity,) = if hitbox_query.contains(event.collider1) {
+            (event.collider1,event.body2.unwrap_or(event.collider2))
+        } else if hitbox_query.contains(event.collider2,) {
+            (event.collider2,event.body1.unwrap_or(event.collider1))
         } else {
             continue;
         };
 
-        let Ok(mut hitbox) =
-            hitbox_query.get_mut(hitbox_entity)
+        let Ok(mut hitbox) = hitbox_query.get_mut(hitbox_entity)
         else {
             continue;
         };
-
         // Hitbox นี้เคยทำดาเมจแล้ว
         if hitbox.has_hit {
             continue;
         }
-
         let Ok((
             mut target_health,
             target_stats,
@@ -1844,7 +1700,6 @@ fn player_slap_hit_enemy(
             continue;
         };
 
-        // เป้าหมายตายไปแล้ว
         // ห้ามแจก EXP หรือทำดาเมจซ้ำ
         if target_health.current <= 0 {
             commands
