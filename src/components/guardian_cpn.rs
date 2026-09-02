@@ -74,3 +74,19 @@ pub struct EnemyHealthBar {
 
 #[derive(Component)]
 pub struct EnemyHealthBarFill;
+
+#[derive(Component)]
+pub struct GuardianMenuButton;
+
+#[derive(Component, Clone, Copy)]
+pub enum GuardianMenuAction {
+    BasicPractice,
+    AdvancedPractice,
+    FullHpMana,
+    StopPractice,
+}
+
+#[derive(Resource, Default)]
+pub struct GuardianMenuSelection {
+    pub index: usize,
+}

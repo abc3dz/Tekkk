@@ -5,7 +5,7 @@ use bevy::{
     shader::ShaderRef,
 };
 use bevy::scene::SceneInstanceReady;
-use crate::components::*;
+//use crate::components::*;
 
 const TOON_SHADER_PATH: &str = "shaders/toon.wgsl";
 
@@ -58,28 +58,28 @@ impl Plugin for CelShaderPlugin {
     }
 }
 
-pub fn test_spawn(
-    mut commands: Commands,
-    asset_server: Res<AssetServer>,
-) {
-    commands
-        .spawn((
-            HubOnly,
-            Npc,
-            GuardianNpc,
-            Transform {
-                translation: Vec3::new(-5.0, 1.25, -6.0),
-                ..default()
-            },
-        ))
-        .with_children(|parent| {
-            parent.spawn((
-                SceneRoot(asset_server.load(GltfAssetLabel::Scene(0).from_asset("npc/Guardian.glb"))),
-                ApplyToonMaterial,
-                Transform::from_xyz(0.0, -1.25, 0.0),
-            ));
-        });
-}
+// pub fn test_spawn(
+//     mut commands: Commands,
+//     asset_server: Res<AssetServer>,
+// ) {
+//     commands
+//         .spawn((
+//             HubOnly,
+//             Npc,
+//             GuardianNpc,
+//             Transform {
+//                 translation: Vec3::new(-5.0, 1.25, -6.0),
+//                 ..default()
+//             },
+//         ))
+//         .with_children(|parent| {
+//             parent.spawn((
+//                 SceneRoot(asset_server.load(GltfAssetLabel::Scene(0).from_asset("npc/Guardian.glb"))),
+//                 ApplyToonMaterial,
+//                 Transform::from_xyz(0.0, -1.25, 0.0),
+//             ));
+//         });
+// }
 
 fn apply_toon_material(
     scene_ready: On<SceneInstanceReady>,

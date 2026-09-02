@@ -46,5 +46,6 @@ pub fn spawn_warp_portal(
         MeshMaterial3d(portal_material),
         Transform::from_xyz(0.0,2.0,-14.0,),
         DespawnOnExit(GameScene::Hub),
+        //ApplyToonMaterial,
     ));
 }

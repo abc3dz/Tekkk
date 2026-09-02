@@ -2,7 +2,7 @@ use bevy::prelude::*;
 use bevy::reflect::TypePath;
 use bevy::render::render_resource::AsBindGroup;
 use bevy::shader::ShaderRef;
-use bevy::animation::AnimationEvent;
+//use bevy::animation::AnimationEvent;
 
 #[derive(Component)]
 pub struct Player;
@@ -116,8 +116,8 @@ pub struct PunchHitboxRequest {
 
 #[derive(Component)]
 pub struct PlayerPunchHitbox {
-    pub owner: Entity,
-    pub already_hit: Vec<Entity>,
+    // pub owner: Entity,
+    // pub already_hit: Vec<Entity>,
 }
 
 #[derive(Component)]
@@ -129,6 +129,8 @@ pub enum FloatingDamageKind {
     EnemyCritical,
     PlayerHit,
     PlayerDrain,
+    Heal,
+    Mana,
 }
 
 #[derive(Component)]

@@ -1,20 +1,23 @@
 pub mod player_cpn;
-pub mod guardian_cpn;
-pub mod enemy;
-pub mod muamua;
-pub mod choky;
-pub mod combat;
-pub mod scene;
-pub mod effect;
-
 pub use player_cpn::*;
+
+pub mod guardian_cpn;
 pub use guardian_cpn::*;
+
+pub mod enemy;
 pub use enemy::*;
+
+pub mod muamua;
 pub use muamua::*;
+
+pub mod choky;
 pub use choky::*;
+
+pub mod combat;
 pub use combat::*;
+
+pub mod scene;
 pub use scene::*;
-//pub use effect::*;
 
 pub mod ui;
 pub use ui::*;

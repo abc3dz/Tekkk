@@ -46,54 +46,42 @@ fn spawn_enemy_muamua(
     mut respawn_timer: ResMut<MuamuaRespawnTimer>,
     muamua_query: Query<(), With<EnemyMuamua>>,
 ) {
-    // ถ้า Muamua ยังอยู่ ไม่ต้องสร้างเพิ่ม
     if !muamua_query.is_empty() {
         respawn_timer.0.reset();
         return;
     }
-
-    // Muamua ไม่มีแล้ว เริ่มนับเวลารอ respawn
     respawn_timer.0.tick(time.delta());
-
     if !respawn_timer.0.just_finished() {
         return;
     }
-
     let muamua_scene = asset_server.load(
         GltfAssetLabel::Scene(0)
             .from_asset("enemy/EnemyMuamua.glb"),
     );
-
     const MUAMUA_BODY_Y: f32 = 1.0;
     let base_stats = BaseStats::MUAMUA;
-
     let enemy_muamua = commands
         .spawn((
             Name::new("Enemy Muamua"),
             Enemy,
             EnemyMuamua,
             EnemyState::Idle,
-
             Health {
                 current: base_stats.max_hp as i32,
                 max: base_stats.max_hp as i32,
             },
-
             base_stats,
             CombatStats::from(base_stats),
             AtkAndDefElement(Element::Earth),
             ElementExpReward::MUAMUA,
-
             RigidBody::Dynamic,
             Collider::capsule(0.45, 1.0),
             LockedAxes::ROTATION_LOCKED,
             LinearVelocity::ZERO,
-
             Transform::from_translation(
                 MUAMUA_SPAWN_POSITION
                     + Vec3::Y * MUAMUA_BODY_Y,
             ),
-
             DespawnOnExit(GameScene::Desert),
         ))
         .with_children(|parent| {
@@ -108,7 +96,6 @@ fn spawn_enemy_muamua(
             ));
         })
         .id();
-
     commands.entity(enemy_muamua).insert((
         CombatTarget,
         MuamuaAttackTimer(Timer::from_seconds(
@@ -116,14 +103,11 @@ fn spawn_enemy_muamua(
             TimerMode::Repeating,
         )),
     ));
-
     spawn_enemy_health_bar(
         &mut commands,
         enemy_muamua,
     );
-
     respawn_timer.0.reset();
-
     info!("Enemy Muamua spawned");
 }
 
@@ -201,7 +185,7 @@ fn setup_enemy_muamua_animation_graph(
     );
     let hurt = graph.add_clip(
         asset_server.load(
-            GltfAssetLabel::Animation(1)
+            GltfAssetLabel::Animation(2)
                 .from_asset("enemy/EnemyMuamua.glb"),
         ),
         1.0,
@@ -209,7 +193,7 @@ fn setup_enemy_muamua_animation_graph(
     );
     let dead = graph.add_clip(
         asset_server.load(
-            GltfAssetLabel::Animation(2)
+            GltfAssetLabel::Animation(1)
                 .from_asset("enemy/EnemyMuamua.glb"),
         ),
         1.0,

@@ -5,15 +5,14 @@ use std::path::PathBuf;
 use chrono::Local;
 
 use crate::combat::ElementMastery;
-use crate::components::{Health, Mana, Player};
+use crate::components::{Health, Mana, Player, SaveScene, GameScene};
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct SaveData {
+    pub scene: SaveScene,
     pub player_position: [f32; 3],
-
     pub hp: i32,
     pub mp: i32,
-
     pub element_water_exp: i32,
     pub element_fire_exp: i32,
     pub element_wind_exp: i32,
@@ -34,6 +33,11 @@ pub struct LoadRequest {
     pub slot: Option<usize>,
 }
 
+#[derive(Resource, Default)]
+pub struct PendingLoad {
+    pub data: Option<SaveData>,
+}
+
 pub struct SaveLoadPlugin;
 
 impl Plugin for SaveLoadPlugin {
@@ -41,12 +45,13 @@ impl Plugin for SaveLoadPlugin {
         app
             .init_resource::<SaveRequest>()
             .init_resource::<LoadRequest>()
-
+            .init_resource::<PendingLoad>()
             .add_systems(
                 Update,
                 (
                     process_save_request,
                     process_load_request,
+                    apply_pending_load,
                 ),
             );
     }
@@ -63,6 +68,7 @@ pub fn save_game(
         ),
         With<Player>,
     >,
+    game_scene: Res<State<GameScene>>,
 ) {
     let Ok((
         transform,
@@ -75,7 +81,28 @@ pub fn save_game(
         return;
     };
 
+    let scene = match game_scene.get() {
+        GameScene::Hub => SaveScene::Hub,
+        GameScene::Desert => SaveScene::Desert,
+        GameScene::FloatingIsland => SaveScene::FloatingIsland,
+        GameScene::Lagoon => SaveScene::Lagoon,
+        GameScene::Volcano => SaveScene::Volcano,
+
+        // Loading state ไม่อนุญาตให้ Save
+        GameScene::LoadingHub
+        | GameScene::LoadingDesert
+        | GameScene::LoadingFloatingIsland
+        | GameScene::LoadingLagoon
+        | GameScene::LoadingVolcano => {
+            println!("Cannot save while loading.");
+            return;
+        }
+
+        // ถ้ามีฉากอื่นก็เพิ่มตรงนี้
+    };
+
     let save_data = SaveData {
+        scene,
         player_position: [
             transform.translation.x,
             transform.translation.y,
@@ -169,70 +196,9 @@ pub fn read_save_slot(slot: usize) -> Option<SaveData> {
     }
 }
 
-pub fn load_game(
-    slot: usize,
-    player_query: &mut Query<
-        (
-            &mut Transform,
-            &mut Health,
-            &mut Mana,
-            &mut ElementMastery,
-        ),
-        With<Player>,
-    >,
-) {
-    let Some(save_data) = read_save_slot(slot) else {
-        println!("Load failed: Slot {} is empty.", slot);
-        return;
-    };
-
-    let Ok((
-        mut transform,
-        mut health,
-        mut mana,
-        mut mastery,
-    )) = player_query.single_mut()
-    else {
-        println!("Load failed: Player not found.");
-        return;
-    };
-
-    // =========================
-    // Player Position
-    // =========================
-
-    transform.translation = Vec3::new(
-        save_data.player_position[0],
-        save_data.player_position[1],
-        save_data.player_position[2],
-    );
-
-    // =========================
-    // HP / MP
-    // =========================
-
-    health.current = save_data.hp;
-    mana.current = save_data.mp;
-
-    // =========================
-    // Element EXP
-    // =========================
-
-    mastery.water.exp = save_data.element_water_exp as u32;
-    mastery.fire.exp = save_data.element_fire_exp as u32;
-    mastery.wind.exp = save_data.element_wind_exp as u32;
-    mastery.earth.exp = save_data.element_earth_exp as u32;
-    mastery.inw.exp = save_data.element_inw_exp as u32;
-
-    println!(
-        "Game loaded from Slot {}",
-        slot
-    );
-}
-
 fn process_save_request(
     mut request: ResMut<SaveRequest>,
-
+    game_scene: Res<State<GameScene>>,
     player_query: Query<
         (
             &Transform,
@@ -251,11 +217,45 @@ fn process_save_request(
     save_game(
         slot,
         player_query,
+        game_scene,
     );
 }
 
 fn process_load_request(
     mut request: ResMut<LoadRequest>,
+
+    mut next_scene: ResMut<NextState<GameScene>>,
+
+    mut pending_load: ResMut<PendingLoad>,
+) {
+    let Some(slot) = request.slot.take()
+    else {
+        return;
+    };
+    let Some(save_data) = read_save_slot(slot) else {
+        println!("Load failed: Slot {} is empty.", slot);
+        return;
+    };
+    println!(
+        "Loading Slot {} → {:?}",
+        slot,
+        save_data.scene
+    );
+    let next_game_scene = match save_data.scene {
+        SaveScene::Hub => GameScene::LoadingHub,
+        SaveScene::Desert => GameScene::LoadingDesert,
+        SaveScene::FloatingIsland => GameScene::LoadingFloatingIsland,
+        SaveScene::Lagoon => GameScene::LoadingLagoon,
+        SaveScene::Volcano => GameScene::LoadingVolcano,
+    };
+
+    next_scene.set(next_game_scene);
+
+    pending_load.data = Some(save_data);
+}
+
+fn apply_pending_load(
+    mut pending_load: ResMut<PendingLoad>,
 
     mut player_query: Query<
         (
@@ -267,13 +267,37 @@ fn process_load_request(
         With<Player>,
     >,
 ) {
-    let Some(slot) = request.slot.take()
-    else {
+    let Some(save_data) = pending_load.data.take() else {
         return;
     };
 
-    load_game(
-        slot,
-        &mut player_query,
+    let Ok((
+        mut transform,
+        mut health,
+        mut mana,
+        mut mastery,
+    )) = player_query.single_mut()
+    else {
+        // Player ยังไม่ spawn
+        // อย่าเอา pending_load ทิ้ง
+        pending_load.data = Some(save_data);
+        return;
+    };
+
+    transform.translation = Vec3::new(
+        save_data.player_position[0],
+        save_data.player_position[1],
+        save_data.player_position[2],
     );
+
+    health.current = save_data.hp;
+    mana.current = save_data.mp;
+
+    mastery.water.exp = save_data.element_water_exp as u32;
+    mastery.fire.exp = save_data.element_fire_exp as u32;
+    mastery.wind.exp = save_data.element_wind_exp as u32;
+    mastery.earth.exp = save_data.element_earth_exp as u32;
+    mastery.inw.exp = save_data.element_inw_exp as u32;
+
+    println!("Pending save data applied.");
 }
