@@ -39,3 +39,6 @@ pub enum SaveScene {
     Lagoon,
     Volcano,
 }
+
+#[derive(Component)]
+pub struct MusicAudio;

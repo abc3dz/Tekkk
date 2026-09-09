@@ -83,18 +83,6 @@ fn spawn_element_status_ui(commands: &mut Commands, fonts: &GameFonts) {
             },
             BackgroundColor(Color::srgba(0.0, 0.0, 0.0, 0.72)),
         ))
-        // .with_children(|root| {
-        //     root.spawn((
-        //         Node {
-        //             width: Val::Px(950.0),
-        //             min_height: Val::Px(620.0),
-        //             flex_direction: FlexDirection::Column,
-        //             row_gap: Val::Px(6.0),
-        //             padding: UiRect::all(Val::Px(24.0)),
-        //             ..default()
-        //         },
-        //         BackgroundColor(Color::srgba(0.05, 0.05, 0.08, 0.95)),
-        //     ))
             .with_children(|panel| {
                 panel.spawn((
                     Text::new("PLAYER STATUS"),
@@ -106,13 +94,6 @@ fn spawn_element_status_ui(commands: &mut Commands, fonts: &GameFonts) {
                         ..default()
                     },
                 ));
-                // panel.spawn((
-                //     Text::new("PLAYER STATUS"),
-                //     TextFont { font: fonts.abc3dz.clone(), font_size: 28.0, ..default() },
-                //     TextColor(Color::WHITE),
-                //     Node { width: Val::Percent(100.0), margin: UiRect::bottom(Val::Px(12.0)), ..default() },
-                // ));
-
                 let status_rows = [
                     ("HP: ", PlayerStatusValueText::Hp, Some(PlayerStatusBonusText::Hp)),
                     ("MP: ", PlayerStatusValueText::Mp, Some(PlayerStatusBonusText::Mp)),

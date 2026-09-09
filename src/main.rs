@@ -18,6 +18,7 @@ mod warp_portal;
 mod cel_shader;
 mod pause_menu;
 mod save_load;
+mod settings;
 
 fn main() {
     App::new()
@@ -43,6 +44,7 @@ fn main() {
             element_drop::ElementDropPlugin,
             pause_menu::PauseMenuPlugin,
             save_load::SaveLoadPlugin,
+            settings::SettingsPlugin,
         ))
         .add_systems(PreStartup, load_fonts)
         .run();

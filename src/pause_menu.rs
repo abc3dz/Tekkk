@@ -2,18 +2,21 @@ use bevy::prelude::*;
 
 use crate::components::*;
 use crate::save_load::*;
+use crate::settings::*;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum PauseMenuScreen {
     Main,
     SaveSlots,
     LoadSlots,
+    Settings,
 }
 
 #[derive(Component, Clone, Copy, PartialEq, Eq)]
 pub enum PauseButton {
     Save,
     Load,
+    Settings,
     Resume,
     SaveSlot(usize),
     LoadSlot(usize),
@@ -50,6 +53,7 @@ pub enum GameMode {
 pub enum PauseMenuItem {
     Save,
     Load,
+    Settings,
     Resume,
 }
 
@@ -59,21 +63,21 @@ struct PauseMenuUI;
 pub struct PauseMenuPlugin;
 
 impl Plugin for PauseMenuPlugin {
-    fn build(&self, app: &mut App) {
-        app.init_state::<GameMode>()
-            .init_resource::<PauseMenuState>()
-            .add_systems(Update, toggle_pause)
-            .add_systems(OnEnter(GameMode::Paused), setup_pause_menu)
-            .add_systems(
-                Update,
-                (
-                    pause_menu_input,
-                    pause_button_system,
-                    refresh_pause_menu,
-                )
-                    .run_if(in_state(GameMode::Paused)),
-            )
-            .add_systems(OnExit(GameMode::Paused), cleanup_pause_menu);
+    fn build(&self, app: &mut App) {app
+        .init_state::<GameMode>()
+        .init_resource::<SaveRequest>()
+        .init_resource::<LoadRequest>()
+        .init_resource::<PauseMenuState>()
+        .add_systems(Update, toggle_pause)
+        .add_systems(OnEnter(GameMode::Paused), setup_pause_menu)
+        .add_systems(
+            Update,
+            (
+                pause_menu_input,
+                pause_button_system,
+                refresh_pause_menu,
+            ).run_if(in_state(GameMode::Paused)))
+        .add_systems(OnExit(GameMode::Paused), cleanup_pause_menu);
     }
 }
 
@@ -105,8 +109,9 @@ fn setup_pause_menu(
     mut commands: Commands,
     fonts: Res<GameFonts>,
     menu_state: Res<PauseMenuState>,
+    settings: Res<SettingsState>,
 ) {
-    spawn_pause_ui(&mut commands, &fonts, &menu_state);
+    spawn_pause_ui(&mut commands, &fonts, &menu_state, &settings);
 }
 
 fn spawn_pause_button(
@@ -154,6 +159,7 @@ fn spawn_pause_ui(
     commands: &mut Commands,
     fonts: &GameFonts,
     menu_state: &PauseMenuState,
+    settings: &SettingsState,
 ) {
     commands
         .spawn((
@@ -191,6 +197,10 @@ fn spawn_pause_ui(
                 PauseMenuScreen::LoadSlots => {
                     spawn_load_slots(menu, fonts, menu_state.selected_slot);
                 }
+                PauseMenuScreen::Settings => {
+                    let settings = settings.into();
+                    crate::settings::spawn_settings_screen(menu, fonts, settings);
+                }
             });
         });
 }
@@ -209,7 +219,6 @@ fn spawn_main_menu(
         },
         TextColor(Color::srgb(1.0, 0.82, 0.20)),
     ));
-
     spawn_pause_button(
         menu,
         fonts,
@@ -217,7 +226,6 @@ fn spawn_main_menu(
         PauseButton::Save,
         selected == PauseMenuItem::Save,
     );
-
     spawn_pause_button(
         menu,
         fonts,
@@ -225,7 +233,13 @@ fn spawn_main_menu(
         PauseButton::Load,
         selected == PauseMenuItem::Load,
     );
-
+    spawn_pause_button(
+        menu,
+        fonts,
+        "SETTINGS",
+        PauseButton::Settings,
+        selected == PauseMenuItem::Settings,
+    );
     spawn_pause_button(
         menu,
         fonts,
@@ -300,15 +314,15 @@ fn spawn_save_slot_button(
                         TextColor(Color::srgb(0.70, 0.70, 0.75)),
                     ));
 
-                    // button.spawn((
-                    //     Text::new(format!("HP: {}    MP: {}", data.hp, data.mp)),
-                    //     TextFont {
-                    //         font: fonts.abc3dz.clone(),
-                    //         font_size: 16.0,
-                    //         ..default()
-                    //     },
-                    //     TextColor(Color::srgb(0.70, 0.70, 0.75)),
-                    // ));
+                    button.spawn((
+                        Text::new(format!("HP: {}    MP: {}", data.hp, data.mp)),
+                        TextFont {
+                            font: fonts.abc3dz.clone(),
+                            font_size: 16.0,
+                            ..default()
+                        },
+                        TextColor(Color::srgb(0.70, 0.70, 0.75)),
+                    ));
                 }
                 None => {
                     button.spawn((
@@ -463,9 +477,10 @@ fn refresh_pause_menu(
     mut commands: Commands,
     fonts: Res<GameFonts>,
     menu_state: Res<PauseMenuState>,
+    settings: Res<SettingsState>,
     query: Query<Entity, With<PauseMenuUI>>,
 ) {
-    if !menu_state.is_changed() {
+    if !menu_state.is_changed() && !settings.is_changed() {
         return;
     }
 
@@ -473,7 +488,7 @@ fn refresh_pause_menu(
         commands.entity(entity).despawn();
     }
 
-    spawn_pause_ui(&mut commands, &fonts, &menu_state);
+    spawn_pause_ui(&mut commands, &fonts, &menu_state, &settings);
 }
 
 // ==========================================
@@ -488,6 +503,7 @@ fn pause_button_system(
     mut next_state: ResMut<NextState<GameMode>>,
     mut save_request: ResMut<SaveRequest>,
     mut load_request: ResMut<LoadRequest>,
+    mut settings: ResMut<SettingsState>,
 ) {
     for (interaction, button) in &mut interaction_query {
         match *interaction {
@@ -499,6 +515,10 @@ fn pause_button_system(
                 PauseButton::Load => {
                     menu_state.screen = PauseMenuScreen::LoadSlots;
                     menu_state.selected_slot = 0;
+                }
+                PauseButton::Settings => {
+                    menu_state.screen = PauseMenuScreen::Settings;
+                    settings.selected = SettingsItem::Resolution;
                 }
                 PauseButton::Resume => {
                     next_state.set(GameMode::Playing);
@@ -515,6 +535,7 @@ fn pause_button_system(
             Interaction::Hovered => match button {
                 PauseButton::Save => menu_state.selected = PauseMenuItem::Save,
                 PauseButton::Load => menu_state.selected = PauseMenuItem::Load,
+                PauseButton::Settings => menu_state.selected = PauseMenuItem::Settings,
                 PauseButton::Resume => menu_state.selected = PauseMenuItem::Resume,
                 PauseButton::SaveSlot(slot) => menu_state.selected_slot = slot - 1,
                 PauseButton::LoadSlot(slot) => menu_state.selected_slot = slot - 1,
@@ -527,13 +548,14 @@ fn pause_button_system(
 // ==========================================
 // KEYBOARD & GAMEPAD INPUT SYSTEM
 // ==========================================
-fn pause_menu_input(
+pub fn pause_menu_input(
     keyboard: Res<ButtonInput<KeyCode>>,
     gamepads: Query<&Gamepad>,
     mut menu_state: ResMut<PauseMenuState>,
     mut next_state: ResMut<NextState<GameMode>>,
     mut save_request: ResMut<SaveRequest>,
     mut load_request: ResMut<LoadRequest>,
+    mut settings: ResMut<SettingsState>,
 ) {
     let up = keyboard.just_pressed(KeyCode::ArrowUp)
         || keyboard.just_pressed(KeyCode::KeyW)
@@ -556,14 +578,16 @@ fn pause_menu_input(
                 menu_state.selected = match menu_state.selected {
                     PauseMenuItem::Save => PauseMenuItem::Resume,
                     PauseMenuItem::Load => PauseMenuItem::Save,
-                    PauseMenuItem::Resume => PauseMenuItem::Load,
+                    PauseMenuItem::Settings => PauseMenuItem::Load,
+                    PauseMenuItem::Resume => PauseMenuItem::Settings,
                 };
             }
 
             if down {
                 menu_state.selected = match menu_state.selected {
                     PauseMenuItem::Save => PauseMenuItem::Load,
-                    PauseMenuItem::Load => PauseMenuItem::Resume,
+                    PauseMenuItem::Load => PauseMenuItem::Settings,
+                    PauseMenuItem::Settings => PauseMenuItem::Resume,
                     PauseMenuItem::Resume => PauseMenuItem::Save,
                 };
             }
@@ -577,6 +601,10 @@ fn pause_menu_input(
                     PauseMenuItem::Load => {
                         menu_state.screen = PauseMenuScreen::LoadSlots;
                         menu_state.selected_slot = 0;
+                    }
+                    PauseMenuItem::Settings => {
+                        menu_state.screen = PauseMenuScreen::Settings;
+                        settings.selected = SettingsItem::Resolution;
                     }
                     PauseMenuItem::Resume => {
                         next_state.set(GameMode::Playing);
@@ -624,6 +652,7 @@ fn pause_menu_input(
                 menu_state.screen = PauseMenuScreen::Main;
             }
         }
+        PauseMenuScreen::Settings => {return;}
     }
 }
 
