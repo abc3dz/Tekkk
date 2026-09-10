@@ -3,51 +3,55 @@ use bevy::prelude::*;
 use crate::components::{MusicAudio, GameFonts};
 use crate::pause_menu::{GameMode, PauseMenuScreen, PauseMenuState};
 
-// ==========================================
-// SETTINGS
-// ==========================================
-
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum SettingsItem {
     Resolution,
     DisplayMode,
     MasterVolume,
+    Apply,
     Back,
 }
 
 #[derive(Resource)]
 pub struct SettingsState {
     pub selected: SettingsItem,
-    pub resolution_index: usize,
-    pub display_mode_index: usize,
-    pub master_volume: f32,
+
+    pub pending_resolution_index: usize,
+    pub pending_display_mode_index: usize,
+    pub pending_master_volume: f32,
+
+    pub current_resolution_index: usize,
+    pub current_display_mode_index: usize,
+    pub current_master_volume: f32,
 }
 
 impl Default for SettingsState {
     fn default() -> Self {
         Self {
             selected: SettingsItem::Resolution,
-            resolution_index: 0,
-            display_mode_index: 0,
-            master_volume: 1.0,
+
+            pending_resolution_index: 0,
+            pending_display_mode_index: 0,
+            pending_master_volume: 1.0,
+
+            current_resolution_index: 0,
+            current_display_mode_index: 0,
+            current_master_volume: 1.0,
         }
     }
 }
 
-// ==========================================
-// UI COMPONENT
-// ==========================================
+#[derive(Resource, Default)]
+pub struct SettingsApplyRequest(pub bool);
 
+// UI COMPONENT
 #[derive(Component)]
 pub struct SettingsUI;
 
 #[derive(Component)]
 struct SettingsButton(SettingsItem);
 
-// ==========================================
 // VALUES
-// ==========================================
-
 const RESOLUTIONS: &[(u32, u32)] = &[
     (1280, 720),
     (1600, 900),
@@ -60,27 +64,41 @@ const DISPLAY_MODES: &[&str] = &[
     "Windowed",
 ];
 
-// ==========================================
 // PLUGIN
-// ==========================================
-
 pub struct SettingsPlugin;
 
 impl Plugin for SettingsPlugin {
-    fn build(&self, app: &mut App) {
-        app.init_resource::<SettingsState>()
-            .add_systems(Update,(
+    fn build(&self, app: &mut App) { app
+            .init_resource::<SettingsState>()
+            .init_resource::<SettingsApplyRequest>()
+
+            .add_systems(
+                Startup,
+                initialize_settings_from_window,
+            )
+
+            .add_systems(
+                Update,
+                (
                     settings_input,
                     settings_button_system,
-                    settings_button_visual_system
-                ).after(crate::pause_menu::pause_menu_input).run_if(in_state(GameMode::Paused)),)
-            .add_systems(Update,apply_master_volume);
+                    settings_button_visual_system,
+                )
+                    .after(crate::pause_menu::pause_menu_input)
+                    .run_if(in_state(GameMode::Paused)),
+            )
+
+            .add_systems(
+                Update,
+                (
+                    apply_master_volume,
+                    apply_display_settings,
+                ),
+            );
     }
 }
 
-// ==========================================
-// SPAWN SETTINGS SCREEN
-// ==========================================
+// SETTINGS UI
 
 pub fn spawn_settings_screen(
     parent: &mut ChildSpawnerCommands,
@@ -91,11 +109,11 @@ pub fn spawn_settings_screen(
         .spawn((
             SettingsUI,
             Node {
-                width: Val::Px(600.0),
+                width: Val::Px(620.0),
                 padding: UiRect::all(Val::Px(35.0)),
                 flex_direction: FlexDirection::Column,
                 align_items: AlignItems::Center,
-                row_gap: Val::Px(15.0),
+                row_gap: Val::Px(14.0),
                 ..default()
             },
             BackgroundColor(Color::srgba(0.05, 0.05, 0.08, 0.96)),
@@ -119,13 +137,14 @@ pub fn spawn_settings_screen(
             // RESOLUTION
             // ==========================================
 
-            let (width, height) = RESOLUTIONS[settings.resolution_index];
+            let (width, height) =
+                RESOLUTIONS[settings.pending_resolution_index];
 
             spawn_settings_button(
                 menu,
                 fonts,
                 SettingsItem::Resolution,
-                &format!("RESOLUTION    {} x {}", width, height),
+                &format!("RESOLUTION      {} x {}", width, height),
                 settings.selected == SettingsItem::Resolution,
             );
 
@@ -139,7 +158,7 @@ pub fn spawn_settings_screen(
                 SettingsItem::DisplayMode,
                 &format!(
                     "DISPLAY MODE    {}",
-                    DISPLAY_MODES[settings.display_mode_index]
+                    DISPLAY_MODES[settings.pending_display_mode_index]
                 ),
                 settings.selected == SettingsItem::DisplayMode,
             );
@@ -148,15 +167,26 @@ pub fn spawn_settings_screen(
             // MASTER VOLUME
             // ==========================================
 
+            let volume = (settings.pending_master_volume * 100.0) as u32;
+
             spawn_settings_button(
                 menu,
                 fonts,
                 SettingsItem::MasterVolume,
-                &format!(
-                    "MASTER VOLUME    {}%",
-                    (settings.master_volume * 100.0) as u32
-                ),
+                &format!("MASTER VOLUME    {}%", volume),
                 settings.selected == SettingsItem::MasterVolume,
+            );
+
+            // ==========================================
+            // APPLY
+            // ==========================================
+
+            spawn_settings_button(
+                menu,
+                fonts,
+                SettingsItem::Apply,
+                "APPLY",
+                settings.selected == SettingsItem::Apply,
             );
 
             // ==========================================
@@ -195,8 +225,8 @@ fn spawn_settings_button(
             Button,
             SettingsButton(item),
             Node {
-                width: Val::Px(520.0),
-                height: Val::Px(60.0),
+                width: Val::Px(550.0),
+                height: Val::Px(62.0),
                 justify_content: JustifyContent::Center,
                 align_items: AlignItems::Center,
                 border_radius: BorderRadius::all(Val::Px(8.0)),
@@ -205,8 +235,10 @@ fn spawn_settings_button(
             BackgroundColor(background),
         ))
         .with_children(|button| {
+            let prefix = if selected { "> " } else { "" };
+
             button.spawn((
-                Text::new(format!("{}", label)),
+                Text::new(format!("{}{}", prefix, label)),
                 TextFont {
                     font: fonts.abc3dz.clone(),
                     font_size: 25.0,
@@ -230,6 +262,7 @@ fn settings_input(
     gamepads: Query<&Gamepad>,
     mut settings: ResMut<SettingsState>,
     mut pause_state: ResMut<PauseMenuState>,
+    mut apply_request: ResMut<SettingsApplyRequest>,
 ) {
     let up = keyboard.just_pressed(KeyCode::ArrowUp)
         || keyboard.just_pressed(KeyCode::KeyW)
@@ -275,7 +308,8 @@ fn settings_input(
             SettingsItem::Resolution => SettingsItem::Back,
             SettingsItem::DisplayMode => SettingsItem::Resolution,
             SettingsItem::MasterVolume => SettingsItem::DisplayMode,
-            SettingsItem::Back => SettingsItem::MasterVolume,
+            SettingsItem::Apply => SettingsItem::MasterVolume,
+            SettingsItem::Back => SettingsItem::Apply,
         };
     }
 
@@ -287,7 +321,8 @@ fn settings_input(
         settings.selected = match settings.selected {
             SettingsItem::Resolution => SettingsItem::DisplayMode,
             SettingsItem::DisplayMode => SettingsItem::MasterVolume,
-            SettingsItem::MasterVolume => SettingsItem::Back,
+            SettingsItem::MasterVolume => SettingsItem::Apply,
+            SettingsItem::Apply => SettingsItem::Back,
             SettingsItem::Back => SettingsItem::Resolution,
         };
     }
@@ -298,40 +333,35 @@ fn settings_input(
 
     match settings.selected {
         SettingsItem::Resolution => {
-            if left && settings.resolution_index > 0 {
-                settings.resolution_index -= 1;
+            if left && settings.pending_resolution_index > 0 {
+                settings.pending_resolution_index -= 1;
             }
 
-            if right
-                && settings.resolution_index < RESOLUTIONS.len() - 1
-            {
-                settings.resolution_index += 1;
+            if right && settings.pending_resolution_index < RESOLUTIONS.len() - 1{
+                settings.pending_resolution_index += 1;
             }
         }
 
         SettingsItem::DisplayMode => {
-            if left && settings.display_mode_index > 0 {
-                settings.display_mode_index -= 1;
+            if left && settings.pending_display_mode_index > 0 {
+                settings.pending_display_mode_index -= 1;
             }
 
-            if right
-                && settings.display_mode_index < DISPLAY_MODES.len() - 1
-            {
-                settings.display_mode_index += 1;
+            if right && settings.pending_display_mode_index < DISPLAY_MODES.len() - 1{
+                settings.pending_display_mode_index += 1;
             }
         }
 
         SettingsItem::MasterVolume => {
             if left {
-                settings.master_volume =
-                    (settings.master_volume - 0.05).max(0.0);
+                settings.pending_master_volume = (settings.pending_master_volume - 0.05).max(0.0);
             }
 
             if right {
-                settings.master_volume =
-                    (settings.master_volume + 0.05).min(1.0);
+                settings.pending_master_volume = (settings.pending_master_volume + 0.05).min(1.0);
             }
         }
+        SettingsItem::Apply => {}
 
         SettingsItem::Back => {}
     }
@@ -341,9 +371,23 @@ fn settings_input(
     // ==========================================
 
     if confirm {
-        if settings.selected == SettingsItem::Back {
-            settings.selected = SettingsItem::Resolution;
-            pause_state.screen = PauseMenuScreen::Main;
+        match settings.selected {
+            SettingsItem::Apply => {
+                settings.current_resolution_index = settings.pending_resolution_index;
+                settings.current_display_mode_index = settings.pending_display_mode_index;
+                settings.current_master_volume = settings.pending_master_volume;
+                apply_request.0 = true;
+            }
+
+            SettingsItem::Back => {
+                settings.pending_resolution_index = settings.current_resolution_index;
+                settings.pending_display_mode_index = settings.current_display_mode_index;
+                settings.pending_master_volume = settings.current_master_volume;
+                settings.selected = SettingsItem::Resolution;
+                pause_state.screen = PauseMenuScreen::Main;
+            }
+
+            _ => {}
         }
     }
 
@@ -368,6 +412,7 @@ fn settings_button_system(
     >,
     mut settings: ResMut<SettingsState>,
     mut pause_state: ResMut<PauseMenuState>,
+    mut apply_request: ResMut<SettingsApplyRequest>,
 ) {
     for (interaction, button) in &mut interaction_query {
         match *interaction {
@@ -376,14 +421,25 @@ fn settings_button_system(
             }
 
             Interaction::Pressed => {
-                match button.0 {
-                    SettingsItem::Resolution => { settings.resolution_index = (settings.resolution_index + 1) % RESOLUTIONS.len();}
+                match button.0 { 
+                    SettingsItem::Resolution => { settings.pending_resolution_index = (settings.pending_resolution_index + 1) % RESOLUTIONS.len();}
+                    SettingsItem::DisplayMode => { settings.pending_display_mode_index = (settings.pending_display_mode_index + 1) % DISPLAY_MODES.len();}
+                    SettingsItem::MasterVolume => { settings.pending_master_volume = (settings.pending_master_volume + 0.05).min(1.0); }
 
-                    SettingsItem::DisplayMode => { settings.display_mode_index = (settings.display_mode_index + 1) % DISPLAY_MODES.len();}
+                    SettingsItem::Apply => {
+                        settings.current_resolution_index = settings.pending_resolution_index;
+                        settings.current_display_mode_index = settings.pending_display_mode_index;
+                        settings.current_master_volume = settings.pending_master_volume;
+                        apply_request.0 = true;
+                    }
 
-                    SettingsItem::MasterVolume => { settings.master_volume = (settings.master_volume + 0.05).min(1.0); }
-
-                    SettingsItem::Back => { pause_state.screen = PauseMenuScreen::Main; }
+                    SettingsItem::Back => {
+                        settings.pending_resolution_index = settings.current_resolution_index;
+                        settings.pending_display_mode_index = settings.current_display_mode_index;
+                        settings.pending_master_volume = settings.current_master_volume;
+                        settings.selected = SettingsItem::Resolution;
+                        pause_state.screen = PauseMenuScreen::Main;
+                    }
                 }
             }
 
@@ -435,6 +491,88 @@ fn apply_master_volume(
     }
 
     for mut sink in &mut music_query {
-        sink.set_volume(bevy::audio::Volume::Linear(settings.master_volume));
+        sink.set_volume(
+            bevy::audio::Volume::Linear(
+                settings.current_master_volume
+            )
+        );
+    }
+}
+fn apply_display_settings(
+    mut apply_request: ResMut<SettingsApplyRequest>,
+    settings: Res<SettingsState>,
+    mut windows: Query<&mut Window>,
+) {
+    if !apply_request.0 {
+        return;
+    }
+
+    let resolutions = [
+        (1280.0, 720.0),
+        (1600.0, 900.0),
+        (1920.0, 1080.0),
+    ];
+
+    let (width, height) =
+        resolutions[settings.current_resolution_index];
+
+    let mode = match settings.current_display_mode_index {
+        0 => bevy::window::WindowMode::Fullscreen(
+            MonitorSelection::Current,
+            VideoModeSelection::Current,
+        ),
+
+        1 => bevy::window::WindowMode::BorderlessFullscreen (
+            MonitorSelection::Current,
+        ),
+
+        _ => bevy::window::WindowMode::Windowed,
+    };
+
+    for mut window in &mut windows {
+        window.resolution.set(width, height);
+        window.mode = mode;
+    }
+
+    apply_request.0 = false;
+}
+fn initialize_settings_from_window(
+    mut settings: ResMut<SettingsState>,
+    windows: Query<&Window>,
+    music_query: Query<&AudioSink, With<MusicAudio>>,
+) {
+    let Ok(window) = windows.single() else {
+        return;
+    };
+
+    let width = window.resolution.width();
+    let height = window.resolution.height();
+
+    let resolutions = [
+        (1280.0, 720.0),
+        (1600.0, 900.0),
+        (1920.0, 1080.0),
+    ];
+
+    if let Some(index) = resolutions
+        .iter()
+        .position(|&(w, h)| w == width && h == height)
+    {
+        settings.current_resolution_index = index;
+        settings.pending_resolution_index = index;
+    }
+
+    let display_mode_index = match window.mode {
+        bevy::window::WindowMode::Fullscreen(_, _) => 0,
+        bevy::window::WindowMode::BorderlessFullscreen(_) => 1,
+        bevy::window::WindowMode::Windowed => 2,
+    };
+
+    settings.current_display_mode_index = display_mode_index;
+    settings.pending_display_mode_index = display_mode_index;
+
+    if let Ok(sink) = music_query.single() {
+        settings.current_master_volume = sink.volume().to_linear();
+        settings.pending_master_volume = sink.volume().to_linear();
     }
 }
