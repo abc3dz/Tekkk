@@ -1,19 +1,16 @@
 use bevy::input::gamepad;
 use bevy::prelude::*;
 
-use crate::combat::{
-    AtkAndDefElement,
-    BaseStats,
-    CombatStats,
-    ElementMastery,
-};
-
 use crate::components::{
     Health,
     Mana,
     Player,
     GuardianDialogUI,
     GameFonts,
+    AtkAndDefElement,
+    BaseStats,
+    CombatStats,
+    ElementMastery,
 };
 
 pub struct ElementUiPlugin;

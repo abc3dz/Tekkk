@@ -1,11 +1,11 @@
 use bevy::prelude::*;
 
-use crate::combat::CombatTarget;
 use crate::components::{
     EnemyHealthBar,
     EnemyHealthBarFill,
     Health,
     Player,
+    CombatTarget,
 };
 
 const ENEMY_HEALTH_BAR_WIDTH: f32 = 76.0;

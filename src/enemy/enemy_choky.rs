@@ -5,7 +5,6 @@ use bevy::{
 };
 
 use crate::cel_shader::*;
-use crate::combat::*;
 use crate::components::*;
 use crate::npc::practice_common::*;
 use crate::player::*;

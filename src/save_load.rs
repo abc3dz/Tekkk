@@ -4,8 +4,7 @@ use std::fs;
 use std::path::PathBuf;
 use chrono::Local;
 
-use crate::combat::ElementMastery;
-use crate::components::{Health, Mana, Player, SaveScene, GameScene};
+use crate::components::{Health, Mana, Player, SaveScene, GameScene, ElementMastery};
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct SaveData {

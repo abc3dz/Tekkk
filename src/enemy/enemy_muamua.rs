@@ -17,8 +17,7 @@ pub struct EnemyMuamua;
 pub struct EnemyMuamuaPlugin;
 
 impl Plugin for EnemyMuamuaPlugin {
-    fn build(&self, app: &mut App) {
-        app
+    fn build(&self, app: &mut App) { app
         .insert_resource(MuamuaRespawnTimer(Timer::from_seconds(1.0,TimerMode::Once)))
         .add_systems(OnEnter(GameScene::Desert),setup_enemy_muamua_animation_graph)
         .add_systems(Update,(
@@ -26,7 +25,6 @@ impl Plugin for EnemyMuamuaPlugin {
                 setup_enemy_muamua_animation_player,
                 enemy_muamua_chase_player,
                 update_enemy_muamua_animation,
-                debug_enemy_muamua_spawn,
                 update_muamua_hurt_and_dead,
                 spawn_muamua_punch_hitbox,
                 muamua_punch_hit_player,
@@ -38,7 +36,7 @@ impl Plugin for EnemyMuamuaPlugin {
     }
 }
 
-const MUAMUA_SPAWN_POSITION: Vec3 = Vec3::new(5.0, 1.0, 5.0);
+const MUAMUA_SPAWN_POSITION: Vec3 = Vec3::new(5.0, 1.0, -15.0);
 fn spawn_enemy_muamua(
     mut commands: Commands,
     time: Res<Time>,
@@ -58,14 +56,15 @@ fn spawn_enemy_muamua(
         GltfAssetLabel::Scene(0)
             .from_asset("enemy/EnemyMuamua.glb"),
     );
+    let random_angle = rand::random::<f32>() * std::f32::consts::TAU;
+    let initial_dir = Vec3::new(random_angle.cos(), 0.0, random_angle.sin()).normalize();
     const MUAMUA_BODY_Y: f32 = 1.0;
     let base_stats = BaseStats::MUAMUA;
-    let enemy_muamua = commands
-        .spawn((
+    let enemy_muamua = commands.spawn((
             Name::new("Enemy Muamua"),
             Enemy,
             EnemyMuamua,
-            EnemyState::Idle,
+            EnemyState::Patrol,
             Health {
                 current: base_stats.max_hp as i32,
                 max: base_stats.max_hp as i32,
@@ -78,12 +77,13 @@ fn spawn_enemy_muamua(
             Collider::capsule(0.45, 1.0),
             LockedAxes::ROTATION_LOCKED,
             LinearVelocity::ZERO,
-            Transform::from_translation(
-                MUAMUA_SPAWN_POSITION
-                    + Vec3::Y * MUAMUA_BODY_Y,
-            ),
+            Transform::from_translation(MUAMUA_SPAWN_POSITION + Vec3::Y * MUAMUA_BODY_Y),
             DespawnOnExit(GameScene::Desert),
         ))
+        .insert(MuamuaPatrol {
+            direction: initial_dir,
+            timer: Timer::from_seconds(3.0, TimerMode::Repeating),
+        })
         .with_children(|parent| {
             parent.spawn((
                 SceneRoot(muamua_scene),
@@ -96,6 +96,7 @@ fn spawn_enemy_muamua(
             ));
         })
         .id();
+    
     commands.entity(enemy_muamua).insert((
         CombatTarget,
         MuamuaAttackTimer(Timer::from_seconds(
@@ -108,48 +109,7 @@ fn spawn_enemy_muamua(
         enemy_muamua,
     );
     respawn_timer.0.reset();
-    info!("Enemy Muamua spawned");
-}
-
-fn debug_enemy_muamua_spawn(
-    query: Query<
-        (
-            &Health,
-            &CombatStats,
-            &AtkAndDefElement,
-            &ElementExpReward,
-            &EnemyState,
-        ),
-        Added<EnemyMuamua>,
-    >,
-) {
-    for (health, stats, element, reward, state) in &query {
-        info!(
-            "Muamua spawned:
-            HP = {}/{},
-            Element = {:?},
-            ATK = {},
-            DEF = {},
-            Reward = Water {}-{}, Fire {}-{}, Wind {}-{}, Earth {}-{}, Inw {}-{},
-            State = {:?}",
-            health.current,
-            health.max,
-            element.0,
-            stats.attack,
-            stats.defense,
-            reward.water.min,
-            reward.water.max,
-            reward.fire.min,
-            reward.fire.max,
-            reward.wind.min,
-            reward.wind.max,
-            reward.earth.min,
-            reward.earth.max,
-            reward.inw.min,
-            reward.inw.max,
-            state,
-        );
-    }
+    //info!("Enemy Muamua spawned");
 }
 
 fn setup_enemy_muamua_animation_graph(
@@ -271,10 +231,8 @@ const MUAMUA_STOP_DISTANCE: f32 = 1.0;
 const MUAMUA_MOVE_SPEED: f32 = 3.0;
 
 fn enemy_muamua_chase_player(
-
     mut commands: Commands,
     time: Res<Time>,
-
     player_query: Query<
         &Transform,
         (
@@ -290,6 +248,7 @@ fn enemy_muamua_chase_player(
             &mut LinearVelocity,
             &mut EnemyState,
             Option<&mut EnemyInvestigateDirection>,
+            Option<&mut MuamuaPatrol>,
         ),
         (
             With<EnemyMuamua>,
@@ -309,6 +268,7 @@ fn enemy_muamua_chase_player(
         mut velocity,
         mut enemy_state,
         investigate,
+        patrol_data
     ) in &mut muamua_query
     {
         // Hurt / Dead ยังหยุดเหมือนเดิม
@@ -379,7 +339,35 @@ fn enemy_muamua_chase_player(
                             10.0,
                             TimerMode::Once,
                         );
+                } else {
+                    // ไม่ได้โดนยิง และ Player อยู่ไกล = ลาดตะเวนสุ่ม (ไม่เดินหา Player โดยตรง)
+                    if let Some(mut patrol) = patrol_data {
+                        patrol.timer.tick(time.delta());
+                        
+                        // สุ่มทิศทางใหม่เมื่อ Timer หมด (ทุก 3 วินาที)
+                        if patrol.timer.just_finished() {
+                            let random_angle = rand::random::<f32>() * std::f32::consts::TAU;
+                            patrol.direction = Vec3::new(random_angle.cos(), 0.0, random_angle.sin()).normalize();
+                        }
+                        
+                        let dir = patrol.direction;
+                        velocity.x = dir.x * MUAMUA_MOVE_SPEED;
+                        velocity.z = dir.z * MUAMUA_MOVE_SPEED;
+                        
+                        // หันหน้าไปทางที่เดิน
+                        if dir.length_squared() > 0.0001 {
+                            muamua_transform.rotation = Quat::from_rotation_y(dir.x.atan2(dir.z));
+                        }
+                        *enemy_state = EnemyState::Patrol;
+                    } else {
+                        // Fallback กรณีไม่มี Component (กัน error)
+                        velocity.x = 0.0;
+                        velocity.z = 0.0;
+                        *enemy_state = EnemyState::Idle;
+                    }
+                    continue;
                 }
+    
 
                 let direction =
                     investigate.direction;
@@ -409,12 +397,18 @@ fn enemy_muamua_chase_player(
 
             // ไม่ได้โดนยิง
             // และ Player ก็อยู่ไกล
-            // = Idle เหมือนเดิม
-            velocity.x = 0.0;
-            velocity.z = 0.0;
-
-            *enemy_state = EnemyState::Idle;
-
+            // = เดินลาดตะเวนหา Player เลยทันที (ไม่ต้องรอโดนยิง)
+            let direction = flat_direction.normalize();
+            velocity.x = direction.x * MUAMUA_MOVE_SPEED;
+            velocity.z = direction.z * MUAMUA_MOVE_SPEED;
+            
+            if direction.length_squared() > 0.0001 {
+                muamua_transform.rotation =
+                    Quat::from_rotation_y(
+                        direction.x.atan2(direction.z),
+                    );
+            }
+            *enemy_state = EnemyState::Chase;
             continue;
         }
 
@@ -495,14 +489,8 @@ fn update_enemy_muamua_animation(
         let wanted_animation = match enemy_state {
             EnemyState::Hurt => EnemyMuamuaAnimState::Hurt,
             EnemyState::Dead => EnemyMuamuaAnimState::Dead,
-            EnemyState::Chase => {
-                EnemyMuamuaAnimState::Chase
-            }
-
-            EnemyState::Attack => {
-                EnemyMuamuaAnimState::Attack
-            }
-
+            EnemyState::Chase | EnemyState::Patrol => EnemyMuamuaAnimState::Chase,
+            EnemyState::Attack => EnemyMuamuaAnimState::Attack,
             _ => EnemyMuamuaAnimState::Idle,
         };
 
