@@ -87,11 +87,7 @@ fn spawn_enemy_muamua(
         .with_children(|parent| {
             parent.spawn((
                 SceneRoot(muamua_scene),
-                Transform::from_xyz(
-                    0.0,
-                    -MUAMUA_BODY_Y,
-                    0.0,
-                ),
+                Transform::from_xyz(0.0,-MUAMUA_BODY_Y,0.0,),
                 ApplyToonMaterial,
             ));
         })
@@ -240,7 +236,6 @@ fn enemy_muamua_chase_player(
             Without<EnemyMuamua>,
         ),
     >,
-
     mut muamua_query: Query<
         (
             Entity,
@@ -248,7 +243,7 @@ fn enemy_muamua_chase_player(
             &mut LinearVelocity,
             &mut EnemyState,
             Option<&mut EnemyInvestigateDirection>,
-            Option<&mut MuamuaPatrol>,
+            Option<&mut MuamuaPatrol>, // <-- ต้องมีบรรทัดนี้ใน Query
         ),
         (
             With<EnemyMuamua>,
@@ -256,9 +251,7 @@ fn enemy_muamua_chase_player(
         ),
     >,
 ) {
-    let Ok(player_transform) =
-        player_query.single()
-    else {
+    let Ok(player_transform) = player_query.single() else {
         return;
     };
 
@@ -268,195 +261,103 @@ fn enemy_muamua_chase_player(
         mut velocity,
         mut enemy_state,
         investigate,
-        patrol_data
+        patrol_data, // <-- ตัวแปรรับค่า MuamuaPatrol
     ) in &mut muamua_query
     {
         // Hurt / Dead ยังหยุดเหมือนเดิม
-        if matches!(
-            *enemy_state,
-            EnemyState::Hurt | EnemyState::Dead
-        ) {
+        if matches!(*enemy_state, EnemyState::Hurt | EnemyState::Dead) {
             velocity.x = 0.0;
             velocity.z = 0.0;
             continue;
         }
 
-        let to_player =
-            player_transform.translation
-                - muamua_transform.translation;
-
-        let flat_direction =
-            Vec3::new(
-                to_player.x,
-                0.0,
-                to_player.z,
-            );
-
-        let distance =
-            flat_direction.length();
+        let to_player = player_transform.translation - muamua_transform.translation;
+        let flat_direction = Vec3::new(to_player.x, 0.0, to_player.z);
+        let distance = flat_direction.length();
 
         // ==========================================
-        // Player ยังอยู่นอกระยะมองเห็น
-        // แต่ Muamua รู้ว่าลูกพลังมาจากทางไหน
+        // 1. Player อยู่ในระยะมองเห็น (<= 10.0) -> ไล่ตามทันที
         // ==========================================
-        if distance > MUAMUA_CHASE_RANGE {
-            if let Some(mut investigate) = investigate {
-                investigate.timer.tick(time.delta());
-
-                if investigate.timer.is_finished() {
-                    let to_spawn =
-                        MUAMUA_SPAWN_POSITION
-                            - muamua_transform.translation;
-
-                    let flat_to_spawn =
-                        Vec3::new(
-                            to_spawn.x,
-                            0.0,
-                            to_spawn.z,
-                        );
-
-                    // กลับถึงจุด Spawn แล้ว
-                    if flat_to_spawn.length() <= 0.3 {
-                        velocity.x = 0.0;
-                        velocity.z = 0.0;
-
-                        *enemy_state = EnemyState::Idle;
-
-                        commands
-                            .entity(muamua_entity)
-                            .remove::<EnemyInvestigateDirection>();
-
-                        continue;
-                    }
-
-                    // ยังไม่ถึง ให้เปลี่ยนทิศไปทางจุด Spawn
-                    investigate.direction =
-                        flat_to_spawn.normalize();
-
-                    // ให้เวลาเดินกลับ ไม่อย่างนั้น Timer จะ finished ตลอด
-                    investigate.timer =
-                        Timer::from_seconds(
-                            10.0,
-                            TimerMode::Once,
-                        );
-                } else {
-                    // ไม่ได้โดนยิง และ Player อยู่ไกล = ลาดตะเวนสุ่ม (ไม่เดินหา Player โดยตรง)
-                    if let Some(mut patrol) = patrol_data {
-                        patrol.timer.tick(time.delta());
-                        
-                        // สุ่มทิศทางใหม่เมื่อ Timer หมด (ทุก 3 วินาที)
-                        if patrol.timer.just_finished() {
-                            let random_angle = rand::random::<f32>() * std::f32::consts::TAU;
-                            patrol.direction = Vec3::new(random_angle.cos(), 0.0, random_angle.sin()).normalize();
-                        }
-                        
-                        let dir = patrol.direction;
-                        velocity.x = dir.x * MUAMUA_MOVE_SPEED;
-                        velocity.z = dir.z * MUAMUA_MOVE_SPEED;
-                        
-                        // หันหน้าไปทางที่เดิน
-                        if dir.length_squared() > 0.0001 {
-                            muamua_transform.rotation = Quat::from_rotation_y(dir.x.atan2(dir.z));
-                        }
-                        *enemy_state = EnemyState::Patrol;
-                    } else {
-                        // Fallback กรณีไม่มี Component (กัน error)
-                        velocity.x = 0.0;
-                        velocity.z = 0.0;
-                        *enemy_state = EnemyState::Idle;
-                    }
-                    continue;
+        if distance <= MUAMUA_CHASE_RANGE {
+            commands.entity(muamua_entity).remove::<EnemyInvestigateDirection>();
+            
+            // Player อยู่ในระยะต่อย
+            if distance <= MUAMUA_STOP_DISTANCE {
+                velocity.x = 0.0;
+                velocity.z = 0.0;
+                if flat_direction.length_squared() > 0.0001 {
+                    let direction = flat_direction.normalize();
+                    muamua_transform.rotation = Quat::from_rotation_y(direction.x.atan2(direction.z));
                 }
-    
-
-                let direction =
-                    investigate.direction;
-
-                // เดินไปทางต้นทางของลูกพลัง
-                velocity.x = direction.x * MUAMUA_MOVE_SPEED;
-                velocity.z = direction.z * MUAMUA_MOVE_SPEED;
-
-                // หันหน้าไปทางที่เดิน
-                if direction.length_squared()
-                    > 0.0001
-                {
-                    muamua_transform.rotation =
-                        Quat::from_rotation_y(
-                            direction
-                                .x
-                                .atan2(direction.z),
-                        );
-                }
-
-                // ใช้ animation Chase เป็นท่าเดิน
-                *enemy_state =
-                    EnemyState::Chase;
-
+                *enemy_state = EnemyState::Attack;
                 continue;
             }
-
-            // ไม่ได้โดนยิง
-            // และ Player ก็อยู่ไกล
-            // = เดินลาดตะเวนหา Player เลยทันที (ไม่ต้องรอโดนยิง)
+            
+            // ไล่ Player ตามปกติ
             let direction = flat_direction.normalize();
             velocity.x = direction.x * MUAMUA_MOVE_SPEED;
             velocity.z = direction.z * MUAMUA_MOVE_SPEED;
-            
-            if direction.length_squared() > 0.0001 {
-                muamua_transform.rotation =
-                    Quat::from_rotation_y(
-                        direction.x.atan2(direction.z),
-                    );
-            }
+            muamua_transform.rotation = Quat::from_rotation_y(direction.x.atan2(direction.z));
             *enemy_state = EnemyState::Chase;
             continue;
         }
 
         // ==========================================
-        // เจอ Player แล้ว
-        // ไม่ต้องตามทิศ projectile อีก
+        // 2. Player อยู่นอกระยะ (> 10.0)
         // ==========================================
-        commands
-            .entity(muamua_entity)
-            .remove::<EnemyInvestigateDirection>();
-
-        // Player อยู่ในระยะต่อย
-        if distance <= MUAMUA_STOP_DISTANCE {
-            velocity.x = 0.0;
-            velocity.z = 0.0;
-
-            if flat_direction.length_squared() > 0.0001 {
-                let direction =
-                    flat_direction.normalize();
-
-                muamua_transform.rotation =
-                    Quat::from_rotation_y(
-                        direction
-                            .x
-                            .atan2(direction.z),
-                    );
+        
+        // 2.1 โดนยิงมา (มี Investigate) -> เดินกลับไปจุดเกิด
+        if let Some(mut investigate) = investigate {
+            investigate.timer.tick(time.delta());
+            if investigate.timer.is_finished() {
+                let to_spawn = MUAMUA_SPAWN_POSITION - muamua_transform.translation;
+                let flat_to_spawn = Vec3::new(to_spawn.x, 0.0, to_spawn.z);
+                
+                if flat_to_spawn.length() <= 0.3 {
+                    velocity.x = 0.0;
+                    velocity.z = 0.0;
+                    *enemy_state = EnemyState::Idle;
+                    commands.entity(muamua_entity).remove::<EnemyInvestigateDirection>();
+                    continue;
+                }
+                investigate.direction = flat_to_spawn.normalize();
+                investigate.timer = Timer::from_seconds(10.0, TimerMode::Once);
             }
-
-            *enemy_state = EnemyState::Attack;
-
+            let direction = investigate.direction;
+            velocity.x = direction.x * MUAMUA_MOVE_SPEED;
+            velocity.z = direction.z * MUAMUA_MOVE_SPEED;
+            if direction.length_squared() > 0.0001 {
+                muamua_transform.rotation = Quat::from_rotation_y(direction.x.atan2(direction.z));
+            }
+            *enemy_state = EnemyState::Chase;
             continue;
         }
 
-        // ==========================================
-        // เจอ Player แล้ว → ไล่ Player ตามปกติ
-        // ==========================================
-        let direction = flat_direction.normalize();
-        velocity.x = direction.x * MUAMUA_MOVE_SPEED;
-        velocity.z = direction.z * MUAMUA_MOVE_SPEED;
+        // 2.2 ไม่ได้โดนยิง และ Player อยู่ไกล -> ลาดตะเวนสุ่ม (MuamuaPatrol)
+        if let Some(mut patrol) = patrol_data {
+            patrol.timer.tick(time.delta());
+            
+            // สุ่มทิศทางใหม่เมื่อ Timer หมด (ทุก 3 วิ)
+            if patrol.timer.just_finished() {
+                let random_angle = rand::random::<f32>() * std::f32::consts::TAU;
+                patrol.direction = Vec3::new(random_angle.cos(), 0.0, random_angle.sin()).normalize();
+            }
+            
+            let dir = patrol.direction;
+            velocity.x = dir.x * MUAMUA_MOVE_SPEED;
+            velocity.z = dir.z * MUAMUA_MOVE_SPEED;
+            
+            if dir.length_squared() > 0.0001 {
+                muamua_transform.rotation = Quat::from_rotation_y(dir.x.atan2(dir.z));
+            }
+            *enemy_state = EnemyState::Patrol;
+            continue;
+        }
 
-        muamua_transform.rotation =
-            Quat::from_rotation_y(
-                direction
-                    .x
-                    .atan2(direction.z),
-            );
-
-        *enemy_state = EnemyState::Chase;
+        // Fallback กัน Error
+        velocity.x = 0.0;
+        velocity.z = 0.0;
+        *enemy_state = EnemyState::Idle;
     }
 }
 
