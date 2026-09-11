@@ -14,6 +14,9 @@ pub struct WarpToDesert;
 pub struct WarpToHub;
 
 #[derive(Component)]
+pub struct WarpToFloatingIsland;
+
+#[derive(Component)]
 pub struct HubOnly;
 
 #[derive(States, Debug, Clone, Copy, PartialEq, Eq, Hash, Default)]
