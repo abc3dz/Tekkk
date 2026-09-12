@@ -13,4 +13,4 @@ Hub and Desert
 
 <img src="https://github.com/abc3dz/Tekkk/blob/main/gif/20260912_TestFloatingIslandScene.gif">
 
-Floating Island, Lagoon, and Volcano soon
+Lagoon and Volcano soon
