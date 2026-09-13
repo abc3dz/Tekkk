@@ -3,6 +3,7 @@ use serde::{Deserialize, Serialize};
 use std::fs;
 use std::path::PathBuf;
 use chrono::Local;
+use avian3d::prelude::Position;
 
 use crate::components::{Health, Mana, Player, SaveScene, GameScene, ElementMastery, SceneSpawnPoint};
 
@@ -221,38 +222,6 @@ fn process_save_request(
     );
 }
 
-// fn process_load_request(
-//     mut request: ResMut<LoadRequest>,
-
-//     mut next_scene: ResMut<NextState<GameScene>>,
-
-//     mut pending_load: ResMut<PendingLoad>,
-// ) {
-//     let Some(slot) = request.slot.take()
-//     else {
-//         return;
-//     };
-//     let Some(save_data) = read_save_slot(slot) else {
-//         println!("Load failed: Slot {} is empty.", slot);
-//         return;
-//     };
-//     println!(
-//         "Loading Slot {} → {:?}",
-//         slot,
-//         save_data.scene
-//     );
-//     let next_game_scene = match save_data.scene {
-//         SaveScene::Hub => GameScene::LoadingHub,
-//         SaveScene::Desert => GameScene::LoadingDesert,
-//         SaveScene::FloatingIsland => GameScene::LoadingFloatingIsland,
-//         SaveScene::Lagoon => GameScene::LoadingLagoon,
-//         SaveScene::Volcano => GameScene::LoadingVolcano,
-//     };
-
-//     next_scene.set(next_game_scene);
-
-//     pending_load.data = Some(save_data);
-// }
 fn process_load_request(
     mut request: ResMut<LoadRequest>,
     mut next_scene: ResMut<NextState<GameScene>>,
@@ -289,55 +258,6 @@ fn process_load_request(
     pending_load.data = Some(save_data);
     pending_load.target = Some(target_scene);
 }
-
-// fn apply_pending_load(
-//     mut pending_load: ResMut<PendingLoad>,
-
-//     mut player_query: Query<
-//         (
-//             &mut Transform,
-//             &mut Health,
-//             &mut Mana,
-//             &mut ElementMastery,
-//         ),
-//         With<Player>,
-//     >,
-// ) {
-//     let Some(save_data) = pending_load.data.take() else {
-//         return;
-//     };
-
-//     let Ok((
-//         mut transform,
-//         mut health,
-//         mut mana,
-//         mut mastery,
-//     )) = player_query.single_mut()
-//     else {
-//         // Player ยังไม่ spawn
-//         // อย่าเอา pending_load ทิ้ง
-//         pending_load.data = Some(save_data);
-//         return;
-//     };
-
-//     transform.translation = Vec3::new(
-//         save_data.player_position[0],
-//         save_data.player_position[1],
-//         save_data.player_position[2],
-//     );
-
-//     health.current = save_data.hp;
-//     mana.current = save_data.mp;
-
-//     mastery.water.exp = save_data.element_water_exp as u32;
-//     mastery.fire.exp = save_data.element_fire_exp as u32;
-//     mastery.wind.exp = save_data.element_wind_exp as u32;
-//     mastery.earth.exp = save_data.element_earth_exp as u32;
-//     mastery.inw.exp = save_data.element_inw_exp as u32;
-
-//     println!("Pending save data applied.");
-// }
-use avian3d::prelude::Position;
 
 fn apply_pending_load(
     game_scene: Res<State<GameScene>>,

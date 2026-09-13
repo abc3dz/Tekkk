@@ -88,9 +88,10 @@ fn cleanup_current_scene(
 }
 fn go_to_hub(
     mut next_state: ResMut<NextState<GameScene>>,
+    mut scene_spawn: ResMut<SceneSpawnPoint>,
 ) {
+    scene_spawn.position = Some(Vec3::new(0.0, 0.0, 0.0));
     next_state.set(GameScene::Hub);
-    print!("Hub");
 }
 fn go_to_desert(
     mut next_state: ResMut<NextState<GameScene>>,
@@ -98,7 +99,6 @@ fn go_to_desert(
 ) {
     scene_spawn.position = Some(Vec3::new(0.0, 0.0, 0.0));
     next_state.set(GameScene::Desert);
-    print!("Desert");
 }
 fn check_warp_to_desert(
     player_query: Query<&Transform, With<Player>>,
