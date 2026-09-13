@@ -4,7 +4,7 @@ use std::fs;
 use std::path::PathBuf;
 use chrono::Local;
 
-use crate::components::{Health, Mana, Player, SaveScene, GameScene, ElementMastery};
+use crate::components::{Health, Mana, Player, SaveScene, GameScene, ElementMastery, SceneSpawnPoint};
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct SaveData {
@@ -35,24 +35,25 @@ pub struct LoadRequest {
 #[derive(Resource, Default)]
 pub struct PendingLoad {
     pub data: Option<SaveData>,
+    pub target: Option<GameScene>,
 }
 
 pub struct SaveLoadPlugin;
 
 impl Plugin for SaveLoadPlugin {
     fn build(&self, app: &mut App) {
-        app
-            .init_resource::<SaveRequest>()
+        app.init_resource::<SaveRequest>()
             .init_resource::<LoadRequest>()
             .init_resource::<PendingLoad>()
+            .init_resource::<SceneSpawnPoint>()
             .add_systems(
                 Update,
                 (
                     process_save_request,
                     process_load_request,
-                    apply_pending_load,
-                ),
-            );
+                    apply_scene_spawn_point,
+                ).chain())
+            .add_systems(Last, apply_pending_load);
     }
 }
 
@@ -220,45 +221,132 @@ fn process_save_request(
     );
 }
 
+// fn process_load_request(
+//     mut request: ResMut<LoadRequest>,
+
+//     mut next_scene: ResMut<NextState<GameScene>>,
+
+//     mut pending_load: ResMut<PendingLoad>,
+// ) {
+//     let Some(slot) = request.slot.take()
+//     else {
+//         return;
+//     };
+//     let Some(save_data) = read_save_slot(slot) else {
+//         println!("Load failed: Slot {} is empty.", slot);
+//         return;
+//     };
+//     println!(
+//         "Loading Slot {} → {:?}",
+//         slot,
+//         save_data.scene
+//     );
+//     let next_game_scene = match save_data.scene {
+//         SaveScene::Hub => GameScene::LoadingHub,
+//         SaveScene::Desert => GameScene::LoadingDesert,
+//         SaveScene::FloatingIsland => GameScene::LoadingFloatingIsland,
+//         SaveScene::Lagoon => GameScene::LoadingLagoon,
+//         SaveScene::Volcano => GameScene::LoadingVolcano,
+//     };
+
+//     next_scene.set(next_game_scene);
+
+//     pending_load.data = Some(save_data);
+// }
 fn process_load_request(
     mut request: ResMut<LoadRequest>,
-
     mut next_scene: ResMut<NextState<GameScene>>,
-
     mut pending_load: ResMut<PendingLoad>,
+    mut scene_spawn: ResMut<SceneSpawnPoint>,
 ) {
-    let Some(slot) = request.slot.take()
-    else {
+    let Some(slot) = request.slot.take() else {
         return;
     };
+
     let Some(save_data) = read_save_slot(slot) else {
         println!("Load failed: Slot {} is empty.", slot);
         return;
     };
-    println!(
-        "Loading Slot {} → {:?}",
-        slot,
-        save_data.scene
-    );
-    let next_game_scene = match save_data.scene {
-        SaveScene::Hub => GameScene::LoadingHub,
-        SaveScene::Desert => GameScene::LoadingDesert,
-        SaveScene::FloatingIsland => GameScene::LoadingFloatingIsland,
-        SaveScene::Lagoon => GameScene::LoadingLagoon,
-        SaveScene::Volcano => GameScene::LoadingVolcano,
+
+    let (loading_scene, target_scene) = match &save_data.scene {
+        SaveScene::Hub => (GameScene::LoadingHub, GameScene::Hub),
+        SaveScene::Desert => (GameScene::LoadingDesert, GameScene::Desert),
+        SaveScene::FloatingIsland => (
+            GameScene::LoadingFloatingIsland,
+            GameScene::FloatingIsland,
+        ),
+        SaveScene::Lagoon => (GameScene::LoadingLagoon, GameScene::Lagoon),
+        SaveScene::Volcano => (GameScene::LoadingVolcano, GameScene::Volcano),
     };
 
-    next_scene.set(next_game_scene);
+    println!("Loading Slot {} → {:?}", slot, save_data.scene);
+
+    // โหลดเซฟต้องชนะจุดเกิดปกติ
+    scene_spawn.position = None;
+
+    next_scene.set(loading_scene);
 
     pending_load.data = Some(save_data);
+    pending_load.target = Some(target_scene);
 }
 
-fn apply_pending_load(
-    mut pending_load: ResMut<PendingLoad>,
+// fn apply_pending_load(
+//     mut pending_load: ResMut<PendingLoad>,
 
+//     mut player_query: Query<
+//         (
+//             &mut Transform,
+//             &mut Health,
+//             &mut Mana,
+//             &mut ElementMastery,
+//         ),
+//         With<Player>,
+//     >,
+// ) {
+//     let Some(save_data) = pending_load.data.take() else {
+//         return;
+//     };
+
+//     let Ok((
+//         mut transform,
+//         mut health,
+//         mut mana,
+//         mut mastery,
+//     )) = player_query.single_mut()
+//     else {
+//         // Player ยังไม่ spawn
+//         // อย่าเอา pending_load ทิ้ง
+//         pending_load.data = Some(save_data);
+//         return;
+//     };
+
+//     transform.translation = Vec3::new(
+//         save_data.player_position[0],
+//         save_data.player_position[1],
+//         save_data.player_position[2],
+//     );
+
+//     health.current = save_data.hp;
+//     mana.current = save_data.mp;
+
+//     mastery.water.exp = save_data.element_water_exp as u32;
+//     mastery.fire.exp = save_data.element_fire_exp as u32;
+//     mastery.wind.exp = save_data.element_wind_exp as u32;
+//     mastery.earth.exp = save_data.element_earth_exp as u32;
+//     mastery.inw.exp = save_data.element_inw_exp as u32;
+
+//     println!("Pending save data applied.");
+// }
+use avian3d::prelude::Position;
+
+fn apply_pending_load(
+    game_scene: Res<State<GameScene>>,
+    mut pending_load: ResMut<PendingLoad>,
+    mut scene_spawn: ResMut<SceneSpawnPoint>,
     mut player_query: Query<
         (
             &mut Transform,
+            Option<&mut Position>,
             &mut Health,
             &mut Mana,
             &mut ElementMastery,
@@ -266,28 +354,51 @@ fn apply_pending_load(
         With<Player>,
     >,
 ) {
+    // ยังไม่มีคำขอโหลด
+    let Some(target) = pending_load.target.take() else {
+        return;
+    };
+
+    // ยังไม่ถึงฉากเป้าหมาย ให้รอต่อไป
+    if game_scene.get() != &target {
+        pending_load.target = Some(target);
+        return;
+    }
+
     let Some(save_data) = pending_load.data.take() else {
+        pending_load.target = Some(target);
         return;
     };
 
     let Ok((
         mut transform,
+        physics_position,
         mut health,
         mut mana,
         mut mastery,
     )) = player_query.single_mut()
     else {
         // Player ยังไม่ spawn
-        // อย่าเอา pending_load ทิ้ง
+        // อย่าเพิ่งทิ้งข้อมูล
         pending_load.data = Some(save_data);
+        pending_load.target = Some(target);
         return;
     };
 
-    transform.translation = Vec3::new(
+    let pos = Vec3::new(
         save_data.player_position[0],
         save_data.player_position[1],
         save_data.player_position[2],
     );
+
+    // ตำแหน่งแสดงผล
+    transform.translation = pos;
+
+    // ถ้าใช้ Avian physics ควรเซ็ต Position ด้วย
+    // ไม่งั้นฟิสิกส์อาจใช้ตำแหน่งเดิมต่อ
+    if let Some(mut p) = physics_position {
+        p.0 = pos;
+    }
 
     health.current = save_data.hp;
     mana.current = save_data.mp;
@@ -298,5 +409,49 @@ fn apply_pending_load(
     mastery.earth.exp = save_data.element_earth_exp as u32;
     mastery.inw.exp = save_data.element_inw_exp as u32;
 
+    // โหลดสำเร็จแล้ว ให้ปิดจุดเกิดปกติที่อาจค้างอยู่
+    scene_spawn.position = None;
+
     println!("Pending save data applied.");
+}
+fn apply_scene_spawn_point(
+    game_scene: Res<State<GameScene>>,
+    pending_load: Res<PendingLoad>,
+    mut scene_spawn: ResMut<SceneSpawnPoint>,
+    mut player_query: Query<(&mut Transform, Option<&mut Position>), With<Player>>,
+) {
+    // ถ้ากำลังโหลดเซฟ ห้ามใช้จุดเกิดปกติ
+    if pending_load.data.is_some() || pending_load.target.is_some() {
+        return;
+    }
+
+    // ใช้เฉพาะตอนที่อยู่ในฉากจริงแล้ว
+    let ready = matches!(
+        game_scene.get(),
+        GameScene::Hub
+            | GameScene::Desert
+            | GameScene::FloatingIsland
+            | GameScene::Lagoon
+            | GameScene::Volcano
+    );
+
+    if !ready {
+        return;
+    }
+
+    let Some(pos) = scene_spawn.position.take() else {
+        return;
+    };
+
+    let Ok((mut transform, physics_position)) = player_query.single_mut() else {
+        // Player ยังไม่พร้อม ให้เก็บค่าไว้ก่อน
+        scene_spawn.position = Some(pos);
+        return;
+    };
+
+    transform.translation = pos;
+
+    if let Some(mut p) = physics_position {
+        p.0 = pos;
+    }
 }

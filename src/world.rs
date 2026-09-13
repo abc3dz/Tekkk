@@ -94,7 +94,9 @@ fn go_to_hub(
 }
 fn go_to_desert(
     mut next_state: ResMut<NextState<GameScene>>,
+    mut scene_spawn: ResMut<SceneSpawnPoint>,
 ) {
+    scene_spawn.position = Some(Vec3::new(0.0, 0.0, 0.0));
     next_state.set(GameScene::Desert);
     print!("Desert");
 }
@@ -165,7 +167,9 @@ fn setup_desert_light(mut commands: Commands) {
 }
 fn go_to_floating_island(
     mut next_state: ResMut<NextState<GameScene>>,
+    mut scene_spawn: ResMut<SceneSpawnPoint>,
 ) {
+    scene_spawn.position = Some(Vec3::new(0.0, 0.0, 0.0));
     next_state.set(GameScene::FloatingIsland);
     println!("Entering FloatingIsland");
 }
