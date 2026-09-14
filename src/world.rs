@@ -4,6 +4,7 @@ use crate::components::*;
 use crate::biomes::*;
 use crate::npc::guardian::GuardianPlugin;
 use crate::enemy::enemy_muamua::*;
+use crate::enemy::enemy_muanim::*;
 use crate::warp_portal::*;
 use crate::enemy::enemy_choky::*;
 use crate::biomes::mtr_quicksand::*;
@@ -15,6 +16,7 @@ impl Plugin for WorldPlugin {
         .init_state::<GameScene>()
         .add_plugins(GuardianPlugin)
         .add_plugins(EnemyMuamuaPlugin)
+        .add_plugins(EnemyMuanimPlugin)
         .add_plugins(WarpPortalPlugin)
         .add_plugins(EnemyChokyPlugin)
         .add_plugins(MaterialPlugin::<QuicksandMaterial>::default())

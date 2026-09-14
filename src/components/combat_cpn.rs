@@ -88,6 +88,14 @@ impl BaseStats {
         critical_damage: 1.0,
     };
 
+    pub const MUANIM: Self = Self {
+        max_hp: 150.0,
+        max_mp: 0.0,
+        attack: 10.0,
+        defense: 5.0,
+        critical_rate: 0.0,
+        critical_damage: 1.0,
+    };
     pub const MUAMUA: Self = Self {
         max_hp: 200.0,
         max_mp: 0.0,
@@ -190,6 +198,13 @@ impl ElementExpReward {
         inw: ExpRange::new(4, 7),
     };
 
+    pub const MUANIM: Self = Self {
+        water: ExpRange::new(3, 3),
+        fire: ExpRange::new(0, 0),
+        wind: ExpRange::new(0, 0),
+        earth: ExpRange::new(10, 10),
+        inw: ExpRange::new(1, 1),
+    };
     pub const MUAMUA: Self = Self {
         water: ExpRange::new(5, 5),
         fire: ExpRange::new(0, 0),
@@ -197,13 +212,12 @@ impl ElementExpReward {
         earth: ExpRange::new(20, 20),
         inw: ExpRange::new(1, 1),
     };
-
     pub const CHOKY: Self = Self {
         water: ExpRange::new(0, 0),
         fire: ExpRange::new(5, 5),
         wind: ExpRange::new(0, 0),
         earth: ExpRange::new(30, 30),
-        inw: ExpRange::new(1, 1),
+        inw: ExpRange::new(2, 2),
     };
 }
 

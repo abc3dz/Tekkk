@@ -45,3 +45,9 @@ pub enum SaveScene {
 
 #[derive(Component)]
 pub struct MusicAudio;
+
+#[derive(Resource, Default)]
+pub struct SceneSpawnPoint {
+    pub position: Option<Vec3>,
+}
+

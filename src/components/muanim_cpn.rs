@@ -1,7 +1,7 @@
 use bevy::prelude::*;
 
 #[derive(Resource)]
-pub struct EnemyMuamuaAnimationGraph {
+pub struct EnemyMuanimAnimationGraph {
     pub graph: Handle<AnimationGraph>,
     pub idle: AnimationNodeIndex,
     pub chase: AnimationNodeIndex,
@@ -11,12 +11,12 @@ pub struct EnemyMuamuaAnimationGraph {
 }
 
 #[derive(Component)]
-pub struct EnemyMuamuaAnimationTarget {
+pub struct EnemyMuanimAnimationTarget {
     pub root: Entity,
 }
 
 #[derive(Component, Debug, Clone, Copy, PartialEq, Eq)]
-pub enum EnemyMuamuaAnimState {
+pub enum EnemyMuanimAnimState {
     Idle,
     Chase,
     Attack,
@@ -25,25 +25,25 @@ pub enum EnemyMuamuaAnimState {
 }
 
 #[derive(Component)]
-pub struct MuamuaPunchHitbox {
+pub struct MuanimPunchHitbox {
     pub owner: Entity,
     pub has_hit: bool,
     pub lifetime: Timer,
 }
 
 #[derive(Component)]
-pub struct MuamuaAttackTimer(pub Timer);
+pub struct MuanimAttackTimer(pub Timer);
 
 #[derive(Resource)]
-pub struct MuamuaRespawnTimer(pub Timer);
+pub struct MuanimRespawnTimer(pub Timer);
 
-#[derive(Component)]
-pub struct MuamuaPatrol {
-    pub direction: Vec3,
-    pub timer: Timer,
-}
+// #[derive(Component)]
+// pub struct MuanimPatrol {
+//     pub direction: Vec3,
+//     pub timer: Timer,
+// }
 
-pub const MUAMUA_SPAWN_LIMIT: u32 = 10;
+pub const MUANIM_SPAWN_LIMIT: u32 = 10;
 
 #[derive(Resource, Default, Debug)]
-pub struct MuamuaSpawnedCount(pub u32);
+pub struct MuanimSpawnedCount(pub u32);

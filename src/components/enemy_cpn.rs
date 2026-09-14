@@ -42,3 +42,12 @@ pub enum DefeatParticleState {
     Rising,
     ChasingPlayer,
 }
+
+#[derive(Component)]
+pub struct PassivePatrol {
+    pub direction: Vec3,
+    pub timer: Timer,
+}
+
+#[derive(Component)]
+pub struct Provoked;

@@ -10,6 +10,9 @@ pub use enemy_cpn::*;
 pub mod muamua_cpn;
 pub use muamua_cpn::*;
 
+pub mod muanim_cpn;
+pub use muanim_cpn::*;
+
 pub mod choky_cpn;
 pub use choky_cpn::*;
 
