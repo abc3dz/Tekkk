@@ -32,7 +32,7 @@ fn main() {
                 ..default()
             }),
             PhysicsPlugins::default(),
-            //PhysicsDebugPlugin,
+            PhysicsDebugPlugin,
             cel_shader::CelShaderPlugin,
         ))
         .add_plugins((

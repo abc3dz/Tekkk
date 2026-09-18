@@ -35,7 +35,7 @@ impl Plugin for WorldPlugin {
 
         .add_systems(OnEnter(GameScene::Desert), (desert::spawn_desert, setup_desert_light))
         .add_systems(Update, check_warp_to_hub.run_if(in_state(GameScene::Desert)))
-        .add_systems(Update, check_warp_to_floating_island.run_if(in_state(GameScene::Desert))) // เปลี่ยนให้วาร์ปไป FloatingIsland
+        .add_systems(Update, check_warp_to_floating_island.run_if(in_state(GameScene::Desert))) 
         
         .add_systems(OnExit(GameScene::Desert), cleanup_current_scene)
 
@@ -47,7 +47,7 @@ impl Plugin for WorldPlugin {
         .add_systems(OnExit(GameScene::LoadingFloatingIsland), cleanup_loading_ui)
         
         .add_systems(OnEnter(GameScene::FloatingIsland), (floating_island::spawn_floating_island, setup_floating_island_light))
-        .add_systems(Update, check_warp_to_desert_from_floating.run_if(in_state(GameScene::FloatingIsland))) // วาร์ปกลับไปที่ Desert
+        .add_systems(Update, check_warp_to_desert_from_floating.run_if(in_state(GameScene::FloatingIsland)))
         .add_systems(OnExit(GameScene::FloatingIsland), cleanup_current_scene);
     }
 }
@@ -92,14 +92,14 @@ fn go_to_hub(
     mut next_state: ResMut<NextState<GameScene>>,
     mut scene_spawn: ResMut<SceneSpawnPoint>,
 ) {
-    scene_spawn.position = Some(Vec3::new(0.0, 0.0, 0.0));
+    scene_spawn.position = Some(Vec3::new(0.0, 2.0, 0.0));
     next_state.set(GameScene::Hub);
 }
 fn go_to_desert(
     mut next_state: ResMut<NextState<GameScene>>,
     mut scene_spawn: ResMut<SceneSpawnPoint>,
 ) {
-    scene_spawn.position = Some(Vec3::new(0.0, 0.0, 0.0));
+    scene_spawn.position = Some(Vec3::new(0.0, 2.0, 0.0));
     next_state.set(GameScene::Desert);
 }
 fn check_warp_to_desert(
@@ -171,7 +171,7 @@ fn go_to_floating_island(
     mut next_state: ResMut<NextState<GameScene>>,
     mut scene_spawn: ResMut<SceneSpawnPoint>,
 ) {
-    scene_spawn.position = Some(Vec3::new(0.0, 0.0, 0.0));
+    scene_spawn.position = Some(Vec3::new(0.0, 2.0, 0.0));
     next_state.set(GameScene::FloatingIsland);
     println!("Entering FloatingIsland");
 }
@@ -207,16 +207,11 @@ fn check_warp_to_desert_from_floating(
 fn setup_floating_island_light(mut commands: Commands) {
     commands.spawn((
         DirectionalLight {
-            illuminance: 40_000.0, // ปรับค่าความสว่างตามธีมของฉาก Floating Island
+            illuminance: 40_000.0,
             shadows_enabled: true,
             ..default()
         },
-        Transform::from_rotation(Quat::from_euler(
-            EulerRot::XYZ,
-            -0.8,
-            -0.3,
-            0.0,
-        )),
+        Transform::from_rotation(Quat::from_euler(EulerRot::XYZ,-0.8,-0.3,0.0)),
         CurrentScene,
     ));
 }

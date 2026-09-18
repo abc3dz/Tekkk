@@ -27,7 +27,6 @@ impl Plugin for EnemyMuanimPlugin {
                 setup_enemy_muanim_animation_graph,
             ),
         )
-        .add_systems(OnEnter(GameScene::Desert),setup_enemy_muanim_animation_graph)
         .add_systems(Update,(
                 spawn_enemy_muanim,
                 setup_enemy_muanim_animation_player,
@@ -46,6 +45,11 @@ impl Plugin for EnemyMuanimPlugin {
 }
 
 const MUANIM_SPAWN_POSITION: Vec3 = Vec3::new(-10.0, 1.0, -10.0);
+const MUANIM_STOP_DISTANCE: f32 = 1.0;
+const MUANIM_MOVE_SPEED: f32 = 3.0;
+const MUANIM_LOSE_INTEREST_DISTANCE: f32 = 10.0;
+const MUANIM_PATROL_RADIUS: f32 = 8.0;
+
 fn spawn_enemy_muanim(
     mut commands: Commands,
     asset_server: Res<AssetServer>,
@@ -55,10 +59,7 @@ fn spawn_enemy_muanim(
         return;
     }
 
-    let muanim_scene = asset_server.load(
-        GltfAssetLabel::Scene(0)
-            .from_asset("enemy/EnemyMuanim.glb"),
-    );
+    let muanim_scene = asset_server.load(GltfAssetLabel::Scene(0).from_asset("enemy/EnemyMuanim.glb"));
     let random_angle = rand::random::<f32>() * std::f32::consts::TAU;
     let initial_dir = Vec3::new(random_angle.cos(), 0.0, random_angle.sin()).normalize();
     const MUANIM_BODY_Y: f32 = 1.0;
@@ -86,6 +87,8 @@ fn spawn_enemy_muanim(
         .insert(PassivePatrol {
             direction: initial_dir,
             timer: Timer::from_seconds(3.0, TimerMode::Repeating),
+            center: MUANIM_SPAWN_POSITION,
+            radius: MUANIM_PATROL_RADIUS,
         })
         .with_children(|parent| {
             parent.spawn((
@@ -226,11 +229,8 @@ fn find_enemy_muanim_root(
     }
 }
 
-const MUANIM_CHASE_RANGE: f32 = 10.0;
-const MUANIM_STOP_DISTANCE: f32 = 1.0;
-const MUANIM_MOVE_SPEED: f32 = 3.0;
-
 fn enemy_muanim_behavior(
+    mut commands: Commands,
     time: Res<Time>,
     player_query: Query<
         &Transform,
@@ -241,6 +241,7 @@ fn enemy_muanim_behavior(
     >,
     mut muanim_query: Query<
         (
+            Entity,
             &mut Transform,
             &mut LinearVelocity,
             &mut EnemyState,
@@ -258,6 +259,7 @@ fn enemy_muanim_behavior(
     };
 
     for (
+        muanim_entity,
         mut muanim_transform,
         mut velocity,
         mut enemy_state,
@@ -274,19 +276,75 @@ fn enemy_muanim_behavior(
 
         // ==================================================
         // กรณีที่ 1 : ยังไม่ถูกผู้เล่นโจมตี
-        // ให้เดินสุ่มอย่างเดียว ไม่สนใจผู้เล่น
+        // ให้เดินสุ่มอย่างเดียว แต่จำกัดพื้นที่ลาดตระเวน
         // ==================================================
         if provoked.is_none() {
             if let Some(mut patrol) = patrol_data {
                 patrol.timer.tick(time.delta());
 
-                if patrol.timer.just_finished() {
+                // คิดแค่ระนาบ XZ
+                let current_position = Vec3::new(
+                    muanim_transform.translation.x,
+                    0.0,
+                    muanim_transform.translation.z,
+                );
+
+                let patrol_center = Vec3::new(
+                    patrol.center.x,
+                    0.0,
+                    patrol.center.z,
+                );
+
+                let from_center = current_position - patrol_center;
+                let distance_from_center = from_center.length();
+
+                // ==================================================
+                // ถ้าออกนอกพื้นที่ลาดตระเวนแล้ว
+                // ให้บังคับหันกลับเข้ากลางพื้นที่
+                // ==================================================
+                if distance_from_center > patrol.radius {
+                    let inward_direction = if from_center.length_squared() > 0.0001 {
+                        (-from_center).normalize()
+                    } else {
+                        Vec3::new(0.0, 0.0, 1.0)
+                    };
+
+                    patrol.direction = inward_direction;
+
+                    // ยังไม่ต้องสุ่มทิศใหม่ตอนนี้ เพราะต้องการให้กลับเข้าพื้นที่ก่อน
+                    patrol.timer.reset();
+                }
+                // ==================================================
+                // ถ้ายังอยู่ในพื้นที่ และครบเวลาสุ่มทิศทาง
+                // ==================================================
+                else if patrol.timer.just_finished() {
                     let random_angle = rand::random::<f32>() * std::f32::consts::TAU;
-                    patrol.direction =
-                        Vec3::new(random_angle.cos(), 0.0, random_angle.sin()).normalize();
+                    let mut new_direction = Vec3::new(
+                        random_angle.cos(),
+                        0.0,
+                        random_angle.sin(),
+                    )
+                    .normalize();
+
+                    // ถ้าอยู่ใกล้ขอบพื้นที่ อย่าให้สุ่มทิศที่ชี้ออกนอกพื้นที่
+                    if patrol.radius > 0.0 && distance_from_center > patrol.radius * 0.75 {
+                        let outward_direction = from_center.normalize();
+
+                        // dot > 0 แปลว่าทิศใหม่กำลังชี้ออกจากศูนย์กลาง
+                        if new_direction.dot(outward_direction) > 0.0 {
+                            new_direction = -outward_direction;
+                        }
+                    }
+
+                    patrol.direction = new_direction;
                 }
 
-                let dir = patrol.direction;
+                // กันกรณีที่ direction เป็นศูนย์
+                let dir = if patrol.direction.length_squared() > 0.0001 {
+                    patrol.direction.normalize()
+                } else {
+                    Vec3::new(0.0, 0.0, 1.0)
+                };
 
                 velocity.x = dir.x * MUANIM_MOVE_SPEED;
                 velocity.z = dir.z * MUANIM_MOVE_SPEED;
@@ -314,6 +372,43 @@ fn enemy_muanim_behavior(
         let flat_direction = Vec3::new(to_player.x, 0.0, to_player.z);
         let distance = flat_direction.length();
 
+        // ==================================================
+        // ถ้าผู้เล่นอยู่ไกลเกินระยะเลิกไล่
+        // ให้ลบ Provoked แล้วกลับไป Patrol
+        // ==================================================
+        if distance > MUANIM_LOSE_INTEREST_DISTANCE {
+            commands
+                .entity(muanim_entity)
+                .remove::<Provoked>();
+
+            if let Some(mut patrol) = patrol_data {
+                *enemy_state = EnemyState::Patrol;
+
+                // รีเซ็ต timer และสุ่มทิศใหม่เพื่อให้กลับมานั่งเดินสุ่มต่อได้
+                patrol.timer.reset();
+
+                let random_angle = rand::random::<f32>() * std::f32::consts::TAU;
+                patrol.direction =
+                    Vec3::new(random_angle.cos(), 0.0, random_angle.sin()).normalize();
+
+                let dir = patrol.direction;
+
+                velocity.x = dir.x * MUANIM_MOVE_SPEED;
+                velocity.z = dir.z * MUANIM_MOVE_SPEED;
+
+                if dir.length_squared() > 0.0001 {
+                    muanim_transform.rotation =
+                        Quat::from_rotation_y(dir.x.atan2(dir.z));
+                }
+            } else {
+                *enemy_state = EnemyState::Idle;
+                velocity.x = 0.0;
+                velocity.z = 0.0;
+            }
+
+            continue;
+        }
+
         // ถ้าใกล้ผู้เล่นมากพอ ให้หยุดแล้วโจมตี
         if distance <= MUANIM_STOP_DISTANCE {
             velocity.x = 0.0;
@@ -340,8 +435,7 @@ fn enemy_muanim_behavior(
         velocity.z = direction.z * MUANIM_MOVE_SPEED;
 
         if direction.length_squared() > 0.0001 {
-            muanim_transform.rotation =
-                Quat::from_rotation_y(direction.x.atan2(direction.z));
+            muanim_transform.rotation = Quat::from_rotation_y(direction.x.atan2(direction.z));
         }
 
         *enemy_state = EnemyState::Chase;

@@ -47,6 +47,8 @@ pub enum DefeatParticleState {
 pub struct PassivePatrol {
     pub direction: Vec3,
     pub timer: Timer,
+    pub center: Vec3,
+    pub radius: f32,
 }
 
 #[derive(Component)]

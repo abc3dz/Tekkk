@@ -41,9 +41,14 @@ pub struct MuamuaRespawnTimer(pub Timer);
 pub struct MuamuaPatrol {
     pub direction: Vec3,
     pub timer: Timer,
+    pub center: Vec3,
+    pub radius: f32,
 }
-
-pub const MUAMUA_SPAWN_LIMIT: u32 = 10;
 
 #[derive(Resource, Default, Debug)]
 pub struct MuamuaSpawnedCount(pub u32);
+
+#[derive(Resource, Default)]
+pub struct MuamuaDefeatedCount(pub u32);
+
+pub const MUAMUA_DEFEAT_GOAL: u32 = 10;

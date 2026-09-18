@@ -20,6 +20,7 @@ pub fn spawn_desert(
         RigidBody::Static,
         Collider::cuboid(50.0, 0.1, 109.0),
         Transform::from_xyz(0.0, 0.0, 0.0),
+        DespawnOnExit(GameScene::Desert),
     ));
     //warp
     commands.spawn((
@@ -27,11 +28,27 @@ pub fn spawn_desert(
         WarpToHub,
         Collider::cuboid(2.0, 2.0, 2.0),
         Transform::from_xyz(5.0, 1.0, -15.0),
+        DespawnOnExit(GameScene::Desert),
     ));
     commands.spawn((
         CurrentScene,
         WarpToFloatingIsland,
         Collider::cuboid(2.0, 2.0, 2.0),
         Transform::from_xyz(-10.0, 1.0, -15.0),
+        DespawnOnExit(GameScene::Desert),
+    ));
+    //mountain left
+    commands.spawn((
+        RigidBody::Static,
+        Collider::cuboid(0.3, 10.0, 100.0),
+        Transform::from_xyz(-25.0, 0.0, 0.0),
+        DespawnOnExit(GameScene::Desert),
+    ));
+    //mountain right
+    commands.spawn((
+        RigidBody::Static,
+        Collider::cuboid(0.3, 10.0, 100.0),
+        Transform::from_xyz(25.0, 0.0, 0.0),
+        DespawnOnExit(GameScene::Desert),
     ));
 }

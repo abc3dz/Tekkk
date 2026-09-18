@@ -34,5 +34,5 @@ pub struct ChokyPunchHitbox {
 #[derive(Component)]
 pub struct ChokyAttackTimer(pub Timer);
 
-#[derive(Resource)]
-pub struct ChokyRespawnTimer(pub Timer);
+#[derive(Resource, Default)]
+pub struct ChokyHasSpawned(pub bool);

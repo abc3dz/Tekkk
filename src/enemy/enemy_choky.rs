@@ -18,9 +18,8 @@ pub struct EnemyChokyPlugin;
 
 impl Plugin for EnemyChokyPlugin {
     fn build(&self, app: &mut App) {
-        app
-        .insert_resource(ChokyRespawnTimer(Timer::from_seconds(1.0,TimerMode::Once)))
-        .add_systems(OnEnter(GameScene::Desert),setup_enemy_choky_animation_graph)
+        app.init_resource::<ChokyHasSpawned>()
+        .add_systems(OnEnter(GameScene::Desert),(setup_enemy_choky_animation_graph, reset_choky_spawn_once,))
         .add_systems(Update,(
                 spawn_enemy_choky,
                 setup_enemy_choky_animation_player,
@@ -38,20 +37,17 @@ impl Plugin for EnemyChokyPlugin {
 
 fn spawn_enemy_choky(
     mut commands: Commands,
-    time: Res<Time>,
     asset_server: Res<AssetServer>,
-    mut respawn_timer: ResMut<ChokyRespawnTimer>,
     choky_query: Query<(), With<EnemyChoky>>,
+    mut has_spawned: ResMut<ChokyHasSpawned>,
 ) {
-    // Choky ยังอยู่ ห้าม spawn เพิ่มทุกเฟรม
-    if !choky_query.is_empty() {
-        respawn_timer.0.reset();
+    if has_spawned.0 {
         return;
     }
 
-    respawn_timer.0.tick(time.delta());
-
-    if !respawn_timer.0.just_finished() {
+    // ถ้ามี Choky อยู่ในฉากอยู่แล้ว ไม่ต้องสร้างเพิ่ม
+    if !choky_query.is_empty() {
+        has_spawned.0 = true;
         return;
     }
 
@@ -60,7 +56,7 @@ fn spawn_enemy_choky(
             .from_asset("enemy/EnemyChoky.glb"),
     );
 
-    let spawn_position = Vec3::new(-13.0, 0.0, -40.0);
+    let spawn_position = Vec3::new(-12.0, 0.0, -45.0);
 
     const CHOKY_BODY_Y: f32 = 1.0;
 
@@ -72,12 +68,10 @@ fn spawn_enemy_choky(
             Enemy,
             EnemyChoky,
             EnemyState::Idle,
-
             Health {
                 current: base_stats.max_hp as i32,
                 max: base_stats.max_hp as i32,
             },
-
             base_stats,
             CombatStats::from(base_stats),
             AtkAndDefElement(Element::Earth),
@@ -113,7 +107,11 @@ fn spawn_enemy_choky(
         enemy_choky,
     );
 
-    respawn_timer.0.reset();
+    has_spawned.0 = true;
+}
+
+fn reset_choky_spawn_once(mut has_spawned: ResMut<ChokyHasSpawned>) {
+    has_spawned.0 = false;
 }
 
 fn debug_enemy_choky_spawn(
@@ -271,14 +269,12 @@ fn find_enemy_choky_root(
     }
 }
 
-const CHOKY_CHASE_RANGE: f32 = 10.0;
+//const CHOKY_CHASE_RANGE: f32 = 10.0;
 const CHOKY_STOP_DISTANCE: f32 = 1.0;
 const CHOKY_MOVE_SPEED: f32 = 3.0;
 
 fn enemy_choky_chase_player(
     mut commands: Commands,
-    time: Res<Time>,
-
     player_query: Query<
         &Transform,
         (
@@ -286,26 +282,27 @@ fn enemy_choky_chase_player(
             Without<EnemyChoky>,
         ),
     >,
-
     mut choky_query: Query<
         (
             Entity,
             &mut Transform,
             &mut LinearVelocity,
             &mut EnemyState,
-            Option<&mut EnemyInvestigateDirection>,
+            Option<&EnemyInvestigateDirection>,
         ),
         (
             With<EnemyChoky>,
             Without<Player>,
         ),
     >,
+    muamua_defeated: Res<MuamuaDefeatedCount>,
 ) {
-    let Ok(player_transform) =
-        player_query.single()
-    else {
+    let Ok(player_transform) = player_query.single() else {
         return;
     };
+
+    let choky_can_hunt =
+        muamua_defeated.0 >= MUAMUA_DEFEAT_GOAL;
 
     for (
         choky_entity,
@@ -315,7 +312,13 @@ fn enemy_choky_chase_player(
         investigate,
     ) in &mut choky_query
     {
-        // Hurt / Dead ยังหยุดเหมือนเดิม
+        if investigate.is_some() {
+            commands
+                .entity(choky_entity)
+                .remove::<EnemyInvestigateDirection>();
+        }
+
+        // ถ้าเจ็บหรือตายอยู่ ยังไม่ให้ไล่
         if matches!(
             *enemy_state,
             EnemyState::Hurt | EnemyState::Dead
@@ -325,142 +328,57 @@ fn enemy_choky_chase_player(
             continue;
         }
 
+        // ถ้า Muamua ยังถูกกำจัดไม่ถึง 10 ตัว
+        // ให้ Choky ยืนเฉย ๆ ยังไม่ไล่ผู้เล่น
+        if !choky_can_hunt {
+            velocity.x = 0.0;
+            velocity.z = 0.0;
+            *enemy_state = EnemyState::Idle;
+            continue;
+        }
+
         let to_player =
             player_transform.translation
                 - choky_transform.translation;
 
-        let flat_direction =
-            Vec3::new(
-                to_player.x,
-                0.0,
-                to_player.z,
-            );
+        let flat_direction = Vec3::new(
+            to_player.x,
+            0.0,
+            to_player.z,
+        );
 
-        let distance =
-            flat_direction.length();
+        let distance = flat_direction.length();
 
-        // ==========================================
-        // Player ยังอยู่นอกระยะมองเห็น
-        // แต่ Choky รู้ว่าลูกพลังมาจากทางไหน
-        // ==========================================
-        if distance > CHOKY_CHASE_RANGE {
-            if let Some(mut investigate) = investigate {
-                investigate.timer.tick(time.delta());
-
-                // หมดเวลาค้นหา
-                if investigate.timer.is_finished() {
-                    velocity.x = 0.0;
-                    velocity.z = 0.0;
-
-                    *enemy_state =
-                        EnemyState::Idle;
-
-                    commands
-                        .entity(choky_entity)
-                        .remove::<EnemyInvestigateDirection>();
-
-                    continue;
-                }
-
-                let direction =
-                    investigate.direction;
-
-                // เดินไปทางต้นทางของลูกพลัง
-                velocity.x =
-                    direction.x
-                        * CHOKY_MOVE_SPEED;
-
-                velocity.z =
-                    direction.z
-                        * CHOKY_MOVE_SPEED;
-
-                // หันหน้าไปทางที่เดิน
-                if direction.length_squared()
-                    > 0.0001
-                {
-                    choky_transform.rotation =
-                        Quat::from_rotation_y(
-                            direction
-                                .x
-                                .atan2(direction.z),
-                        );
-                }
-
-                // ใช้ animation Chase เป็นท่าเดิน
-                *enemy_state =
-                    EnemyState::Chase;
-
-                continue;
-            }
-
-            // ไม่ได้โดนยิง
-            // และ Player ก็อยู่ไกล
-            // = Idle เหมือนเดิม
-            velocity.x = 0.0;
-            velocity.z = 0.0;
-
-            *enemy_state =
-                EnemyState::Idle;
-
-            continue;
-        }
-
-        // ==========================================
-        // เจอ Player แล้ว
-        // ไม่ต้องตามทิศ projectile อีก
-        // ==========================================
-        commands
-            .entity(choky_entity)
-            .remove::<EnemyInvestigateDirection>();
-
-        // Player อยู่ในระยะต่อย
+        // ถ้าใกล้พอในระยะโจมตี ให้หยุดแล้ว Attack
         if distance <= CHOKY_STOP_DISTANCE {
             velocity.x = 0.0;
             velocity.z = 0.0;
 
-            if flat_direction.length_squared()
-                > 0.0001
-            {
-                let direction =
-                    flat_direction.normalize();
+            if flat_direction.length_squared() > 0.0001 {
+                let direction = flat_direction.normalize();
 
                 choky_transform.rotation =
                     Quat::from_rotation_y(
-                        direction
-                            .x
-                            .atan2(direction.z),
+                        direction.x.atan2(direction.z),
                     );
             }
 
-            *enemy_state =
-                EnemyState::Attack;
-
+            *enemy_state = EnemyState::Attack;
             continue;
         }
 
-        // ==========================================
-        // เจอ Player แล้ว → ไล่ Player ตามปกติ
-        // ==========================================
-        let direction =
-            flat_direction.normalize();
+        // นอกนั้นให้ไล่ตามผู้เล่นเสมอ
+        let direction = flat_direction.normalize();
 
-        velocity.x =
-            direction.x
-                * CHOKY_MOVE_SPEED;
-
-        velocity.z =
-            direction.z
-                * CHOKY_MOVE_SPEED;
+        velocity.x = direction.x * CHOKY_MOVE_SPEED;
+        velocity.z = direction.z * CHOKY_MOVE_SPEED;
 
         choky_transform.rotation =
             Quat::from_rotation_y(
-                direction
-                    .x
-                    .atan2(direction.z),
+                direction.x.atan2(direction.z),
             );
 
-        *enemy_state =
-            EnemyState::Chase;
+        *enemy_state = EnemyState::Chase;
     }
 }
 

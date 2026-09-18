@@ -22,11 +22,49 @@ pub fn spawn_hub(
         Transform::from_xyz(0.0, 0.0, 0.0),
         DespawnOnExit(GameScene::Hub),
     ));
-    //wall
+    //wall back
     commands.spawn((
         RigidBody::Static,
-        Collider::cuboid(32.0, 3.0, 0.3),
-        Transform::from_xyz(0.0, 1.0, -15.5),
+        Collider::cuboid(32.0, 2.9, 0.3),
+        Transform::from_xyz(0.0, 1.5, -15.7),
+        DespawnOnExit(GameScene::Hub),
+    ));
+    //wall right
+    commands.spawn((
+        RigidBody::Static,
+        Collider::cuboid(0.3, 2.9, 32.0),
+        Transform::from_xyz(15.8, 1.5, 0.0),
+        DespawnOnExit(GameScene::Hub),
+    ));
+    //wall left
+    commands.spawn((
+        RigidBody::Static,
+        Collider::cuboid(0.3, 2.9, 32.0),
+        Transform::from_xyz(-15.80, 1.5, 0.0),
+        DespawnOnExit(GameScene::Hub),
+    ));
+    //wall front left
+    commands.spawn((
+        RigidBody::Static,
+        Collider::cuboid(13.0, 2.9, 0.3),
+        Transform::from_xyz(-9.5, 1.5, 16.0),
+        DespawnOnExit(GameScene::Hub),
+    ));
+    //wall front right
+    commands.spawn((
+        RigidBody::Static,
+        Collider::cuboid(13.0, 2.9, 0.3),
+        Transform::from_xyz(9.5, 1.5, 16.0),
+        DespawnOnExit(GameScene::Hub),
+    ));
+    //wall front right
+    commands.spawn((
+        RigidBody::Static,
+        Collider::cylinder(0.3, 5.0),
+        //Transform::from_xyz(9.5, 1.0, 16.0),
+        Transform::from_xyz(0.0, 1.2, 16.5)
+        .with_rotation(Quat::from_rotation_z(std::f32::consts::FRAC_PI_2)),
+    // หมุน 90° รอบแกน X → cylinder จะนอนตามแกน Z
         DespawnOnExit(GameScene::Hub),
     ));
     //warp

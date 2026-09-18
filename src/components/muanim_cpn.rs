@@ -37,12 +37,6 @@ pub struct MuanimAttackTimer(pub Timer);
 #[derive(Resource)]
 pub struct MuanimRespawnTimer(pub Timer);
 
-// #[derive(Component)]
-// pub struct MuanimPatrol {
-//     pub direction: Vec3,
-//     pub timer: Timer,
-// }
-
 pub const MUANIM_SPAWN_LIMIT: u32 = 10;
 
 #[derive(Resource, Default, Debug)]

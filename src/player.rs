@@ -12,8 +12,8 @@ use crate::pause_menu::GameMode;
 pub struct PlayerPlugin;
 
 impl Plugin for PlayerPlugin {
-    fn build(&self, app: &mut App) {app
-        .add_plugins(MaterialPlugin::<PlayerEnergyMaterial>::default())
+    fn build(&self, app: &mut App) {
+        app.add_plugins(MaterialPlugin::<PlayerEnergyMaterial>::default())
         .add_systems(Startup,setup_player_energy_assets)
         .add_systems(Startup, (
             setup_player_animation_graph, 
@@ -69,8 +69,7 @@ fn spawn_player(
 ) {
     let base_stats = BaseStats::PLAYER;
 
-    commands
-    .spawn((
+    commands.spawn((
         Player,
         MoveSpeed(6.0),
         Health {current: base_stats.max_hp as i32, max: base_stats.max_hp as i32},

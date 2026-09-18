@@ -18,34 +18,34 @@ pub fn spawn_floating_island(
     //ground
     commands.spawn((
         RigidBody::Static,
-        Collider::cuboid(50.0, 0.1, 109.0),
-        Transform::from_xyz(0.0, 0.0, 0.0),
+        Collider::cylinder(9.8, 0.1),
+        Transform::from_xyz(0.0, 0.0, 1.25),
     ));
     //sloped
      commands.spawn((
         RigidBody::Static,
-        Collider::cuboid(10.0, 0.1, 100.0),
+        Collider::cuboid(10.0, 0.1, 80.0),
         Transform::from_xyz(0.0, 0.0, 0.0)
             .with_rotation(Quat::from_rotation_x(35.0_f32.to_radians())),
     ));
     //ground2
     commands.spawn((
         RigidBody::Static,
-        Collider::cuboid(50.0, 0.1, 30.0),
-        Transform::from_xyz(8.0, 20.85, -9.0),
+        Collider::cuboid(25.6, 0.1, 28.5),
+        Transform::from_xyz(8.3, 20.85, -13.1),
     ));
     //sloped2
     commands.spawn((
         RigidBody::Static,
-        Collider::cuboid(90.0, 0.1, 10.0),
+        Collider::cuboid(50.0, 0.1, 10.0),
         Transform::from_xyz(10.0,22.0,-9.0)
             .with_rotation(Quat::from_rotation_z(35.0_f32.to_radians())),
     ));
     //ground3
     commands.spawn((
         RigidBody::Static,
-        Collider::cuboid(30.0, 0.1, 25.0),
-        Transform::from_xyz(41.0, 34.4, -18.0),
+        Collider::cylinder(12.5, 0.1),
+        Transform::from_xyz(41.0, 34.4, -23.12),
     ));
     //warp
     commands.spawn((

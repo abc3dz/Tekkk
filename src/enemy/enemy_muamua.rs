@@ -20,6 +20,7 @@ impl Plugin for EnemyMuamuaPlugin {
     fn build(&self, app: &mut App) { app
         .insert_resource(MuamuaRespawnTimer(Timer::from_seconds(1.0,TimerMode::Once)))
         .init_resource::<MuamuaSpawnedCount>()
+        .init_resource::<MuamuaDefeatedCount>()
         .add_systems(
             OnEnter(GameScene::Desert),
             (
@@ -27,7 +28,6 @@ impl Plugin for EnemyMuamuaPlugin {
                 setup_enemy_muamua_animation_graph,
             ),
         )
-        .add_systems(OnEnter(GameScene::Desert),setup_enemy_muamua_animation_graph)
         .add_systems(Update,(
                 spawn_enemy_muamua,
                 setup_enemy_muamua_animation_player,
@@ -45,34 +45,52 @@ impl Plugin for EnemyMuamuaPlugin {
 }
 
 const MUAMUA_SPAWN_POSITION: Vec3 = Vec3::new(5.0, 1.0, -30.0);
+const MUAMUA_MAX_ALIVE: usize = 3;
+const MUAMUA_CHASE_RANGE: f32 = 10.0;
+const MUAMUA_STOP_DISTANCE: f32 = 1.0;
+const MUAMUA_MOVE_SPEED: f32 = 3.0;
+const MUAMUA_PATROL_RADIUS: f32 = 8.0;
+
 fn spawn_enemy_muamua(
     mut commands: Commands,
-    time: Res<Time>,
     asset_server: Res<AssetServer>,
-    mut respawn_timer: ResMut<MuamuaRespawnTimer>,
-    muamua_query: Query<(), With<EnemyMuamua>>,
+    defeated_count: Res<MuamuaDefeatedCount>,
     mut spawned_count: ResMut<MuamuaSpawnedCount>,
+    muamua_query: Query<(), With<EnemyMuamua>>,
 ) {
-    if spawned_count.0 >= MUAMUA_SPAWN_LIMIT {
+    // ถ้าแพ้ครบแล้ว ไม่ต้อง spawn เพิ่ม
+    if defeated_count.0 >= MUAMUA_DEFEAT_GOAL {
         return;
     }
-    // if !muamua_query.is_empty() {
-    //     respawn_timer.0.reset();
-    //     return;
-    // }
-    // respawn_timer.0.tick(time.delta());
-    // if !respawn_timer.0.just_finished() {
-    //     return;
-    // }
+
+    // ถ้าเคยเกิดครบ 10 ตัวไปแล้ว ไม่ต้อง spawn เพิ่ม
+    if spawned_count.0 >= MUAMUA_DEFEAT_GOAL {
+        return;
+    }
+
+    let alive_count = muamua_query.iter().count();
+    let remaining_to_spawn = MUAMUA_DEFEAT_GOAL.saturating_sub(spawned_count.0) as usize;
+    let max_alive = MUAMUA_MAX_ALIVE.min(remaining_to_spawn);
+
+    // ถ้าตัวที่ยังมีชีวิตอยู่เต็มจำนวนแล้ว ยังไม่ต้อง spawn
+    if alive_count >= max_alive {
+        return;
+    }
+
     let muamua_scene = asset_server.load(
         GltfAssetLabel::Scene(0)
             .from_asset("enemy/EnemyMuamua.glb"),
     );
+
     let random_angle = rand::random::<f32>() * std::f32::consts::TAU;
     let initial_dir = Vec3::new(random_angle.cos(), 0.0, random_angle.sin()).normalize();
+
     const MUAMUA_BODY_Y: f32 = 1.0;
+
     let base_stats = BaseStats::MUAMUA;
-    let enemy_muamua = commands.spawn((
+
+    let enemy_muamua = commands
+        .spawn((
             Name::new("Enemy Muamua"),
             Enemy,
             EnemyMuamua,
@@ -95,16 +113,18 @@ fn spawn_enemy_muamua(
         .insert(MuamuaPatrol {
             direction: initial_dir,
             timer: Timer::from_seconds(3.0, TimerMode::Repeating),
+            center: MUAMUA_SPAWN_POSITION,
+            radius: MUAMUA_PATROL_RADIUS,
         })
         .with_children(|parent| {
             parent.spawn((
                 SceneRoot(muamua_scene),
-                Transform::from_xyz(0.0,-MUAMUA_BODY_Y,0.0,),
+                Transform::from_xyz(0.0, -MUAMUA_BODY_Y, 0.0),
                 ApplyToonMaterial,
             ));
         })
         .id();
-    
+
     commands.entity(enemy_muamua).insert((
         CombatTarget,
         MuamuaAttackTimer(Timer::from_seconds(
@@ -112,13 +132,13 @@ fn spawn_enemy_muamua(
             TimerMode::Repeating,
         )),
     ));
+
     spawn_enemy_health_bar(
         &mut commands,
         enemy_muamua,
     );
-    //respawn_timer.0.reset();
+
     spawned_count.0 += 1;
-    //info!("Enemy Muamua spawned");
 }
 
 fn setup_enemy_muamua_animation_graph(
@@ -235,10 +255,6 @@ fn find_enemy_muamua_root(
     }
 }
 
-const MUAMUA_CHASE_RANGE: f32 = 10.0;
-const MUAMUA_STOP_DISTANCE: f32 = 1.0;
-const MUAMUA_MOVE_SPEED: f32 = 3.0;
-
 fn enemy_muamua_chase_player(
     mut commands: Commands,
     time: Res<Time>,
@@ -346,31 +362,85 @@ fn enemy_muamua_chase_player(
             continue;
         }
 
-        // 2.2 ไม่ได้โดนยิง และ Player อยู่ไกล -> ลาดตะเวนสุ่ม (MuamuaPatrol)
+        // 2.2 ไม่ได้โดนยิง และ Player อยู่ไกล -> ลาดตระเวนสุ่มแบบจำกัดพื้นที่
         if let Some(mut patrol) = patrol_data {
             patrol.timer.tick(time.delta());
-            
-            // สุ่มทิศทางใหม่เมื่อ Timer หมด (ทุก 3 วิ)
-            if patrol.timer.just_finished() {
+
+            // ตัดแกน Y ออก ให้คิดแค่ระนาบ XZ
+            let current_pos = Vec3::new(
+                muamua_transform.translation.x,
+                0.0,
+                muamua_transform.translation.z,
+            );
+
+            let patrol_center = Vec3::new(
+                patrol.center.x,
+                0.0,
+                patrol.center.z,
+            );
+
+            let from_center = current_pos - patrol_center;
+            let distance_from_center = from_center.length();
+
+            // ==========================================================
+            // กรณีออกนอกพื้นที่แล้ว -> บังคับให้หันกลับเข้ากลางทันที
+            // ==========================================================
+            if distance_from_center > patrol.radius {
+                let inward_direction = if from_center.length_squared() > 0.0001 {
+                    (-from_center).normalize()
+                } else {
+                    Vec3::new(0.0, 0.0, 1.0)
+                };
+
+                patrol.direction = inward_direction;
+
+                // ถ้ากำลังออกนอกเขต อาจยังไม่จำเป็นต้องสุ่มทิศใหม่ตอนนี้
+                patrol.timer.reset();
+            }
+            // ==========================================================
+            // กรณีอยู่ในพื้นที่ และครบเวลา -> สุ่มทิศใหม่
+            // ==========================================================
+            else if patrol.timer.just_finished() {
                 let random_angle = rand::random::<f32>() * std::f32::consts::TAU;
-                patrol.direction = Vec3::new(random_angle.cos(), 0.0, random_angle.sin()).normalize();
+                let mut new_direction = Vec3::new(
+                    random_angle.cos(),
+                    0.0,
+                    random_angle.sin(),
+                )
+                .normalize();
+
+                // ถ้าอยู่ใกล้ขอบพื้นที่แล้ว อย่าให้สุ่มทิศที่ “หันออกนอกเขต”
+                // เช่น อยู่ใกล้ขอบวงกลมแล้ว ถ้าทิศใหม่ชี้ออกนอกวงกลม ให้บังคับกลับเข้ากลาง
+                if patrol.radius > 0.0 && distance_from_center > patrol.radius * 0.75 {
+                    let outward_direction = from_center.normalize();
+
+                    // dot > 0 แปลว่าทิศใหม่กำลังชี้ “ออกนอกศูนย์กลาง”
+                    if new_direction.dot(outward_direction) > 0.0 {
+                        new_direction = -outward_direction;
+                    }
+                }
+
+                patrol.direction = new_direction;
             }
-            
-            let dir = patrol.direction;
-            velocity.x = dir.x * MUAMUA_MOVE_SPEED;
-            velocity.z = dir.z * MUAMUA_MOVE_SPEED;
-            
-            if dir.length_squared() > 0.0001 {
-                muamua_transform.rotation = Quat::from_rotation_y(dir.x.atan2(dir.z));
+
+            // ป้องกัน direction เป็น Vec3::ZERO
+            let direction = if patrol.direction.length_squared() > 0.0001 {
+                patrol.direction.normalize()
+            } else {
+                Vec3::new(0.0, 0.0, 1.0)
+            };
+
+            velocity.x = direction.x * MUAMUA_MOVE_SPEED;
+            velocity.z = direction.z * MUAMUA_MOVE_SPEED;
+
+            if direction.length_squared() > 0.0001 {
+                muamua_transform.rotation =
+                    Quat::from_rotation_y(direction.x.atan2(direction.z));
             }
+
             *enemy_state = EnemyState::Patrol;
             continue;
         }
-
-        // Fallback กัน Error
-        velocity.x = 0.0;
-        velocity.z = 0.0;
-        *enemy_state = EnemyState::Idle;
     }
 }
 
@@ -444,75 +514,6 @@ fn update_enemy_muamua_animation(
         }
 
         *current_animation = wanted_animation;
-    }
-}
-
-fn update_muamua_hurt_and_dead(
-    mut commands: Commands,
-    time: Res<Time>,
-
-    mut muamua_query: Query<
-        (
-            Entity,
-            &mut EnemyState,
-            &mut EnemyStateTimer,
-            &mut LinearVelocity,
-        ),
-        With<EnemyMuamua>,
-    >,
-) {
-    for (
-        muamua_entity,
-        mut enemy_state,
-        mut state_timer,
-        mut velocity,
-    ) in &mut muamua_query
-    {
-        state_timer.0.tick(time.delta());
-
-        match *enemy_state {
-            EnemyState::Hurt => {
-                // Hurt ธรรมดาไม่กระเด็น
-                velocity.x = 0.0;
-                velocity.z = 0.0;
-            }
-
-            EnemyState::Dead => {
-                // ปล่อยให้กระเด็น 0.25 วินาที
-                if state_timer.0.elapsed_secs() >= 0.25 {
-                    velocity.x = 0.0;
-                    velocity.z = 0.0;
-                }
-            }
-
-            _ => {}
-        }
-
-        if !state_timer.0.is_finished() {
-            continue;
-        }
-
-        match *enemy_state {
-            EnemyState::Hurt => {
-                *enemy_state = EnemyState::Idle;
-
-                commands
-                    .entity(muamua_entity)
-                    .remove::<EnemyStateTimer>();
-            }
-
-            EnemyState::Dead => {
-                commands
-                    .entity(muamua_entity)
-                    .despawn();
-            }
-
-            _ => {
-                commands
-                    .entity(muamua_entity)
-                    .remove::<EnemyStateTimer>();
-            }
-        }
     }
 }
 
@@ -729,7 +730,103 @@ fn despawn_muamua_punch_hitbox(
 fn reset_enemy_muamua_wave(
     mut spawned_count: ResMut<MuamuaSpawnedCount>,
     mut respawn_timer: ResMut<MuamuaRespawnTimer>,
+    mut defeated_count: ResMut<MuamuaDefeatedCount>,
 ) {
     spawned_count.0 = 0;
     respawn_timer.0.reset();
+    defeated_count.0 = 0;
+}
+fn update_muamua_hurt_and_dead(
+    mut commands: Commands,
+    time: Res<Time>,
+    mut muamua_query: Query<
+        (
+            Entity,
+            &mut EnemyState,
+            &mut EnemyStateTimer,
+            &mut LinearVelocity,
+        ),
+        With<EnemyMuamua>,
+    >,
+    mut defeated_count: ResMut<MuamuaDefeatedCount>,
+) {
+    for (
+        muamua_entity,
+        mut enemy_state,
+        mut state_timer,
+        mut velocity,
+    ) in &mut muamua_query
+    {
+        state_timer.0.tick(time.delta());
+
+        match *enemy_state {
+            EnemyState::Hurt => {
+                velocity.x = 0.0;
+                velocity.z = 0.0;
+            }
+            EnemyState::Dead => {
+                // ปล่อยให้กระเด็นนิดนึงก่อน
+                if state_timer.0.elapsed_secs() >= 0.25 {
+                    velocity.x = 0.0;
+                    velocity.z = 0.0;
+                }
+            }
+            _ => {}
+        }
+
+        if !state_timer.0.is_finished() {
+            continue;
+        }
+
+        match *enemy_state {
+            EnemyState::Hurt => {
+                *enemy_state = EnemyState::Idle;
+                commands
+                    .entity(muamua_entity)
+                    .remove::<EnemyStateTimer>();
+            }
+
+            EnemyState::Dead => {
+                // นับว่า Muamua ถูก defeat 1 ตัว
+                defeated_count.0 += 1;
+
+                info!(
+                    "Muamua defeated: {}/{}",
+                    defeated_count.0,
+                    MUAMUA_DEFEAT_GOAL
+                );
+
+                commands
+                    .entity(muamua_entity)
+                    .despawn();
+            }
+
+            _ => {
+                commands
+                    .entity(muamua_entity)
+                    .remove::<EnemyStateTimer>();
+            }
+        }
+    }
+}
+fn check_muamua_defeat_goal(
+    defeated_count: Res<MuamuaDefeatedCount>,
+    mut completed: Local<bool>,
+) {
+    if *completed {
+        return;
+    }
+
+    if defeated_count.0 >= MUAMUA_DEFEAT_GOAL {
+        *completed = true;
+
+        info!("Quest complete: defeated 10 Muamua!");
+
+        // ตรงนี้ใส่สิ่งที่คุณต้องการให้เกิดขึ้นได้ เช่น
+        // - เปิดประตู
+        // - แสดง UI
+        // - หยุด spawn
+        // - ให้รางวัล
+        // - เปลี่ยนฉาก
+    }
 }
