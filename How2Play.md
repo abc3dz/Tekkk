@@ -24,29 +24,16 @@ Keyboard: I
 Xbox Controller: Y
 PlayStation Controller: Triangle
 
-Player Status (toggle)
+Pause Menu
 Keyboard: ESC
 Xbox Controller: Start
 PlayStation Controller: Start
 
-## GUARDIAN PRACTICE DIALOG
+Status
+Keyboard: U
 
-Basic Practice
-Keyboard: 1
-Xbox Controller: A
-PlayStation Controller: Cross
+Control 
+Keyboard: O
 
-Advanced Practice
-Keyboard: 2
-Xbox Controller: X
-PlayStation Controller: Square
-
-Fully Restore HP and Mana
-Keyboard: 3
-Xbox Controller: Y
-PlayStation Controller: Triangle
-
-Stop Practice
-Keyboard: Esc
-Xbox Controller: B
-PlayStation Controller: Circle
+Redistribute Elements
+Mouse Click
