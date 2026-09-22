@@ -78,6 +78,7 @@ fn spawn_player(
         CombatStats::from(base_stats),
         AtkAndDefElement(Element::Inw),
         ElementMastery::default(),
+        ElementPointPool::default(), //test
         PlayerCombo {
             current_index: None,
             queued_next: false,
@@ -1382,24 +1383,8 @@ pub fn respawn_player_when_defeated(
     anim_graph: Res<PlayerAnimationGraph>,
     asset_server: Res<AssetServer>,
     mut next_scene: ResMut<NextState<GameScene>>,
-    mut player_query: Query<
-        (
-            Entity,
-            &mut Health,
-            &mut Transform,
-            &mut LinearVelocity,
-            &mut PlayerCombo,
-        ),
-        With<Player>,
-    >,
-    mut anim_query: Query<
-        (
-            Entity,
-            &mut AnimationPlayer,
-            &mut PlayerAnimState,
-        ),
-        With<PlayerAnimationTarget>,
-    >,
+    mut player_query: Query<(Entity,&mut Health,&mut Transform,&mut LinearVelocity,&mut PlayerCombo,),With<Player>,>,
+    mut anim_query: Query<(Entity,&mut AnimationPlayer,&mut PlayerAnimState,),With<PlayerAnimationTarget>,>,
     camera_query: Query<Entity, With<MainCamera>>,
 ) {
     let Ok((

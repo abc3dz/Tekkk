@@ -89,7 +89,7 @@ impl BaseStats {
     };
 
     pub const MUANIM: Self = Self {
-        max_hp: 150.0,
+        max_hp: 100.0,
         max_mp: 0.0,
         attack: 10.0,
         defense: 5.0,
@@ -105,7 +105,7 @@ impl BaseStats {
         critical_damage: 1.0,
     };
     pub const CHOKY: Self = Self {
-        max_hp: 500.0,
+        max_hp: 700.0,
         max_mp: 0.0,
         attack: 18.0,
         defense: 11.0,
@@ -166,22 +166,6 @@ pub struct ElementExpReward {
 }
 
 impl ElementExpReward {
-    pub fn for_element(
-        &self,
-        element: Element,
-    ) -> ExpRange {
-        match element {
-            Element::Water => self.water,
-            Element::Fire => self.fire,
-            Element::Wind => self.wind,
-            Element::Earth => self.earth,
-            Element::Inw => self.inw,
-            Element::Neutral => ExpRange::default(),
-        }
-    }
-}
-
-impl ElementExpReward {
     pub const BASIC_PRACTICE_GUN: Self = Self {
         water: ExpRange::new(2, 3),
         fire: ExpRange::new(2, 3),
@@ -224,45 +208,12 @@ impl ElementExpReward {
 #[derive(Component, Debug, Default)]
 pub struct CombatTarget;
 
-#[derive(Debug, Default, Clone, Copy)]
-pub struct ElementExpGain {
-    pub water: u32,
-    pub fire: u32,
-    pub wind: u32,
-    pub earth: u32,
-    pub inw: u32,
-}
-
 impl ExpRange {
     pub fn roll(self, rng: &mut impl Rng) -> u32 {
         if self.max < self.min {
             return 0;
         }
         rng.random_range(self.min..=self.max)
-    }
-}
-
-impl ElementExpReward {
-    pub fn grant_all(
-        &self,
-        mastery: &mut ElementMastery,
-        rng: &mut impl Rng,
-    ) -> ElementExpGain {
-        let gain = ElementExpGain {
-            water: self.water.roll(rng),
-            fire: self.fire.roll(rng),
-            wind: self.wind.roll(rng),
-            earth: self.earth.roll(rng),
-            inw: self.inw.roll(rng),
-        };
-
-        mastery.water.exp = mastery.water.exp.saturating_add(gain.water);
-        mastery.fire.exp = mastery.fire.exp.saturating_add(gain.fire);
-        mastery.wind.exp = mastery.wind.exp.saturating_add(gain.wind);
-        mastery.earth.exp = mastery.earth.exp.saturating_add(gain.earth);
-        mastery.inw.exp = mastery.inw.exp.saturating_add(gain.inw);
-
-        gain
     }
 }
 
@@ -275,40 +226,40 @@ pub fn elemental_multiplier(
     match (attacker, defender) {
         // Water
         (Water, Water) => 1.0,
-        (Water, Earth) => 1.0,
-        (Water, Wind) => 0.5,
-        (Water, Fire) => 2.0,
-        (Water, Inw) => 0.5,
+        (Water, Earth) => 0.75,
+        (Water, Wind) => 1.0,
+        (Water, Fire) => 1.5,
+        (Water, Inw) => 0.75,
 
         // Earth
-        (Earth, Water) => 2.0,
+        (Earth, Water) => 1.5,
         (Earth, Earth) => 1.0,
-        (Earth, Wind) => 1.0,
-        (Earth, Fire) => 0.5,
-        (Earth, Inw) => 0.5,
+        (Earth, Wind) => 0.75,
+        (Earth, Fire) => 1.0,
+        (Earth, Inw) => 0.75,
 
         // Wind
         (Wind, Water) => 1.0,
-        (Wind, Earth) => 2.0,
+        (Wind, Earth) => 1.5,
         (Wind, Wind) => 1.0,
-        (Wind, Fire) => 0.5,
-        (Wind, Inw) => 0.5,
+        (Wind, Fire) => 0.75,
+        (Wind, Inw) => 0.75,
 
         // Fire
-        (Fire, Water) => 0.5,
+        (Fire, Water) => 0.75,
         (Fire, Earth) => 1.0,
-        (Fire, Wind) => 2.0,
+        (Fire, Wind) => 1.5,
         (Fire, Fire) => 1.0,
-        (Fire, Inw) => 0.5,
+        (Fire, Inw) => 0.75,
 
         // Inw
-        (Inw, Water) => 2.0,
-        (Inw, Earth) => 2.0,
-        (Inw, Wind) => 2.0,
-        (Inw, Fire) => 2.0,
+        (Inw, Water) => 1.5,
+        (Inw, Earth) => 1.5,
+        (Inw, Wind) => 1.5,
+        (Inw, Fire) => 1.5,
         (Inw, Inw) => 1.0,
 
-        // Neutral ไม่ได้เปรียบเสียเปรียบ
+        // Neutral
         _ => 1.0,
     }
 }
@@ -326,7 +277,6 @@ pub fn calculate_combat_damage(
     let damage = final_damage.round().max(1.0) as i32;
     (damage, is_critical)
 }
-
 pub fn combat_stats_from_element_exp(
     base: &BaseStats,
     mastery: &ElementMastery,
@@ -352,4 +302,68 @@ pub fn combat_stats_from_element_exp(
         critical_rate: base.critical_rate + critical_rate_bonus,
         critical_damage: base.critical_damage + critical_damage_bonus,
     }
+}
+
+/// "ค่ากลาง" (Neutral Pool) — จุดที่ได้จากการกด "-" ลด EXP ธาตุ
+/// เก็บไว้ใช้กด "+" เพิ่ม EXP ธาตุอื่นต่อไป
+#[derive(Component, Debug, Default, Clone, Copy, PartialEq, Eq)]
+pub struct ElementPointPool {
+    pub points: u32,
+}
+
+/// รายชื่อธาตุทั้งหมด ใช้วนลูปสร้าง UI
+pub const ALL_ELEMENTS: [Element; 5] = [
+    Element::Water,
+    Element::Fire,
+    Element::Wind,
+    Element::Earth,
+    Element::Inw,
+];
+
+impl ElementMastery {
+    /// อ่านค่า EXP ธาตุแบบ immutable (ไว้โชว์ UI)
+    pub fn get(&self, element: Element) -> Option<&ElementProgress> {
+        match element {
+            Element::Water => Some(&self.water),
+            Element::Fire => Some(&self.fire),
+            Element::Wind => Some(&self.wind),
+            Element::Earth => Some(&self.earth),
+            Element::Inw => Some(&self.inw),
+            Element::Neutral => None,
+        }
+    }
+}
+
+/// ปุ่ม "-" : ลด EXP ธาตุ 1 หน่วย -> ค่ากลาง +1
+pub fn decrease_element_to_pool(
+    mastery: &mut ElementMastery,
+    pool: &mut ElementPointPool,
+    element: Element,
+) -> bool {
+    let Some(progress) = mastery.get_mut(element) else {
+        return false;
+    };
+    if progress.exp == 0 {
+        return false;
+    }
+    progress.exp -= 1;
+    pool.points += 1;
+    true
+}
+
+/// ปุ่ม "+" : ใช้ค่ากลาง 1 หน่วย -> EXP ธาตุ +1
+pub fn increase_element_from_pool(
+    mastery: &mut ElementMastery,
+    pool: &mut ElementPointPool,
+    element: Element,
+) -> bool {
+    if pool.points == 0 {
+        return false;
+    }
+    let Some(progress) = mastery.get_mut(element) else {
+        return false;
+    };
+    pool.points -= 1;
+    progress.exp += 1;
+    true
 }

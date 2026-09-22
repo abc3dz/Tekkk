@@ -38,6 +38,8 @@ impl Plugin for GuardianPlugin {
             show_guardian_dialog,
             guardian_menu_keyboard,
             guardian_menu_button_interaction,
+            guardian_alloc_button_interaction,   //test allocation
+            update_guardian_alloc_ui, //
             cleanup_guardian_ui_when_player_leave,
         ).run_if(in_state(GameScene::Hub).and(in_state(GameMode::Playing))))
         //.add_systems(Update, guardian_dialog_exit_input.run_if(in_state(GameScene::Hub)))
@@ -248,6 +250,8 @@ pub fn show_guardian_dialog(
     player_query: Query<(), With<PlayerInGuardianArea>>,
     dialog_query: Query<Entity, With<GuardianDialogUI>>,
     mut selection: ResMut<GuardianMenuSelection>,
+    fonts: Res<GameFonts>,
+    loc: Res<Localization>,
 ) {
     if player_query.is_empty() {
         return;
@@ -312,30 +316,13 @@ pub fn show_guardian_dialog(
                         },
                     ))
                     .with_children(|menu| {
-                        spawn_guardian_button(
-                            menu,
-                            "Basic Practice",
-                            GuardianMenuAction::BasicPractice,
-                        );
-
-                        spawn_guardian_button(
-                            menu,
-                            "Advanced Practice",
-                            GuardianMenuAction::AdvancedPractice,
-                        );
-
-                        spawn_guardian_button(
-                            menu,
-                            "Full HP / Mana",
-                            GuardianMenuAction::FullHpMana,
-                        );
-
-                        spawn_guardian_button(
-                            menu,
-                            "Stop Practice",
-                            GuardianMenuAction::StopPractice,
-                        );
+                        spawn_guardian_button(menu, loc.get("basic_practice"), GuardianMenuAction::BasicPractice, &fonts);
+                        spawn_guardian_button(menu, loc.get("advanced_practice"), GuardianMenuAction::AdvancedPractice, &fonts);
+                        spawn_guardian_button(menu, loc.get("full_hp_mana"), GuardianMenuAction::FullHpMana, &fonts);
+                        spawn_guardian_button(menu, loc.get("stop_practice"), GuardianMenuAction::StopPractice, &fonts);
                     });
+                //test allocation
+                spawn_alloc_panel(parent, &fonts, &loc);
             });
         });
 }
@@ -344,6 +331,7 @@ fn spawn_guardian_button(
     parent: &mut ChildSpawnerCommands,
     text: &str,
     action: GuardianMenuAction,
+    fonts: &GameFonts
 ) {
     parent
         .spawn((
@@ -363,10 +351,7 @@ fn spawn_guardian_button(
         .with_children(|button| {
             button.spawn((
                 Text::new(text),
-                TextFont {
-                    font_size: 24.0,
-                    ..default()
-                },
+                TextFont {font: fonts.abc3dz.clone(),font_size: 24.0, ..default()},
                 TextColor(Color::WHITE),
             ));
         });
@@ -416,7 +401,6 @@ pub fn guardian_menu_button_interaction(
     keyboard: Res<ButtonInput<KeyCode>>,
     // gamepads: Query<&Gamepad>, 
     mut selection: ResMut<GuardianMenuSelection>,
-
     mut interaction_query: Query<
         (
             &GuardianMenuAction,
@@ -428,26 +412,17 @@ pub fn guardian_menu_button_interaction(
     mut commands: Commands,
     asset_server: Res<AssetServer>,
     practice_query: Query<Entity, With<PracticeEntity>>,
-    mut player_query: Query<
-        (&mut Health, &mut Mana, &mut Transform),
-        With<Player>,
-    >,
+    mut player_query: Query<(&mut Health, &mut Mana, &mut Transform),With<Player>>,
     mut basic_practice_active: ResMut<BasicPracticeActive>,
     mut advanced_practice_active: ResMut<AdvancedPracticeActive>,
     mut respawn_timer: ResMut<BasicGunRespawnTimer>,
     mut advanced_respawn_timer: ResMut<AdvancedMinionRespawnTimer>,
 ) {
-    let enter_pressed = keyboard.just_pressed(KeyCode::Enter);
+    let space_pressed = keyboard.just_pressed(KeyCode::Space);
 
-    for (action, interaction, mut background) in
-        &mut interaction_query
-    {
-        let mouse_pressed =
-            *interaction == Interaction::Pressed;
-
-        let action_pressed =
-            mouse_pressed || enter_pressed && is_selected(*action, selection.index);
-
+    for (action, interaction, mut background) in &mut interaction_query{
+        let mouse_pressed = *interaction == Interaction::Pressed;
+        let action_pressed = mouse_pressed || space_pressed && is_selected(*action, selection.index);
         if !action_pressed {
             continue;
         }
@@ -589,5 +564,148 @@ pub fn despawn_hub_only_entities(
 ) {
     for entity in &hub_query {
         commands.entity(entity).despawn();
+    }
+}
+//test allocation
+fn element_key(element: Element) -> &'static str {
+    match element {
+        Element::Water => "water",
+        Element::Fire => "fire",
+        Element::Wind => "wind",
+        Element::Earth => "earth",
+        Element::Inw => "inw",
+        Element::Neutral => "neutral",
+    }
+}
+
+fn spawn_alloc_panel(parent: &mut ChildSpawnerCommands, fonts: &GameFonts, loc: &Localization) {
+    parent
+        .spawn((
+            Node {
+                flex_direction: FlexDirection::Column,
+                row_gap: Val::Px(6.0),
+                width: Val::Px(320.0),
+                padding: UiRect::all(Val::Px(12.0)),
+                ..default()
+            },
+            BackgroundColor(Color::srgba(0.08, 0.08, 0.12, 0.9)),
+        ))
+        .with_children(|panel| {
+            panel.spawn((
+                Text::new(loc.get("redistribute_elements")),
+                TextFont { font: fonts.abc3dz.clone(), font_size: 20.0, ..default() },
+                TextColor(Color::WHITE),
+            ));
+            panel.spawn((
+                AllocPoolText,
+                Text::new(format!("{}: 0", loc.get("neutral_pool"))),
+                TextFont { font_size: 18.0, ..default() },
+                TextColor(Color::srgb(1.0, 0.85, 0.2)),
+            ));
+            for element in ALL_ELEMENTS {
+                spawn_alloc_row(panel, element, fonts, loc);
+            }
+        });
+}
+
+fn spawn_alloc_row(
+    parent: &mut ChildSpawnerCommands,
+    element: Element,
+    fonts: &GameFonts,
+    loc: &Localization,
+) {
+    parent
+        .spawn(Node {
+            flex_direction: FlexDirection::Row,
+            align_items: AlignItems::Center,
+            column_gap: Val::Px(8.0),
+            ..default()
+        })
+        .with_children(|row| {
+            row.spawn((
+                AllocElementText(element),
+                Text::new(format!("{}: 0", loc.get(element_key(element)))),
+                TextFont { font: fonts.abc3dz.clone(), font_size: 18.0, ..default() },
+                TextColor(Color::WHITE),
+                Node { width: Val::Px(150.0), ..default() },
+            ));
+            spawn_alloc_button(row, element, false, fonts); // [-]
+            spawn_alloc_button(row, element, true, fonts);  // [+]
+        });
+}
+
+fn spawn_alloc_button(
+    parent: &mut ChildSpawnerCommands,
+    element: Element,
+    increase: bool,
+    fonts: &GameFonts
+) {
+    parent
+        .spawn((
+            Button,
+            AllocButton { element, increase },
+            Node {
+                width: Val::Px(36.0),
+                height: Val::Px(28.0),
+                justify_content: JustifyContent::Center,
+                align_items: AlignItems::Center,
+                ..default()
+            },
+            BackgroundColor(Color::srgb(0.2, 0.2, 0.25)),
+        ))
+        .with_children(|b| {
+            b.spawn((
+                Text::new(if increase { "+" } else { "-" }),
+                TextFont { font: fonts.abc3dz.clone(), font_size: 20.0, ..default() },
+                TextColor(Color::WHITE),
+            ));
+        });
+}
+
+/// กดปุ่ม + / - โยก EXP ระหว่างธาตุผ่านค่ากลาง
+pub fn guardian_alloc_button_interaction(
+    mut interaction_query: Query<(&AllocButton, &Interaction)>,
+    mut player_query: Query<
+        (&mut ElementMastery, &mut ElementPointPool),
+        With<Player>,
+    >,
+) {
+    let Ok((mut mastery, mut pool)) = player_query.single_mut()
+    else {
+        return;
+    };
+    let mastery = &mut *mastery;
+    let pool = &mut *pool;
+    for (button, interaction) in &mut interaction_query {
+        if *interaction != Interaction::Pressed {
+            continue;
+        }
+        if button.increase {
+            increase_element_from_pool(mastery, pool, button.element);
+        } else {
+            decrease_element_to_pool(mastery, pool, button.element);
+        }
+    }
+}
+
+pub fn update_guardian_alloc_ui(
+    dialog_query: Query<(), With<GuardianDialogUI>>,
+    player_query: Query<(&ElementMastery, &ElementPointPool), With<Player>>,
+    mut pool_text: Query<&mut Text, (With<AllocPoolText>, Without<AllocElementText>)>,
+    mut element_texts: Query<(&AllocElementText, &mut Text), (With<AllocElementText>, Without<AllocPoolText>)>,
+    fonts: Res<GameFonts>,
+    loc: Res<Localization>,
+) {
+    if dialog_query.is_empty() { return; }
+    let Ok((mastery, pool)) = player_query.single() else { return; };
+
+    for mut text in &mut pool_text {
+        // อัปเดตข้อความแบบมีภาษา
+        text.set_if_neq(Text::new(format!("{}: {}", loc.get("neutral_pool"), pool.points)));
+    }
+    for (marker, mut text) in &mut element_texts {
+        let exp = mastery.get(marker.0).map(|p| p.exp).unwrap_or(0);
+        // อัปเดตข้อความแบบมีภาษา
+        text.set_if_neq(Text::new(format!("{}: {}", loc.get(element_key(marker.0)), exp)));
     }
 }

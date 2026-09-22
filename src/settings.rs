@@ -1,6 +1,6 @@
 use bevy::prelude::*;
 
-use crate::components::{MusicAudio, GameFonts};
+use crate::components::{MusicAudio, GameFonts, Localization, Language};
 use crate::pause_menu::{GameMode, PauseMenuScreen, PauseMenuState};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -8,6 +8,7 @@ pub enum SettingsItem {
     Resolution,
     DisplayMode,
     MasterVolume,
+    Language,
     Apply,
     Back,
 }
@@ -60,7 +61,6 @@ const RESOLUTIONS: &[(u32, u32)] = &[
 
 const DISPLAY_MODES: &[&str] = &[
     "Fullscreen",
-    "Borderless",
     "Windowed",
 ];
 
@@ -104,6 +104,7 @@ pub fn spawn_settings_screen(
     parent: &mut ChildSpawnerCommands,
     fonts: &GameFonts,
     settings: &SettingsState,
+    loc: &Localization,
 ) {
     parent
         .spawn((
@@ -124,7 +125,7 @@ pub fn spawn_settings_screen(
             // ==========================================
 
             menu.spawn((
-                Text::new("SETTINGS"),
+                Text::new(loc.get("settings_title")), 
                 TextFont {
                     font: fonts.abc3dz.clone(),
                     font_size: 42.0,
@@ -137,14 +138,13 @@ pub fn spawn_settings_screen(
             // RESOLUTION
             // ==========================================
 
-            let (width, height) =
-                RESOLUTIONS[settings.pending_resolution_index];
+            let (width, height) = RESOLUTIONS[settings.pending_resolution_index];
 
             spawn_settings_button(
                 menu,
                 fonts,
                 SettingsItem::Resolution,
-                &format!("RESOLUTION      {} x {}", width, height),
+                &format!("{} {} x {}", loc.get("resolution"), width, height),
                 settings.selected == SettingsItem::Resolution,
             );
 
@@ -152,14 +152,22 @@ pub fn spawn_settings_screen(
             // DISPLAY MODE
             // ==========================================
 
+            let display_mode_text = DISPLAY_MODES
+                .get(settings.pending_display_mode_index)
+                .copied()
+                .unwrap_or("Windowed");
+            let mode_key = match DISPLAY_MODES[settings.pending_display_mode_index] {
+                "Fullscreen" => "fullscreen",
+                "Borderless" => "borderless",
+                "Windowed" => "windowed",
+                _ => "windowed",
+            };
+
             spawn_settings_button(
                 menu,
                 fonts,
                 SettingsItem::DisplayMode,
-                &format!(
-                    "DISPLAY MODE    {}",
-                    DISPLAY_MODES[settings.pending_display_mode_index]
-                ),
+                &format!("{} {}", loc.get("display_mode"), loc.get(mode_key)),
                 settings.selected == SettingsItem::DisplayMode,
             );
 
@@ -173,8 +181,21 @@ pub fn spawn_settings_screen(
                 menu,
                 fonts,
                 SettingsItem::MasterVolume,
-                &format!("MASTER VOLUME    {}%", volume),
+                &format!("{} {}%", loc.get("master_volume"), volume),
                 settings.selected == SettingsItem::MasterVolume,
+            );
+            //Language
+            let lang_str = match loc.current {
+                Language::English => loc.get("lang_en"),
+                Language::Thai => loc.get("lang_th"),
+                Language::NorthernThai => loc.get("lang_nth"),
+            };
+            spawn_settings_button(
+                menu,
+                fonts,
+                SettingsItem::Language,
+                &format!("{}: {}", loc.get("language"), lang_str),
+                settings.selected == SettingsItem::Language,
             );
 
             // ==========================================
@@ -185,7 +206,7 @@ pub fn spawn_settings_screen(
                 menu,
                 fonts,
                 SettingsItem::Apply,
-                "APPLY",
+                loc.get("apply"),
                 settings.selected == SettingsItem::Apply,
             );
 
@@ -197,7 +218,7 @@ pub fn spawn_settings_screen(
                 menu,
                 fonts,
                 SettingsItem::Back,
-                "BACK",
+                loc.get("back"),
                 settings.selected == SettingsItem::Back,
             );
         });
@@ -263,6 +284,7 @@ fn settings_input(
     mut settings: ResMut<SettingsState>,
     mut pause_state: ResMut<PauseMenuState>,
     mut apply_request: ResMut<SettingsApplyRequest>,
+    mut loc: ResMut<Localization>, 
 ) {
     let up = keyboard.just_pressed(KeyCode::ArrowUp)
         || keyboard.just_pressed(KeyCode::KeyW)
@@ -308,7 +330,8 @@ fn settings_input(
             SettingsItem::Resolution => SettingsItem::Back,
             SettingsItem::DisplayMode => SettingsItem::Resolution,
             SettingsItem::MasterVolume => SettingsItem::DisplayMode,
-            SettingsItem::Apply => SettingsItem::MasterVolume,
+            SettingsItem::Language => SettingsItem::MasterVolume, // <-- เพิ่ม
+            SettingsItem::Apply => SettingsItem::Language,        // <-- แก้
             SettingsItem::Back => SettingsItem::Apply,
         };
     }
@@ -321,7 +344,8 @@ fn settings_input(
         settings.selected = match settings.selected {
             SettingsItem::Resolution => SettingsItem::DisplayMode,
             SettingsItem::DisplayMode => SettingsItem::MasterVolume,
-            SettingsItem::MasterVolume => SettingsItem::Apply,
+            SettingsItem::MasterVolume => SettingsItem::Language, // <-- เพิ่ม
+            SettingsItem::Language => SettingsItem::Apply,        // <-- เพิ่ม
             SettingsItem::Apply => SettingsItem::Back,
             SettingsItem::Back => SettingsItem::Resolution,
         };
@@ -361,9 +385,16 @@ fn settings_input(
                 settings.pending_master_volume = (settings.pending_master_volume + 0.05).min(1.0);
             }
         }
-        SettingsItem::Apply => {}
-
-        SettingsItem::Back => {}
+        SettingsItem::Language => {
+            if left || right {
+                loc.current = match loc.current {
+                    Language::English => Language::Thai,
+                    Language::Thai => Language::NorthernThai,
+                    Language::NorthernThai => Language::English,
+                };
+            }
+        }
+        _ => {}
     }
 
     // ==========================================
@@ -387,6 +418,13 @@ fn settings_input(
                 pause_state.screen = PauseMenuScreen::Main;
             }
 
+            SettingsItem::Language => {
+                loc.current = match loc.current {
+                    Language::English => Language::Thai,
+                    Language::Thai => Language::NorthernThai,
+                    Language::NorthernThai => Language::English,
+                };
+            }
             _ => {}
         }
     }
@@ -413,6 +451,7 @@ fn settings_button_system(
     mut settings: ResMut<SettingsState>,
     mut pause_state: ResMut<PauseMenuState>,
     mut apply_request: ResMut<SettingsApplyRequest>,
+    mut loc: ResMut<Localization>,
 ) {
     for (interaction, button) in &mut interaction_query {
         match *interaction {
@@ -425,6 +464,13 @@ fn settings_button_system(
                     SettingsItem::Resolution => { settings.pending_resolution_index = (settings.pending_resolution_index + 1) % RESOLUTIONS.len();}
                     SettingsItem::DisplayMode => { settings.pending_display_mode_index = (settings.pending_display_mode_index + 1) % DISPLAY_MODES.len();}
                     SettingsItem::MasterVolume => { settings.pending_master_volume = (settings.pending_master_volume + 0.05).min(1.0); }
+                    SettingsItem::Language => {
+                        loc.current = match loc.current {
+                            Language::English => Language::Thai,
+                            Language::Thai => Language::NorthernThai,
+                            Language::NorthernThai => Language::English,
+                        };
+                    }
 
                     SettingsItem::Apply => {
                         settings.current_resolution_index = settings.pending_resolution_index;
@@ -513,19 +559,16 @@ fn apply_display_settings(
         (1920.0, 1080.0),
     ];
 
-    let (width, height) =
-        resolutions[settings.current_resolution_index];
+    let resolution_index = settings
+        .current_resolution_index
+        .min(resolutions.len() - 1);
+
+    let (width, height) = resolutions[resolution_index];
 
     let mode = match settings.current_display_mode_index {
-        0 => bevy::window::WindowMode::Fullscreen(
-            MonitorSelection::Current,
-            VideoModeSelection::Current,
-        ),
-
-        1 => bevy::window::WindowMode::BorderlessFullscreen (
+        0 => bevy::window::WindowMode::BorderlessFullscreen(
             MonitorSelection::Current,
         ),
-
         _ => bevy::window::WindowMode::Windowed,
     };
 
@@ -564,8 +607,8 @@ fn initialize_settings_from_window(
 
     let display_mode_index = match window.mode {
         bevy::window::WindowMode::Fullscreen(_, _) => 0,
-        bevy::window::WindowMode::BorderlessFullscreen(_) => 1,
-        bevy::window::WindowMode::Windowed => 2,
+        bevy::window::WindowMode::BorderlessFullscreen(_) => 0,
+        bevy::window::WindowMode::Windowed => 1,
     };
 
     settings.current_display_mode_index = display_mode_index;

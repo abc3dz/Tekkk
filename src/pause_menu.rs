@@ -110,8 +110,9 @@ fn setup_pause_menu(
     fonts: Res<GameFonts>,
     menu_state: Res<PauseMenuState>,
     settings: Res<SettingsState>,
+    loc: Res<Localization>,
 ) {
-    spawn_pause_ui(&mut commands, &fonts, &menu_state, &settings);
+    spawn_pause_ui(&mut commands, &fonts, &menu_state, &settings, &loc);
 }
 
 fn spawn_pause_button(
@@ -160,6 +161,7 @@ fn spawn_pause_ui(
     fonts: &GameFonts,
     menu_state: &PauseMenuState,
     settings: &SettingsState,
+    loc: &Localization,
 ) {
     commands
         .spawn((
@@ -189,7 +191,7 @@ fn spawn_pause_ui(
             ))
             .with_children(|menu| match menu_state.screen {
                 PauseMenuScreen::Main => {
-                    spawn_main_menu(menu, fonts, menu_state.selected);
+                    spawn_main_menu(menu, fonts, menu_state.selected, loc);
                 }
                 PauseMenuScreen::SaveSlots => {
                     spawn_save_slots(menu, fonts, menu_state.selected_slot);
@@ -199,7 +201,7 @@ fn spawn_pause_ui(
                 }
                 PauseMenuScreen::Settings => {
                     let settings = settings.into();
-                    crate::settings::spawn_settings_screen(menu, fonts, settings);
+                    crate::settings::spawn_settings_screen(menu, fonts, settings, loc);
                 }
             });
         });
@@ -209,44 +211,18 @@ fn spawn_main_menu(
     menu: &mut ChildSpawnerCommands,
     fonts: &GameFonts,
     selected: PauseMenuItem,
+    loc: &Localization, // <-- เพิ่ม
 ) {
     menu.spawn((
-        Text::new("PAUSED"),
-        TextFont {
-            font: fonts.abc3dz.clone(),
-            font_size: 42.0,
-            ..default()
-        },
+        Text::new(loc.get("paused")), // <-- ใช้คำแปล
+        TextFont { font: fonts.abc3dz.clone(), font_size: 42.0, ..default() },
         TextColor(Color::srgb(1.0, 0.82, 0.20)),
     ));
-    spawn_pause_button(
-        menu,
-        fonts,
-        "SAVE",
-        PauseButton::Save,
-        selected == PauseMenuItem::Save,
-    );
-    spawn_pause_button(
-        menu,
-        fonts,
-        "LOAD",
-        PauseButton::Load,
-        selected == PauseMenuItem::Load,
-    );
-    spawn_pause_button(
-        menu,
-        fonts,
-        "SETTINGS",
-        PauseButton::Settings,
-        selected == PauseMenuItem::Settings,
-    );
-    spawn_pause_button(
-        menu,
-        fonts,
-        "RESUME",
-        PauseButton::Resume,
-        selected == PauseMenuItem::Resume,
-    );
+    
+    spawn_pause_button(menu, fonts, loc.get("save"), PauseButton::Save, selected == PauseMenuItem::Save);
+    spawn_pause_button(menu, fonts, loc.get("load"), PauseButton::Load, selected == PauseMenuItem::Load);
+    spawn_pause_button(menu, fonts, loc.get("settings"), PauseButton::Settings, selected == PauseMenuItem::Settings);
+    spawn_pause_button(menu, fonts, loc.get("resume"), PauseButton::Resume, selected == PauseMenuItem::Resume);
 }
 
 fn spawn_save_slot_button(
@@ -479,8 +455,9 @@ fn refresh_pause_menu(
     menu_state: Res<PauseMenuState>,
     settings: Res<SettingsState>,
     query: Query<Entity, With<PauseMenuUI>>,
+    loc: Res<Localization>,
 ) {
-    if !menu_state.is_changed() && !settings.is_changed() {
+    if !menu_state.is_changed() && !settings.is_changed() && !loc.is_changed() {
         return;
     }
 
@@ -488,7 +465,7 @@ fn refresh_pause_menu(
         commands.entity(entity).despawn();
     }
 
-    spawn_pause_ui(&mut commands, &fonts, &menu_state, &settings);
+    spawn_pause_ui(&mut commands, &fonts, &menu_state, &settings, &loc);
 }
 
 // ==========================================
