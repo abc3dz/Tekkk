@@ -39,6 +39,7 @@ impl Plugin for GuardianPlugin {
             guardian_menu_keyboard,
             guardian_menu_button_interaction,
             guardian_alloc_button_interaction,   //test allocation
+            guardian_atk_element_button_interaction, //test change element
             update_guardian_alloc_ui, //
             cleanup_guardian_ui_when_player_leave,
         ).run_if(in_state(GameScene::Hub).and(in_state(GameMode::Playing))))
@@ -605,6 +606,7 @@ fn spawn_alloc_panel(parent: &mut ChildSpawnerCommands, fonts: &GameFonts, loc: 
             for element in ALL_ELEMENTS {
                 spawn_alloc_row(panel, element, fonts, loc);
             }
+            spawn_atk_element_row(panel, fonts);
         });
 }
 
@@ -690,22 +692,138 @@ pub fn guardian_alloc_button_interaction(
 
 pub fn update_guardian_alloc_ui(
     dialog_query: Query<(), With<GuardianDialogUI>>,
-    player_query: Query<(&ElementMastery, &ElementPointPool), With<Player>>,
-    mut pool_text: Query<&mut Text, (With<AllocPoolText>, Without<AllocElementText>)>,
-    mut element_texts: Query<(&AllocElementText, &mut Text), (With<AllocElementText>, Without<AllocPoolText>)>,
-    fonts: Res<GameFonts>,
-    loc: Res<Localization>,
+    player_query: Query<
+        (&ElementMastery, &ElementPointPool, &AtkAndDefElement),
+        With<Player>,
+    >,
+    mut pool_text: Query<
+        &mut Text,
+        (With<AllocPoolText>, Without<AllocElementText>, Without<AtkElementText>),
+    >,
+    mut element_texts: Query<
+        (&AllocElementText, &mut Text),
+        (With<AllocElementText>, Without<AllocPoolText>, Without<AtkElementText>),
+    >,
+    mut atk_text: Query<
+        &mut Text,
+        (With<AtkElementText>, Without<AllocPoolText>, Without<AllocElementText>),
+    >,
+    mut atk_buttons: Query<
+        (&AtkElementButton, &mut BackgroundColor),
+        Without<GuardianMenuButton>,
+    >,
 ) {
-    if dialog_query.is_empty() { return; }
-    let Ok((mastery, pool)) = player_query.single() else { return; };
-
+    if dialog_query.is_empty() {
+        return;
+    }
+    let Ok((mastery, pool, atk_element)) = player_query.single() else {
+        return;
+    };
     for mut text in &mut pool_text {
-        // อัปเดตข้อความแบบมีภาษา
-        text.set_if_neq(Text::new(format!("{}: {}", loc.get("neutral_pool"), pool.points)));
+        text.set_if_neq(Text::new(format!("Neutral Pool: {}", pool.points)));
     }
     for (marker, mut text) in &mut element_texts {
         let exp = mastery.get(marker.0).map(|p| p.exp).unwrap_or(0);
-        // อัปเดตข้อความแบบมีภาษา
-        text.set_if_neq(Text::new(format!("{}: {}", loc.get(element_key(marker.0)), exp)));
+        text.set_if_neq(Text::new(format!("{}: {}", element_short_name(marker.0), exp)));
+    }
+    for mut text in &mut atk_text {
+        text.set_if_neq(Text::new(format!(
+            "Attack Element: {}",
+            element_short_name(atk_element.0),
+        )));
+    }
+    for (button, mut background) in &mut atk_buttons {
+        let new_color = if button.0 == atk_element.0 {
+            Color::srgb(0.15, 0.55, 0.35)
+        } else {
+            Color::srgb(0.2, 0.2, 0.25)
+        };
+        if background.0 != new_color {
+            *background = BackgroundColor(new_color);
+        }
+    }
+}
+
+fn element_short_name(element: Element) -> &'static str {
+    match element {
+        Element::Water => "Water",
+        Element::Fire => "Fire",
+        Element::Wind => "Wind",
+        Element::Earth => "Earth",
+        Element::Inw => "Inw",
+        Element::Neutral => "Neutral",
+    }
+}
+
+fn spawn_atk_element_row(
+    parent: &mut ChildSpawnerCommands,
+    fonts: &GameFonts,
+) {
+    parent
+        .spawn(Node {
+            flex_direction: FlexDirection::Column,
+            row_gap: Val::Px(4.0),
+            ..default()
+        })
+        .with_children(|col| {
+            // บรรทัดบน: บอกธาตุที่ใช้อยู่
+            col.spawn((
+                AtkElementText,
+                Text::new("Attack Element: -"),
+                TextFont {
+                    font: fonts.abc3dz.clone(),
+                    font_size: 18.0,
+                    ..default()
+                },
+                TextColor(Color::srgb(0.4, 1.0, 0.9)),
+            ));
+            // บรรทัดล่าง: ปุ่มชื่อเต็มทั้ง 5 ธาตุ
+            col.spawn(Node {
+                flex_direction: FlexDirection::Row,
+                column_gap: Val::Px(6.0),
+                ..default()
+            })
+            .with_children(|row| {
+                for element in ALL_ELEMENTS {
+                    row.spawn((
+                        Button,
+                        AtkElementButton(element),
+                        Node {
+                            width: Val::Px(62.0),
+                            height: Val::Px(28.0),
+                            justify_content: JustifyContent::Center,
+                            align_items: AlignItems::Center,
+                            ..default()
+                        },
+                        BackgroundColor(Color::srgb(0.2, 0.2, 0.25)),
+                    ))
+                    .with_children(|b| {
+                        b.spawn((
+                            Text::new(element_short_name(element)), // ← ชื่อเต็ม
+                            TextFont {
+                                font: fonts.abc3dz.clone(),
+                                font_size: 14.0,
+                                ..default()
+                            },
+                            TextColor(Color::WHITE),
+                        ));
+                    });
+                }
+            });
+        });
+}
+
+pub fn guardian_atk_element_button_interaction(
+    mut interaction_query: Query<(&AtkElementButton, &Interaction)>,
+    mut player_query: Query<&mut AtkAndDefElement, With<Player>>,
+) {
+    let Ok(mut atk_element) = player_query.single_mut() else {
+        return;
+    };
+    for (button, interaction) in &mut interaction_query {
+        if *interaction != Interaction::Pressed {
+            continue;
+        }
+        atk_element.0 = button.0;
     }
 }

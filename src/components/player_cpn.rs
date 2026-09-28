@@ -163,3 +163,10 @@ pub struct PlayerEnergyBall {
     pub lifetime: Timer,
     pub has_hit: bool,
 }
+
+// เพิ่มใน player_cpn.rs
+#[derive(Component)]
+pub struct CriticalHitParticle {
+    pub lifetime: Timer,
+    pub rotation_speed: f32, // เรเดียนต่อวินาที
+}

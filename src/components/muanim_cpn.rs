@@ -37,7 +37,7 @@ pub struct MuanimAttackTimer(pub Timer);
 #[derive(Resource)]
 pub struct MuanimRespawnTimer(pub Timer);
 
-pub const MUANIM_SPAWN_LIMIT: u32 = 10;
+pub const MUANIM_SPAWN_LIMIT: u32 = 5;
 
 #[derive(Resource, Default, Debug)]
 pub struct MuanimSpawnedCount(pub u32);

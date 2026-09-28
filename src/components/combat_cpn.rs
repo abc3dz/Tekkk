@@ -69,7 +69,7 @@ impl BaseStats {
         critical_rate: 0.05,
         critical_damage: 1.5,
     };
-
+    //hub
     pub const BASIC_PRACTICE_GUN: Self = Self {
         max_hp: 100.0,
         max_mp: 0.0,
@@ -78,7 +78,6 @@ impl BaseStats {
         critical_rate: 0.0,
         critical_damage: 1.0,
     };
-
     pub const ADVANCED_PRACTICE_MINION: Self = Self {
         max_hp: 120.0,
         max_mp: 0.0,
@@ -88,6 +87,7 @@ impl BaseStats {
         critical_damage: 1.0,
     };
 
+    //desert
     pub const MUANIM: Self = Self {
         max_hp: 100.0,
         max_mp: 0.0,
@@ -171,37 +171,37 @@ impl ElementExpReward {
         fire: ExpRange::new(2, 3),
         wind: ExpRange::new(2, 3),
         earth: ExpRange::new(2, 3),
-        inw: ExpRange::new(1, 1),
+        inw: ExpRange::new(1, 2),
     };
 
     pub const ADVANCED_PRACTICE_MINION: Self = Self {
-        water: ExpRange::new(6, 9),
-        fire: ExpRange::new(6, 9),
-        wind: ExpRange::new(6, 9),
-        earth: ExpRange::new(6, 9),
-        inw: ExpRange::new(4, 7),
+        water: ExpRange::new(4,5),
+        fire: ExpRange::new(4,5),
+        wind: ExpRange::new(4,5),
+        earth: ExpRange::new(4,5),
+        inw: ExpRange::new(3,4),
     };
 
     pub const MUANIM: Self = Self {
-        water: ExpRange::new(3, 3),
+        water: ExpRange::new(0, 0),
         fire: ExpRange::new(0, 0),
         wind: ExpRange::new(0, 0),
         earth: ExpRange::new(10, 10),
         inw: ExpRange::new(1, 1),
     };
     pub const MUAMUA: Self = Self {
-        water: ExpRange::new(5, 5),
+        water: ExpRange::new(3,3),
         fire: ExpRange::new(0, 0),
         wind: ExpRange::new(0, 0),
         earth: ExpRange::new(20, 20),
-        inw: ExpRange::new(1, 1),
+        inw: ExpRange::new(2,2),
     };
     pub const CHOKY: Self = Self {
         water: ExpRange::new(0, 0),
         fire: ExpRange::new(5, 5),
         wind: ExpRange::new(0, 0),
         earth: ExpRange::new(30, 30),
-        inw: ExpRange::new(2, 2),
+        inw: ExpRange::new(3,3),
     };
 }
 
@@ -253,10 +253,10 @@ pub fn elemental_multiplier(
         (Fire, Inw) => 0.75,
 
         // Inw
-        (Inw, Water) => 1.5,
-        (Inw, Earth) => 1.5,
-        (Inw, Wind) => 1.5,
-        (Inw, Fire) => 1.5,
+        (Inw, Water) => 1.0,
+        (Inw, Earth) => 1.0,
+        (Inw, Wind) => 1.0,
+        (Inw, Fire) => 1.0,
         (Inw, Inw) => 1.0,
 
         // Neutral

@@ -51,4 +51,4 @@ pub struct MuamuaSpawnedCount(pub u32);
 #[derive(Resource, Default)]
 pub struct MuamuaDefeatedCount(pub u32);
 
-pub const MUAMUA_DEFEAT_GOAL: u32 = 10;
+pub const MUAMUA_DEFEAT_GOAL: u32 = 5;

@@ -38,6 +38,7 @@ impl Plugin for PlayerPlugin {
             rebuild_player_combat_stats_from_exp,
             update_floating_damage_text,
             update_defeat_particles,
+            update_critical_hit_particles,
             player_return_after_hurt,
             respawn_player_when_defeated,
             ).chain().run_if(in_state(GameMode::Playing)))
@@ -78,7 +79,8 @@ fn spawn_player(
         CombatStats::from(base_stats),
         AtkAndDefElement(Element::Inw),
         ElementMastery::default(),
-        ElementPointPool::default(), //test
+        //ElementPointPool::default(), //test
+        ElementPointPool { points:100 },
         PlayerCombo {
             current_index: None,
             queued_next: false,
@@ -1311,7 +1313,69 @@ fn spawn_defeat_particles(
         ));
     }
 }
+pub fn spawn_critical_hit_particle(
+    commands: &mut Commands,
+    meshes: &mut ResMut<Assets<Mesh>>,
+    materials: &mut ResMut<Assets<StandardMaterial>>,
+    position: Vec3,
+) {
+    let duration = 0.5; // เวลาทั้งหมด 0.5 วินาที
+    // หมุน 2 รอบ = 4 * PI เรเดียน
+    let rotation_speed = (4.0 * std::f32::consts::PI) / duration;
 
+    // ✅ สร้างรูป 5 เหลี่ยม (Pentagon) รัศมี 0.6
+    let mesh = meshes.add(RegularPolygon::default());
+    let material = materials.add(StandardMaterial {
+        // ★ ช่องที่ 4 = alpha, เริ่มที่ 1.0 (ทึบสนิท) แล้วค่อยลดใน update
+        base_color: Color::srgba(1.0, 0.85, 0.0, 1.0),
+        alpha_mode: AlphaMode::Blend,
+        unlit: true,
+        cull_mode: None, // รูปแบน เปิดไว้ให้เห็นทั้งสองด้าน ไม่งั้นตอนหันหลังจะหายไปเฉยๆ
+        ..default()
+    });
+
+    commands.spawn((
+        Mesh3d(mesh),
+        MeshMaterial3d(material),
+        Transform::from_translation(position + Vec3::new(0.0, 0.2, 0.0)),
+        CriticalHitParticle {
+            lifetime: Timer::from_seconds(duration, TimerMode::Once),
+            rotation_speed,
+        },
+    ));
+}
+pub fn update_critical_hit_particles(
+    mut commands: Commands,
+    time: Res<Time>,
+    mut materials: ResMut<Assets<StandardMaterial>>, // ★ ต้องเป็น ResMut เพื่อ get_mut ได้
+    mut query: Query<(
+        Entity,
+        &mut Transform,
+        &MeshMaterial3d<StandardMaterial>, // ★ ดึง handle ของ material มาด้วย
+        &mut CriticalHitParticle,
+    )>,
+) {
+    for (entity, mut transform, material_handle, mut particle) in &mut query {
+        particle.lifetime.tick(time.delta());
+        let t = particle.lifetime.fraction(); // 0.0 → 1.0
+
+        // หมุน 2 รอบตามปกติ
+        transform.rotate_z(particle.rotation_speed * time.delta_secs());
+
+        // ★ fade out: แก้ alpha ของ material ผ่าน handle
+        if let Some(mat) = materials.get_mut(&material_handle.0) {
+            mat.base_color.set_alpha(1.0 - t);
+            // อยากให้สว่างค้างไว้แล้วค่อยหายเร็วๆ: ใช้ (1.0 - t).powi(2)
+        }
+
+        if particle.lifetime.is_finished() {
+            commands.entity(entity).despawn();
+            // ถ้าเกม spawn บ่อยๆ แนะนำเปิดบรรทัดนี้ ไม่งั้น material
+            // จะสะสมอยู่ใน Assets ตลอดไป (despawn entity ไม่ได้ลบ asset ให้)
+            // materials.remove(&material_handle.0);
+        }
+    }
+}
 pub fn update_defeat_particles(
     mut commands: Commands,
     time: Res<Time>,
@@ -1711,18 +1775,19 @@ fn player_slap_hit_enemy(
             );
 
         let damage = (base_damage as f32 * element_multiplier).round().max(1.0) as i32;
+        let target_position = target_transform.translation();
         if is_critical {
-            if let Ok(camera_entity) = camera_query.single()
-            {
-                commands
-                    .entity(camera_entity)
-                    .insert(
-                        CameraShake::new(
-                            0.15, // ระยะเวลาสั่น
-                            0.08, // ความแรง
-                        ),
-                    );
+            if let Ok(camera_entity) = camera_query.single() {
+                commands.entity(camera_entity).insert(CameraShake::new(0.15, 0.08));
             }
+            
+            // === เพิ่มบรรทัดนี้เพื่อ Spawn Particle ===
+            spawn_critical_hit_particle(
+                &mut commands,
+                &mut meshes,
+                &mut materials,
+                target_position + Vec3::new(0.0, 1.0, 0.0), // ปรับตำแหน่ง Y ตามความเหมาะสม
+            );
         }
         target_health.current -= damage;
 
@@ -1738,9 +1803,6 @@ fn player_slap_hit_enemy(
             } else {
                 FloatingDamageKind::EnemyNormal
             };
-
-        let target_position =
-            target_transform.translation();
 
         spawn_floating_damage_text(
             &mut commands,
@@ -2214,18 +2276,20 @@ fn player_energy_hit_enemy(
         let element_multiplier = elemental_multiplier(player_element.0,target_element.0);
 
         let damage = (base_damage as f32 * element_multiplier).round().max(1.0) as i32;
+        let target_position = target_transform.translation();
         if is_critical {
             commands.spawn(AudioPlayer::new(asset_server.load("sounds/moya_power_detection.ogg")));
             if let Ok(camera_entity) = camera_query.single() {
-                commands
-                    .entity(camera_entity)
-                    .insert(
-                        CameraShake::new(
-                            0.15, // ระยะเวลาสั่น
-                            0.08, // ความแรง
-                        ),
-                    );
+                commands.entity(camera_entity).insert(CameraShake::new(0.15, 0.08));
             }
+            
+            // === เพิ่มบรรทัดนี้เพื่อ Spawn Particle ===
+            spawn_critical_hit_particle(
+                &mut commands,
+                &mut meshes,
+                &mut materials,
+                target_position + Vec3::new(0.0, 1.0, 0.0),
+            );
         }
         target_health.current -= damage;
 
@@ -2235,8 +2299,7 @@ fn player_energy_hit_enemy(
                 target_health.max,
             );
 
-        let target_position =
-            target_transform.translation();
+        
 
         let damage_kind =
             if is_critical {

@@ -1,4 +1,3 @@
-// element_ui.rs
 use bevy::prelude::*;
 use crate::components::{
     Health, Mana, Player, GuardianDialogUI,
@@ -154,6 +153,7 @@ fn element_status_input(
     ui_query: Query<Entity, With<ElementStatusUi>>,
     fonts: Res<GameFonts>,
     loc: Res<Localization>, // เพิ่ม Res<Localization>
+    asset_server: Res<AssetServer>
 ) {
     if !dialog_query.is_empty() { return; }
 
@@ -167,6 +167,7 @@ fn element_status_input(
     } else {
         spawn_element_status_ui(&mut commands, &fonts, &loc); // ส่ง loc เข้าไป
     }
+    commands.spawn(AudioPlayer::new(asset_server.load("sounds/status_window.ogg")));
 }
 
 fn update_element_status_ui(
@@ -276,6 +277,7 @@ fn game_controls_input(
     dialog_query: Query<(), With<GuardianDialogUI>>,
     controls_ui_query: Query<Entity, With<ControlsUiRoot>>,
     fonts: Res<GameFonts>,
+    asset_server: Res<AssetServer>,
     loc: Res<Localization>, // เพิ่ม Res<Localization>
 ) {
     if !dialog_query.is_empty() { return; }
@@ -290,6 +292,7 @@ fn game_controls_input(
     } else {
         spawn_controls_ui(&mut commands, &fonts, &loc); // ส่ง loc เข้าไป
     }
+    commands.spawn(AudioPlayer::new(asset_server.load("sounds/control_window.ogg")));
 }
 
 // ระบบสลับภาษา
@@ -297,6 +300,8 @@ fn language_switch_input(
     keyboard: Res<ButtonInput<KeyCode>>,
     gamepads: Query<&Gamepad>,
     mut loc: ResMut<Localization>,
+    mut commands: Commands,
+    asset_server: Res<AssetServer>,
 ) {
     let kb_pressed = keyboard.just_pressed(KeyCode::KeyE);
     // Bevy 0.15 ใช้ FaceEast แทน East (ปุ่ม B / Circle)
@@ -308,7 +313,9 @@ fn language_switch_input(
             Language::Thai => Language::NorthernThai,
             Language::NorthernThai => Language::English,
         };
+        commands.spawn(AudioPlayer::new(asset_server.load("sounds/change_lang.ogg")));
     }
+    
 }
 
 // ระบบตรวจสอบการเปลี่ยนภาษา

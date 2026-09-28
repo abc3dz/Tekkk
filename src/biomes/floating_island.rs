@@ -20,32 +20,35 @@ pub fn spawn_floating_island(
         RigidBody::Static,
         Collider::cylinder(9.8, 0.1),
         Transform::from_xyz(0.0, 0.0, 1.25),
+        DespawnOnExit(GameScene::FloatingIsland),
     ));
     //sloped
      commands.spawn((
         RigidBody::Static,
         Collider::cuboid(10.0, 0.1, 80.0),
-        Transform::from_xyz(0.0, 0.0, 0.0)
-            .with_rotation(Quat::from_rotation_x(35.0_f32.to_radians())),
+        Transform::from_xyz(0.0, 0.0, 0.0).with_rotation(Quat::from_rotation_x(35.0_f32.to_radians())),
+        DespawnOnExit(GameScene::FloatingIsland),
     ));
     //ground2
     commands.spawn((
         RigidBody::Static,
         Collider::cuboid(25.6, 0.1, 28.5),
         Transform::from_xyz(8.3, 20.85, -13.1),
+        DespawnOnExit(GameScene::FloatingIsland),
     ));
     //sloped2
     commands.spawn((
         RigidBody::Static,
         Collider::cuboid(50.0, 0.1, 10.0),
-        Transform::from_xyz(10.0,22.0,-9.0)
-            .with_rotation(Quat::from_rotation_z(35.0_f32.to_radians())),
+        Transform::from_xyz(10.0,22.0,-9.0).with_rotation(Quat::from_rotation_z(35.0_f32.to_radians())),
+        DespawnOnExit(GameScene::FloatingIsland),
     ));
     //ground3
     commands.spawn((
         RigidBody::Static,
         Collider::cylinder(12.5, 0.1),
         Transform::from_xyz(41.0, 34.4, -23.12),
+        DespawnOnExit(GameScene::FloatingIsland),
     ));
     //warp
     commands.spawn((

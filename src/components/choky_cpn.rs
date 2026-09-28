@@ -1,5 +1,4 @@
 use bevy::prelude::*;
-use crate::components::combat_cpn::Element;
 
 #[derive(Resource)]
 pub struct EnemyChokyAnimationGraph {
@@ -37,18 +36,3 @@ pub struct ChokyAttackTimer(pub Timer);
 
 #[derive(Resource, Default)]
 pub struct ChokyHasSpawned(pub bool);
-
-/// ปุ่ม + / - ประจำแต่ละธาตุในแผงจัดสรร
-#[derive(Component, Clone, Copy)]
-pub struct AllocButton {
-    pub element: Element,
-    pub increase: bool,
-}
-
-/// Text แสดง EXP ของธาตุไหน (ไว้อัพเดตตัวเลขทุกเฟรม)
-#[derive(Component, Clone, Copy)]
-pub struct AllocElementText(pub Element);
-
-/// Text แสดงค่ากลางปัจจุบัน
-#[derive(Component)]
-pub struct AllocPoolText;

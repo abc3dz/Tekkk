@@ -1,4 +1,5 @@
 use bevy::prelude::*;
+use crate::components::combat_cpn::Element;
 
 #[derive(Resource)]
 pub struct GuardianAnimationGraph {
@@ -90,3 +91,25 @@ pub enum GuardianMenuAction {
 pub struct GuardianMenuSelection {
     pub index: usize,
 }
+// ปุ่ม + / - ประจำแต่ละธาตุในแผงจัดสรร
+#[derive(Component, Clone, Copy)]
+pub struct AllocButton {
+    pub element: Element,
+    pub increase: bool,
+}
+
+// Text แสดง EXP ของธาตุไหน (ไว้อัพเดตตัวเลขทุกเฟรม)
+#[derive(Component, Clone, Copy)]
+pub struct AllocElementText(pub Element);
+
+// Text แสดงค่ากลางปัจจุบัน
+#[derive(Component)]
+pub struct AllocPoolText;
+
+// ปุ่มเลือกธาตุโจมตี/ป้องกัน ในแผงเทพผู้พิทักษ์
+#[derive(Component, Clone, Copy)]
+pub struct AtkElementButton(pub Element);
+
+// Text แสดงธาตุโจมตีปัจจุบัน
+#[derive(Component)]
+pub struct AtkElementText;
