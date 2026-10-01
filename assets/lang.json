@@ -39,7 +39,6 @@
     "load": "LOAD",
     "settings": "SETTINGS",
     "resume": "RESUME",
-    
     "settings_title": "SETTINGS",
     "resolution": "RESOLUTION",
     "display_mode": "DISPLAY MODE",
@@ -47,14 +46,31 @@
     "language": "LANGUAGE",
     "apply": "APPLY",
     "back": "BACK",
-    
+    "attack_element": "Attack Element",
     "fullscreen": "Fullscreen",
     "borderless": "Borderless",
     "windowed": "Windowed",
-    
     "lang_en": "English",
     "lang_th": "Thai",
-    "lang_nth": "Northern Thai"
+    "lang_nth": "Northern Thai",
+    "guardian_controls_title": "CONTROLS",
+    "guardian_controls_menu_title": "Left Menu",
+    "guardian_controls_menu_up": "W / ArrowUp / DPadUp = Up",
+    "guardian_controls_menu_down": "S / ArrowDown / DPadDown = Down",
+    "guardian_controls_menu_confirm": "Space / South = Confirm",
+    "guardian_controls_menu_switch_alloc": "Tab / Select = Switch to Allocation Panel",
+    "guardian_controls_menu_close": "Esc / Start = Close dialog",
+
+    "guardian_controls_alloc_title": "Element Allocation Panel",
+    "guardian_controls_alloc_up": "W / ArrowUp / DPadUp = Select element (Up)",
+    "guardian_controls_alloc_down": "S / ArrowDown / DPadDown = Select element (Down)",
+    "guardian_controls_alloc_increase": "U / RightTrigger = Increase element value",
+    "guardian_controls_alloc_decrease": "E / LeftTrigger = Decrease element value",
+    "guardian_controls_alloc_atk_left": "A / ArrowLeft / DPadLeft = Select left attack element",
+    "guardian_controls_alloc_atk_right": "D / ArrowRight / DPadRight = Select right attack element",
+    "guardian_controls_alloc_confirm": "Enter / East = Confirm attack element",
+    "guardian_controls_alloc_switch_menu": "Tab / Select = Switch back to menu"
+    
   },
   "th": {
     "player_status_title": "สถานะผู้เล่น",
@@ -96,7 +112,6 @@
     "load": "โหลดเกม",
     "settings": "ตั้งค่า",
     "resume": "เล่นต่อ",
-    
     "settings_title": "ตั้งค่า",
     "resolution": "ความละเอียด",
     "display_mode": "โหมดการแสดงผล",
@@ -104,14 +119,30 @@
     "language": "ภาษา",
     "apply": "นำไปใช้",
     "back": "กลับ",
-    
+    "attack_element": "ธาตุโจมตี",
     "fullscreen": "เต็มหน้าจอ",
     "borderless": "ไร้ขอบเขต",
     "windowed": "หน้าต่าง",
-    
     "lang_en": "ภาษาอังกฤษ",
     "lang_th": "ภาษาไทย",
-    "lang_nth": "ภาษาเหนือ"
+    "lang_nth": "ภาษาเหนือ",
+    "guardian_controls_title": "การควบคุม",
+    "guardian_controls_menu_title": "เมนูซ้าย",
+    "guardian_controls_menu_up": "W / ArrowUp / DPadUp = ขึ้น",
+    "guardian_controls_menu_down": "S / ArrowDown / DPadDown = ลง",
+    "guardian_controls_menu_confirm": "Space / South = ยืนยัน",
+    "guardian_controls_menu_switch_alloc": "Tab / Select = สลับไปแผงจัดสรรธาตุ",
+    "guardian_controls_menu_close": "Esc / Start = ปิดหน้าต่าง",
+
+    "guardian_controls_alloc_title": "แผงจัดสรรธาตุ",
+    "guardian_controls_alloc_up": "W / ArrowUp / DPadUp = เลือกธาตุ (ขึ้น)",
+    "guardian_controls_alloc_down": "S / ArrowDown / DPadDown = เลือกธาตุ (ลง)",
+    "guardian_controls_alloc_increase": "U / RightTrigger = เพิ่มค่าธาตุ",
+    "guardian_controls_alloc_decrease": "E / LeftTrigger = ลดค่าธาตุ",
+    "guardian_controls_alloc_atk_left": "A / ArrowLeft / DPadLeft = เลือกธาตุโจมตีซ้าย",
+    "guardian_controls_alloc_atk_right": "D / ArrowRight / DPadRight = เลือกธาตุโจมตีขวา",
+    "guardian_controls_alloc_confirm": "Enter / East = ยืนยันธาตุโจมตี",
+    "guardian_controls_alloc_switch_menu": "Tab / Select = สลับกลับเมนู"
   },
   "nth": {
     "player_status_title": "สถานะข้อยหื้อ",
@@ -153,7 +184,6 @@
     "load": "โหลด",
     "settings": "ตั้งค่า",
     "resume": "เล่นต่อ",
-    
     "settings_title": "ตั้งค่า",
     "resolution": "ความละเอียด",
     "display_mode": "โหมดจอ",
@@ -161,13 +191,29 @@
     "language": "ภาษา",
     "apply": "ใช้เลย",
     "back": "ย้อน",
-    
+    "attack_element": "ธาตุตี",
     "fullscreen": "เต็มจอ",
     "borderless": "ไร้ขอบ",
     "windowed": "หน้าต่าง",
-    
     "lang_en": "ภาษาอังกฤษ",
     "lang_th": "ภาษาไทย",
-    "lang_nth": "กำเมือง"
+    "lang_nth": "กำเมือง",
+    "guardian_controls_title": "การควบคุม",
+    "guardian_controls_menu_title": "เมนูฝั่งซ้าย",
+    "guardian_controls_menu_up": "W / ArrowUp / DPadUp = ขึ้น",
+    "guardian_controls_menu_down": "S / ArrowDown / DPadDown = ลง",
+    "guardian_controls_menu_confirm": "Space / South = ยืนยัน",
+    "guardian_controls_menu_switch_alloc": "Tab / Select = ไปแผงจัดธาตุ",
+    "guardian_controls_menu_close": "Esc / Start = ปิ๊ดหน้าต่าง",
+
+    "guardian_controls_alloc_title": "แผงจัดธาตุ",
+    "guardian_controls_alloc_up": "W / ArrowUp / DPadUp = เลือกธาตุ (ขึ้น)",
+    "guardian_controls_alloc_down": "S / ArrowDown / DPadDown = เลือกธาตุ (ลง)",
+    "guardian_controls_alloc_increase": "U / RightTrigger = เพิ่มค่าธาตุ",
+    "guardian_controls_alloc_decrease": "E / LeftTrigger = ลดค่าธาตุ",
+    "guardian_controls_alloc_atk_left": "A / ArrowLeft / DPadLeft = เลือกธาตุตีซ้าย",
+    "guardian_controls_alloc_atk_right": "D / ArrowRight / DPadRight = เลือกธาตุตีขวา",
+    "guardian_controls_alloc_confirm": "Enter / East = ยืนยันธาตุตี",
+    "guardian_controls_alloc_switch_menu": "Tab / Select = กลับเมนู"
   }
 }
