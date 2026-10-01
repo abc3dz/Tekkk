@@ -68,11 +68,10 @@ impl Plugin for PauseMenuPlugin {
         .init_resource::<SaveRequest>()
         .init_resource::<LoadRequest>()
         .init_resource::<PauseMenuState>()
+        .add_systems(First, reset_guardian_esc_consumed)
         .add_systems(Update, toggle_pause)
         .add_systems(OnEnter(GameMode::Paused), setup_pause_menu)
-        .add_systems(
-            Update,
-            (
+        .add_systems(Update,(
                 pause_menu_input,
                 pause_button_system,
                 refresh_pause_menu,
@@ -86,12 +85,21 @@ fn toggle_pause(
     gamepads: Query<&Gamepad>,
     state: Res<State<GameMode>>,
     mut next_state: ResMut<NextState<GameMode>>,
+    guardian_dialog_open: Res<GuardianDialogOpen>,
+    guardian_esc_consumed: Res<GuardianDialogEscConsumed>,
 ) {
     let keyboard_pressed = keyboard.just_pressed(KeyCode::Escape);
-    let gamepad_pressed =
-        gamepads.iter().any(|gamepad| gamepad.just_pressed(GamepadButton::Start));
-
+    let gamepad_pressed = gamepads.iter().any(|gamepad| gamepad.just_pressed(GamepadButton::Start));
     if !keyboard_pressed && !gamepad_pressed {
+        return;
+    }
+
+    // ถ้าอยู่ในโหมด Playing และ Guardian dialog เปิดอยู่
+    // หรือเพิ่งกด ESC เพื่อปิด Guardian dialog ในเฟรมนี้
+    // ให้บล็อกการเปิด Pause Menu
+    if *state.get() == GameMode::Playing
+        && (guardian_dialog_open.0 || guardian_esc_consumed.0)
+    {
         return;
     }
 
@@ -104,7 +112,9 @@ fn toggle_pause(
         }
     }
 }
-
+fn reset_guardian_esc_consumed(mut consumed: ResMut<GuardianDialogEscConsumed>) {
+    consumed.0 = false;
+}
 fn setup_pause_menu(
     mut commands: Commands,
     fonts: Res<GameFonts>,

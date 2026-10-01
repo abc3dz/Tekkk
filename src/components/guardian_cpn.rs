@@ -84,7 +84,6 @@ pub enum GuardianMenuAction {
     BasicPractice,
     AdvancedPractice,
     FullHpMana,
-    StopPractice,
 }
 
 #[derive(Resource, Default)]
@@ -113,3 +112,80 @@ pub struct AtkElementButton(pub Element);
 // Text แสดงธาตุโจมตีปัจจุบัน
 #[derive(Component)]
 pub struct AtkElementText;
+
+#[derive(Resource, Default)]
+pub struct GuardianDialogOpen(pub bool);
+
+#[derive(Resource, Default)]
+pub struct GuardianDialogEscConsumed(pub bool);
+
+#[derive(Resource, Default)]
+pub struct GuardianAllocSelection {
+    pub index: usize,
+}
+
+#[derive(Resource, Default)]
+pub struct GuardianAllocPointSelection {
+    pub index: usize,
+}
+
+#[derive(Resource, Default, Clone, Copy, PartialEq, Eq)]
+pub enum GuardianDialogFocus {
+    #[default]
+    Menu,
+    Allocation,
+}
+
+#[derive(Component)]
+pub struct GuardianMenuPanel;
+
+#[derive(Component)]
+pub struct GuardianAllocPanel;
+
+#[derive(Resource)]
+pub struct GuardianAllocIncreaseRepeat(pub Timer);
+
+#[derive(Resource)]
+pub struct GuardianAllocDecreaseRepeat(pub Timer);
+
+impl Default for GuardianAllocIncreaseRepeat {
+    fn default() -> Self {
+        // ถ้าอยากให้เร็วขึ้น ลดเลขนี้ เช่น 0.04 หรือ 0.03
+        Self(Timer::from_seconds(0.06, TimerMode::Repeating))
+    }
+}
+
+impl Default for GuardianAllocDecreaseRepeat {
+    fn default() -> Self {
+        // ถ้าอยากให้เร็วขึ้น ลดเลขนี้ เช่น 0.04 หรือ 0.03
+        Self(Timer::from_seconds(0.06, TimerMode::Repeating))
+    }
+}
+#[derive(Default)]
+pub struct GuardianAllocPressState {
+    pub increase: bool,
+    pub decrease: bool,
+}
+
+#[derive(Clone, Copy, PartialEq, Eq)]
+pub enum GuardianControlKey {
+    MenuTitle,
+    MenuUp,
+    MenuDown,
+    MenuConfirm,
+    MenuSwitchAlloc,
+    MenuClose,
+
+    AllocTitle,
+    AllocUp,
+    AllocDown,
+    AllocIncrease,
+    AllocDecrease,
+    AllocAtkLeft,
+    AllocAtkRight,
+    AllocConfirm,
+    AllocSwitchMenu,
+}
+
+#[derive(Component)]
+pub struct GuardianControlLabel(pub GuardianControlKey);

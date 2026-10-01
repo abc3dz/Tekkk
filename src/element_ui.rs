@@ -1,10 +1,10 @@
 use bevy::prelude::*;
 use crate::components::{
     Health, Mana, Player, GuardianDialogUI,
-    AtkAndDefElement, BaseStats, CombatStats, ElementMastery,
+    AtkAndDefElement, BaseStats, CombatStats, ElementMastery, Element, // เพิ่ม Element
 };
 use crate::ui_cpn::{
-    GameFonts, Localization, Language, PreviousLanguage,
+    GameFonts, Localization, PreviousLanguage,
     setup_localization, load_fonts,
 };
 
@@ -13,18 +13,18 @@ pub struct ElementUiPlugin;
 impl Plugin for ElementUiPlugin {
     fn build(&self, app: &mut App) {
         app
-        .add_systems(Startup, (
-            load_fonts,
-            setup_localization,
-        ))
-        .init_resource::<PreviousLanguage>()
-        .add_systems(Update, (
-            element_status_input,
-            update_element_status_ui,
-            game_controls_input,
-            language_switch_input,
-            update_ui_on_language_change,
-        ));
+            .add_systems(Startup, (
+                load_fonts,
+                setup_localization,
+            ))
+            .init_resource::<PreviousLanguage>()
+            .add_systems(Update, (
+                close_status_and_controls_when_guardian_dialog_open,
+                element_status_input,
+                update_element_status_ui,
+                game_controls_input,
+                update_ui_on_language_change,
+            ));
     }
 }
 
@@ -44,7 +44,10 @@ enum PlayerStatusBonusText { Hp, Mp, Attack, Defense, CriticalRate, CriticalDama
 enum ElementExpText { Water, Fire, Wind, Earth, Inw }
 
 // 1. เพิ่ม loc: &Localization
-fn spawn_element_status_ui(commands: &mut Commands, fonts: &GameFonts, loc: &Localization) {
+fn spawn_element_status_ui(commands: &mut Commands, fonts: &GameFonts, loc: &Localization, dialog_query: Query<(), With<GuardianDialogUI>>,) {
+    if !dialog_query.is_empty() {
+        return;
+    }
     commands
         .spawn((
             ElementStatusUi,
@@ -64,7 +67,7 @@ fn spawn_element_status_ui(commands: &mut Commands, fonts: &GameFonts, loc: &Loc
         ))
         .with_children(|panel| {
             panel.spawn((
-                Text::new(loc.get("player_status_title")), // ใช้ loc.get
+                Text::new(loc.get("player_status_title")), 
                 TextFont { font: fonts.abc3dz.clone(), font_size: 28.0, ..default() },
                 TextColor(Color::srgb(1.0, 0.82, 0.20)),
                 Node {
@@ -110,7 +113,7 @@ fn spawn_element_status_ui(commands: &mut Commands, fonts: &GameFonts, loc: &Loc
             }
 
             panel.spawn((
-                Text::new(loc.get("element_exp_title")), // ใช้ loc.get
+                Text::new(loc.get("element_exp_title")), 
                 TextFont { font: fonts.abc3dz.clone(), font_size: 28.0, ..default() },
                 TextColor(Color::srgb(1.0, 0.82, 0.20)),
                 Node {
@@ -151,26 +154,44 @@ fn element_status_input(
     gamepads: Query<&Gamepad>,
     dialog_query: Query<(), With<GuardianDialogUI>>,
     ui_query: Query<Entity, With<ElementStatusUi>>,
+    controls_query: Query<Entity, With<ControlsUiRoot>>, // เพิ่มตัวนี้
     fonts: Res<GameFonts>,
-    loc: Res<Localization>, // เพิ่ม Res<Localization>
-    asset_server: Res<AssetServer>
+    loc: Res<Localization>,
+    asset_server: Res<AssetServer>,
 ) {
-    if !dialog_query.is_empty() { return; }
-
-    let keyboard_pressed = keyboard.just_pressed(KeyCode::KeyU);
-    let gamepad_pressed = gamepads.iter().any(|gamepad| gamepad.just_pressed(GamepadButton::RightTrigger));
-
-    if !keyboard_pressed && !gamepad_pressed { return; }
-
-    if let Ok(entity) = ui_query.single() {
-        commands.entity(entity).despawn();
-    } else {
-        spawn_element_status_ui(&mut commands, &fonts, &loc); // ส่ง loc เข้าไป
+    if !dialog_query.is_empty() {
+        return;
     }
+
+    let keyboard_pressed = keyboard.just_pressed(KeyCode::KeyQ);
+    let gamepad_pressed = gamepads
+        .iter()
+        .any(|gamepad| gamepad.just_pressed(GamepadButton::LeftTrigger2));
+
+    if !keyboard_pressed && !gamepad_pressed {
+        return;
+    }
+
+    // ถ้าหน้าสถานะเปิดอยู่ -> ปิดหน้าสถานะ
+    if !ui_query.is_empty() {
+        for entity in &ui_query {
+            commands.entity(entity).despawn();
+        }
+    } else {
+        // ถ้าจะเปิดหน้าสถานะ -> ปิดหน้าควบคุมก่อน
+        for entity in &controls_query {
+            commands.entity(entity).despawn();
+        }
+
+        spawn_element_status_ui(&mut commands, &fonts, &loc, dialog_query);
+    }
+
     commands.spawn(AudioPlayer::new(asset_server.load("sounds/status_window.ogg")));
 }
 
+// 2. เพิ่ม loc: Res<Localization> เข้ามาเพื่อใช้แปลชื่อธาตุ
 fn update_element_status_ui(
+    loc: Res<Localization>, // <--- เพิ่มบรรทัดนี้
     player_query: Query<(&Health, &Mana, &BaseStats, &CombatStats, &ElementMastery, &AtkAndDefElement), With<Player>>,
     ui_query: Query<&Node, With<ElementStatusUi>>,
     mut value_query: Query<(&PlayerStatusValueText, &mut TextSpan), (Without<PlayerStatusBonusText>, Without<ElementExpText>)>,
@@ -179,7 +200,7 @@ fn update_element_status_ui(
 ) {
     let Ok(ui_node) = ui_query.single() else { return };
     if matches!(ui_node.display, Display::None) { return; }
-
+    
     let Ok((health, mana, base, combat, mastery, atk_and_def_element)) = player_query.single() else { return };
 
     let hp_bonus = combat.max_hp - base.max_hp;
@@ -190,7 +211,6 @@ fn update_element_status_ui(
     let critical_damage_bonus = (combat.critical_damage - base.critical_damage) * 100.0;
 
     for (kind, mut span) in &mut value_query {
-        // แก้จาก span.0 ใน Bevy 0.15 TextSpan คือ struct TextSpan(pub String)
         span.0 = match kind {
             PlayerStatusValueText::Hp => format!("{} / {:.0}", health.current, combat.max_hp),
             PlayerStatusValueText::Mp => format!("{} / {:.0}", mana.current, combat.max_mp),
@@ -198,12 +218,23 @@ fn update_element_status_ui(
             PlayerStatusValueText::Defense => format!("{:.1}", combat.defense),
             PlayerStatusValueText::CriticalRate => format!("{:.1}%", combat.critical_rate * 100.0),
             PlayerStatusValueText::CriticalDamage => format!("{:.1}%", combat.critical_damage * 100.0),
-            PlayerStatusValueText::AtkAndDefElement => format!("{:?}", atk_and_def_element.0),
+            
+            // แก้ไขส่วนนี้: ดึงชื่อธาตุจาก lang.json แทนการใช้ {:?}
+            PlayerStatusValueText::AtkAndDefElement => {
+                let element_name = match atk_and_def_element.0 {
+                    Element::Water => loc.get("water"),
+                    Element::Fire => loc.get("fire"),
+                    Element::Wind => loc.get("wind"),
+                    Element::Earth => loc.get("earth"),
+                    Element::Inw => loc.get("inw"),
+                    Element::Neutral => loc.get("neutral"),
+                };
+                element_name.to_string()
+            }
         };
     }
 
     for (kind, mut span) in &mut bonus_query {
-        // แก้ **span เป็น span.0
         span.0 = match kind {
             PlayerStatusBonusText::Hp => format!("  (+{:.0})", hp_bonus),
             PlayerStatusBonusText::Mp => format!("  (+{:.0})", mp_bonus),
@@ -225,8 +256,10 @@ fn update_element_status_ui(
     }
 }
 
-// 2. เพิ่ม loc: &Localization
-fn spawn_controls_ui(commands: &mut Commands, fonts: &GameFonts, loc: &Localization) {
+fn spawn_controls_ui(commands: &mut Commands, fonts: &GameFonts, loc: &Localization, dialog_query: Query<(), With<GuardianDialogUI>>,) {
+    if !dialog_query.is_empty() {
+        return;
+    }
     commands
         .spawn((
             ControlsUiRoot,
@@ -256,7 +289,7 @@ fn spawn_controls_ui(commands: &mut Commands, fonts: &GameFonts, loc: &Localizat
                 loc.get("attack_label"), "J / X Button", "",
                 loc.get("dash_label"), "L / B Button", "",
                 loc.get("power_label"), "I / Y Button", "",
-                loc.get("status_label"), "U / RB", "",
+                loc.get("status_label"), "Q / LT", "",
                 loc.get("controls_label"), "O / RT", "",
             ];
 
@@ -276,46 +309,39 @@ fn game_controls_input(
     gamepads: Query<&Gamepad>,
     dialog_query: Query<(), With<GuardianDialogUI>>,
     controls_ui_query: Query<Entity, With<ControlsUiRoot>>,
+    status_query: Query<Entity, With<ElementStatusUi>>, // เพิ่มตัวนี้
     fonts: Res<GameFonts>,
     asset_server: Res<AssetServer>,
-    loc: Res<Localization>, // เพิ่ม Res<Localization>
+    loc: Res<Localization>,
 ) {
-    if !dialog_query.is_empty() { return; }
+    if !dialog_query.is_empty() {
+        return;
+    }
 
     let keyboard_pressed = keyboard.just_pressed(KeyCode::KeyO);
-    let gamepad_pressed = gamepads.iter().any(|gamepad| gamepad.just_pressed(GamepadButton::RightTrigger2));
+    let gamepad_pressed = gamepads
+        .iter()
+        .any(|gamepad| gamepad.just_pressed(GamepadButton::RightTrigger2));
 
-    if !keyboard_pressed && !gamepad_pressed { return; }
+    if !keyboard_pressed && !gamepad_pressed {
+        return;
+    }
 
-    if let Ok(entity) = controls_ui_query.single() {
-        commands.entity(entity).despawn();
+    // ถ้าหน้าควบคุมเปิดอยู่ -> ปิดหน้าควบคุม
+    if !controls_ui_query.is_empty() {
+        for entity in &controls_ui_query {
+            commands.entity(entity).despawn();
+        }
     } else {
-        spawn_controls_ui(&mut commands, &fonts, &loc); // ส่ง loc เข้าไป
+        // ถ้าจะเปิดหน้าควบคุม -> ปิดหน้าสถานะก่อน
+        for entity in &status_query {
+            commands.entity(entity).despawn();
+        }
+
+        spawn_controls_ui(&mut commands, &fonts, &loc, dialog_query);
     }
+
     commands.spawn(AudioPlayer::new(asset_server.load("sounds/control_window.ogg")));
-}
-
-// ระบบสลับภาษา
-fn language_switch_input(
-    keyboard: Res<ButtonInput<KeyCode>>,
-    gamepads: Query<&Gamepad>,
-    mut loc: ResMut<Localization>,
-    mut commands: Commands,
-    asset_server: Res<AssetServer>,
-) {
-    let kb_pressed = keyboard.just_pressed(KeyCode::KeyE);
-    // Bevy 0.15 ใช้ FaceEast แทน East (ปุ่ม B / Circle)
-    let gp_pressed = gamepads.iter().any(|g| g.just_pressed(GamepadButton::RightTrigger)); 
-
-    if kb_pressed || gp_pressed {
-        loc.current = match loc.current {
-            Language::English => Language::Thai,
-            Language::Thai => Language::NorthernThai,
-            Language::NorthernThai => Language::English,
-        };
-        commands.spawn(AudioPlayer::new(asset_server.load("sounds/change_lang.ogg")));
-    }
-    
 }
 
 // ระบบตรวจสอบการเปลี่ยนภาษา
@@ -326,22 +352,44 @@ fn update_ui_on_language_change(
     ui_query: Query<Entity, With<ElementStatusUi>>,
     controls_query: Query<Entity, With<ControlsUiRoot>>,
     guardian_query: Query<Entity, With<GuardianDialogUI>>,
+    dialog_query: Query<(), With<GuardianDialogUI>>,
     fonts: Res<GameFonts>,
 ) {
     if loc.current != prev_lang.0 {
         if let Ok(entity) = ui_query.single() {
             commands.entity(entity).despawn();
-            spawn_element_status_ui(&mut commands, &fonts, &loc);
+            spawn_element_status_ui(&mut commands, &fonts, &loc, dialog_query);
         }
         if let Ok(entity) = controls_query.single() {
             commands.entity(entity).despawn();
-            spawn_controls_ui(&mut commands, &fonts, &loc);
+            spawn_controls_ui(&mut commands, &fonts, &loc, dialog_query);
         }
         if let Ok(entity) = guardian_query.single() {
             commands.entity(entity).despawn();
             // ไม่ต้อง spawn ใหม่ตรงๆ เพราะระบบ show_guardian_dialog จะทำงานในเฟรมถัดไป
-            // และมันจะ spawn ใหม่ให้เองโดยอัตโนมัติ (เพราะ dialog_query.is_empty() จะเป็น true)
         }
         prev_lang.0 = loc.current;
+    }
+}
+
+fn close_status_and_controls_when_guardian_dialog_open(
+    mut commands: Commands,
+    dialog_query: Query<(), With<GuardianDialogUI>>,
+    status_query: Query<Entity, With<ElementStatusUi>>,
+    controls_query: Query<Entity, With<ControlsUiRoot>>,
+) {
+    // ถ้าไม่มี guardian dialog เปิดอยู่ ก็ไม่ต้องทำอะไร
+    if dialog_query.is_empty() {
+        return;
+    }
+
+    // ปิดหน้าต่างสถานะผู้เล่น
+    for entity in &status_query {
+        commands.entity(entity).despawn();
+    }
+
+    // ปิดหน้าต่าง controls
+    for entity in &controls_query {
+        commands.entity(entity).despawn();
     }
 }
