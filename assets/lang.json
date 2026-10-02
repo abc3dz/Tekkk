@@ -69,8 +69,13 @@
     "guardian_controls_alloc_atk_left": "A / ArrowLeft / DPadLeft = Select left attack element",
     "guardian_controls_alloc_atk_right": "D / ArrowRight / DPadRight = Select right attack element",
     "guardian_controls_alloc_confirm": "Enter / East = Confirm attack element",
-    "guardian_controls_alloc_switch_menu": "Tab / Select = Switch back to menu"
-    
+    "guardian_controls_alloc_switch_menu": "Tab / Select = Switch back to menu",
+
+    "element_allocation": "Element Allocation",
+    "alloc_window_title": "Element Allocation Window",
+    "element_bonus_title": "Bonus per 10 Element Points",
+    "elemental_per_10": "Elemental/10",
+    "guardian_controls_alloc_close": "Close Allocation Window: Esc / Start"
   },
   "th": {
     "player_status_title": "สถานะผู้เล่น",
@@ -142,16 +147,22 @@
     "guardian_controls_alloc_atk_left": "A / ArrowLeft / DPadLeft = เลือกธาตุโจมตีซ้าย",
     "guardian_controls_alloc_atk_right": "D / ArrowRight / DPadRight = เลือกธาตุโจมตีขวา",
     "guardian_controls_alloc_confirm": "Enter / East = ยืนยันธาตุโจมตี",
-    "guardian_controls_alloc_switch_menu": "Tab / Select = สลับกลับเมนู"
+    "guardian_controls_alloc_switch_menu": "Tab / Select = สลับกลับเมนู",
+
+    "element_allocation": "จัดสรรธาตุ",
+    "alloc_window_title": "หน้าต่างจัดสรรธาตุ",
+    "element_bonus_title": "โบนัสที่ได้รับต่อธาตุ 10 แต้ม",
+    "elemental_per_10": "Elemental/10",
+    "guardian_controls_alloc_close": "ปิดหน้าต่างจัดสรร: Esc / Start"
   },
   "nth": {
-    "player_status_title": "สถานะข้อยหื้อ",
+    "player_status_title": "สถานะคนเล่น",
     "hp_label": "เลือด: ",
     "mp_label": "มานา: ",
     "atk_label": "พลังตี: ",
     "def_label": "พลังรับ: ",
     "crit_rate_label": "โอกาสคริ: ",
-    "crit_dmg_label": "แรงคริ: ",
+    "crit_dmg_label": "แฮงคริ: ",
     "element_label": "ธาตุ: ",
     "element_exp_title": "ประสบการณ์ธาตุ",
     "water_label": "น้ำ: ",
@@ -159,11 +170,11 @@
     "wind_label": "ลม: ",
     "earth_label": "ดิน: ",
     "inw_label": "เทพ: ",
-    "controls_title": "การควบคุม\nคีย์บอร์ด / เกมแพด",
+    "controls_title": "การควบคุม\nคีย์บอร์ด / จอยเกม",
     "move_label": "ขยับ",
-    "jump_label": "ก้าด",
-    "attack_label": "ตี",
-    "dash_label": "หลบ",
+    "jump_label": "วิด",
+    "attack_label": "ตี๋",
+    "dash_label": "ปุ่ง",
     "power_label": "ของดี",
     "status_label": "สถานะ",
     "controls_label": "การควบคุม",
@@ -189,8 +200,8 @@
     "display_mode": "โหมดจอ",
     "master_volume": "เสียง",
     "language": "ภาษา",
-    "apply": "ใช้เลย",
-    "back": "ย้อน",
+    "apply": "ใจ้เลย",
+    "back": "ปิก",
     "attack_element": "ธาตุตี",
     "fullscreen": "เต็มจอ",
     "borderless": "ไร้ขอบ",
@@ -199,7 +210,7 @@
     "lang_th": "ภาษาไทย",
     "lang_nth": "กำเมือง",
     "guardian_controls_title": "การควบคุม",
-    "guardian_controls_menu_title": "เมนูฝั่งซ้าย",
+    "guardian_controls_menu_title": "เมนูตางซ้าย",
     "guardian_controls_menu_up": "W / ArrowUp / DPadUp = ขึ้น",
     "guardian_controls_menu_down": "S / ArrowDown / DPadDown = ลง",
     "guardian_controls_menu_confirm": "Space / South = ยืนยัน",
@@ -211,9 +222,14 @@
     "guardian_controls_alloc_down": "S / ArrowDown / DPadDown = เลือกธาตุ (ลง)",
     "guardian_controls_alloc_increase": "U / RightTrigger = เพิ่มค่าธาตุ",
     "guardian_controls_alloc_decrease": "E / LeftTrigger = ลดค่าธาตุ",
-    "guardian_controls_alloc_atk_left": "A / ArrowLeft / DPadLeft = เลือกธาตุตีซ้าย",
-    "guardian_controls_alloc_atk_right": "D / ArrowRight / DPadRight = เลือกธาตุตีขวา",
+    "guardian_controls_alloc_atk_left": "A / ArrowLeft / DPadLeft = เลือกธาตุตางซ้าย",
+    "guardian_controls_alloc_atk_right": "D / ArrowRight / DPadRight = เลือกธาตุตางขวา",
     "guardian_controls_alloc_confirm": "Enter / East = ยืนยันธาตุตี",
-    "guardian_controls_alloc_switch_menu": "Tab / Select = กลับเมนู"
+
+    "element_allocation": "จัดสรรธาตุ",
+    "alloc_window_title": "หน้าต่างจัดสรรธาตุ",
+    "element_bonus_title": "โบนัสที่ได้ต่อธาตุ 10 แต้ม",
+    "elemental_per_10": "ค่าธาตุตี่ตี10ตัว",
+    "guardian_controls_alloc_close": "ปิดหน้าต่างจัดสรร: Esc / Start"
   }
 }
