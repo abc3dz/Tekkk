@@ -1,4 +1,5 @@
 use bevy::prelude::*;
+use bevy::ecs::system::SystemParam;
 use crate::components::combat_cpn::Element;
 
 #[derive(Resource)]
@@ -84,7 +85,12 @@ pub enum GuardianMenuAction {
     BasicPractice,
     AdvancedPractice,
     FullHpMana,
+    ElementAllocation,
 }
+
+// marker ของหน้าต่างจัดสรรธาตุ
+#[derive(Component)]
+pub struct GuardianAllocWindow;
 
 #[derive(Resource, Default)]
 pub struct GuardianMenuSelection {
@@ -173,9 +179,7 @@ pub enum GuardianControlKey {
     MenuUp,
     MenuDown,
     MenuConfirm,
-    MenuSwitchAlloc,
     MenuClose,
-
     AllocTitle,
     AllocUp,
     AllocDown,
@@ -184,8 +188,16 @@ pub enum GuardianControlKey {
     AllocAtkLeft,
     AllocAtkRight,
     AllocConfirm,
-    AllocSwitchMenu,
+    AllocClose,
 }
 
 #[derive(Component)]
 pub struct GuardianControlLabel(pub GuardianControlKey);
+
+#[derive(SystemParam)]
+pub struct PracticeSettings<'w> {
+    pub basic_active: ResMut<'w, BasicPracticeActive>,
+    pub advanced_active: ResMut<'w, AdvancedPracticeActive>,
+    pub basic_timer: ResMut<'w, BasicGunRespawnTimer>,
+    pub advanced_timer: ResMut<'w, AdvancedMinionRespawnTimer>,
+}

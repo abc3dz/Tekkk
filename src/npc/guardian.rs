@@ -46,19 +46,16 @@ impl Plugin for GuardianPlugin {
                 check_guardian_interaction_area_exit,
                 show_guardian_dialog,
                 guardian_dialog_esc_input.after(show_guardian_dialog),
-                guardian_dialog_focus_keyboard.after(guardian_dialog_esc_input),
-                update_guardian_focus_visuals.after(guardian_dialog_focus_keyboard),
+                update_guardian_focus_visuals.after(guardian_dialog_esc_input),
                 guardian_menu_keyboard.after(update_guardian_focus_visuals),
                 guardian_menu_confirm_keyboard.after(guardian_menu_keyboard),
-                guardian_atk_selection_keyboard.after(guardian_dialog_focus_keyboard),
+                guardian_atk_selection_keyboard.after(guardian_dialog_esc_input),
                 guardian_alloc_point_keyboard.after(guardian_atk_selection_keyboard),
                 update_guardian_alloc_ui
                     .after(update_guardian_focus_visuals)
                     .after(guardian_alloc_point_keyboard)
                     .after(guardian_atk_selection_keyboard),
-                update_guardian_controls_language_and_focus
-                    .after(guardian_dialog_focus_keyboard)
-                    .after(update_guardian_focus_visuals),
+                update_guardian_controls_language_and_focus.after(update_guardian_focus_visuals),
                 cleanup_guardian_ui_when_player_leave,
             ).run_if(in_state(GameScene::Hub).and(in_state(GameMode::Playing))),)
             .add_systems(OnExit(GameScene::Hub), despawn_hub_only_entities);
@@ -297,7 +294,7 @@ pub fn show_guardian_dialog(
                 height: Val::Percent(100.0),
                 justify_content: JustifyContent::Center,
                 align_items: AlignItems::Center,
-                padding: UiRect::bottom(Val::Px(40.0)),
+                padding: UiRect::bottom(Val::Px(20.0)),
                 ..default()
             },
             BackgroundColor(Color::srgba(0.0, 0.0, 0.0, 0.60)),
@@ -307,6 +304,7 @@ pub fn show_guardian_dialog(
                 width: Val::Percent(85.0),
                 flex_direction: FlexDirection::Column,
                 row_gap: Val::Px(12.0),
+                margin: UiRect::top(Val::Auto), // 👈 ดูดพื้นที่ว่างด้านบนทั้งหมด = ดันทั้งก้อนลงชิดล่าง
                 ..default()
             })
             .with_children(|outer| {
@@ -347,27 +345,11 @@ pub fn show_guardian_dialog(
                                 BackgroundColor(Color::srgba(0.16, 0.16, 0.22, 0.9)),
                             ))
                             .with_children(|menu| {
-                                spawn_guardian_button(
-                                    menu,
-                                    loc.get("basic_practice"),
-                                    GuardianMenuAction::BasicPractice,
-                                    &fonts,
-                                );
-                                spawn_guardian_button(
-                                    menu,
-                                    loc.get("advanced_practice"),
-                                    GuardianMenuAction::AdvancedPractice,
-                                    &fonts,
-                                );
-                                spawn_guardian_button(
-                                    menu,
-                                    loc.get("full_hp_mana"),
-                                    GuardianMenuAction::FullHpMana,
-                                    &fonts,
-                                );
+                                spawn_guardian_button(menu, loc.get("basic_practice"), GuardianMenuAction::BasicPractice, &fonts);
+                                spawn_guardian_button(menu, loc.get("advanced_practice"), GuardianMenuAction::AdvancedPractice, &fonts);
+                                spawn_guardian_button(menu, loc.get("full_hp_mana"), GuardianMenuAction::FullHpMana, &fonts);
+                                spawn_guardian_button(menu, loc.get("element_allocation"), GuardianMenuAction::ElementAllocation, &fonts);
                             });
-
-                        spawn_alloc_panel(parent, &fonts, &loc);
                     });
 
                 // แผงบอกปุ่มควบคุม
@@ -386,6 +368,8 @@ pub fn guardian_dialog_esc_input(
     mut dialog_open: ResMut<GuardianDialogOpen>,
     mut esc_consumed: ResMut<GuardianDialogEscConsumed>,
     mut player_query: Query<&mut Transform, With<Player>>,
+    window_query: Query<Entity, With<GuardianAllocWindow>>, 
+    mut focus: ResMut<GuardianDialogFocus>
 ) {
     if !dialog_open.0 {
         return;
@@ -393,6 +377,17 @@ pub fn guardian_dialog_esc_input(
     let close_pressed = keyboard.just_pressed(KeyCode::Escape)
         || any_gp_just_pressed(&gamepads, GamepadButton::Start);
     if close_pressed {
+        // จังหวะแรก: ถ้าหน้าต่างจัดสรรเปิดอยู่ ให้ปิดมันก่อน ยังไม่ปิด dialog
+        if !window_query.is_empty() {
+            for entity in &window_query {
+                commands.entity(entity).despawn();
+            }
+            *focus = GuardianDialogFocus::Menu;
+            esc_consumed.0 = true;
+            return;
+        }
+
+        // จังหวะสอง: ปิด dialog ทั้งอัน (โค้ดเดิม)
         for entity in &dialog_query {
             commands.entity(entity).despawn();
         }
@@ -441,12 +436,13 @@ pub fn guardian_menu_keyboard(
     mut selection: ResMut<GuardianMenuSelection>,
     basic_active: Res<BasicPracticeActive>,
     advanced_active: Res<AdvancedPracticeActive>,
+    window_query: Query<(), With<GuardianAllocWindow>>, // เพิ่ม
     mut button_query: Query<(&GuardianMenuAction, &mut BackgroundColor), With<GuardianMenuButton>>,
 ) {
     if !dialog_open.0 {
         return;
     }
-    const MENU_COUNT: usize = 3;
+    const MENU_COUNT: usize = 4;
     if selection.index >= MENU_COUNT {
         selection.index = 0;
     }
@@ -469,27 +465,25 @@ pub fn guardian_menu_keyboard(
         }
     }
     let menu_focused = *focus == GuardianDialogFocus::Menu;
+    let window_open = !window_query.is_empty();
     for (action, mut background) in &mut button_query {
         let index = match action {
             GuardianMenuAction::BasicPractice => 0,
             GuardianMenuAction::AdvancedPractice => 1,
             GuardianMenuAction::FullHpMana => 2,
+            GuardianMenuAction::ElementAllocation => 3,
         };
-        let selected = index == selection.index;
         let active = match action {
             GuardianMenuAction::BasicPractice => basic_active.0,
             GuardianMenuAction::AdvancedPractice => advanced_active.0,
             GuardianMenuAction::FullHpMana => false,
+            GuardianMenuAction::ElementAllocation => window_open, // เปิดค้าง = สี active
         };
         let new_color = if !menu_focused {
             Color::srgb(0.04, 0.04, 0.05)
         } else if active {
-            if selected {
-                Color::srgb(0.07, 0.12, 0.07)
-            } else {
-                Color::srgb(0.02, 0.05, 0.02)
-            }
-        } else if selected {
+            if selected(index, selection.index) { Color::srgb(0.07, 0.12, 0.07) } else { Color::srgb(0.02, 0.05, 0.02) }
+        } else if index == selection.index {
             Color::srgb(0.35, 0.35, 0.35)
         } else {
             Color::srgb(0.15, 0.15, 0.15)
@@ -500,93 +494,79 @@ pub fn guardian_menu_keyboard(
     }
 }
 
+fn selected(a: usize, b: usize) -> bool { a == b }
+
 pub fn guardian_menu_confirm_keyboard(
     keyboard: Res<ButtonInput<KeyCode>>,
     gamepads: Query<&Gamepad>,
     dialog_open: Res<GuardianDialogOpen>,
-    focus: Res<GuardianDialogFocus>,
     selection: Res<GuardianMenuSelection>,
     mut commands: Commands,
     asset_server: Res<AssetServer>,
     practice_query: Query<Entity, With<PracticeEntity>>,
     mut player_query: Query<(&mut Health, &mut Mana, &mut Transform), With<Player>>,
-    mut basic_practice_active: ResMut<BasicPracticeActive>,
-    mut advanced_practice_active: ResMut<AdvancedPracticeActive>,
-    mut respawn_timer: ResMut<BasicGunRespawnTimer>,
-    mut advanced_respawn_timer: ResMut<AdvancedMinionRespawnTimer>,
+    mut focus: ResMut<GuardianDialogFocus>,
+    fonts: Res<GameFonts>,
+    loc: Res<Localization>,
+    dialog_query: Query<Entity, With<GuardianDialogUI>>,
+    window_query: Query<Entity, With<GuardianAllocWindow>>,
+    mut practice: PracticeSettings, // 👈 รวม 4 ตัวมาอยู่ตรงนี้
 ) {
     if !dialog_open.0 || *focus != GuardianDialogFocus::Menu {
         return;
     }
+    
     let gamepad_confirm = any_gp_just_pressed(&gamepads, GamepadButton::South);
     let confirm_pressed = keyboard.just_pressed(KeyCode::Space) || gamepad_confirm;
     if !confirm_pressed {
         return;
     }
+
     match selection.index {
         0 => {
-            if basic_practice_active.0 {
-                basic_practice_active.0 = false;
+            // เปลี่ยนจาก basic_practice_active เป็น practice.basic_active
+            practice.basic_active.0 = !practice.basic_active.0; 
+            if !practice.basic_active.0 {
                 for entity in &practice_query {
                     commands.entity(entity).despawn();
                 }
-                commands.spawn(AudioPlayer::new(asset_server.load("sounds/npc/exit_pt.ogg")));
-                if let Ok((_, _, mut transform)) = player_query.single_mut() {
-                    transform.translation.z += 2.5;
-                }
-            } else {
-                basic_practice_active.0 = true;
-                advanced_practice_active.0 = false;
-                respawn_timer.0.reset();
-                for entity in &practice_query {
-                    commands.entity(entity).despawn();
-                }
-                if let Ok((_, _, mut transform)) = player_query.single_mut() {
-                    transform.translation = Vec3::new(0.0, 2.0, 0.0);
-                }
-                spawn_basic_practice_gun(&mut commands, &asset_server);
-                commands.spawn(AudioPlayer::new(asset_server.load("sounds/npc/basic_pt.ogg")));
+                // เปลี่ยนจาก respawn_timer เป็น practice.basic_timer
+                practice.basic_timer.0 = Timer::from_seconds(0.1, TimerMode::Once); 
             }
         }
         1 => {
-            if advanced_practice_active.0 {
-                advanced_practice_active.0 = false;
+            // เปลี่ยนจาก advanced_practice_active เป็น practice.advanced_active
+            practice.advanced_active.0 = !practice.advanced_active.0;
+            if !practice.advanced_active.0 {
                 for entity in &practice_query {
                     commands.entity(entity).despawn();
                 }
-                commands.spawn(AudioPlayer::new(asset_server.load("sounds/npc/exit_pt.ogg")));
-                if let Ok((_, _, mut transform)) = player_query.single_mut() {
-                    transform.translation.z += 2.5;
-                }
-            } else {
-                advanced_practice_active.0 = true;
-                basic_practice_active.0 = false;
-                advanced_respawn_timer.0.reset();
-                for entity in &practice_query {
-                    commands.entity(entity).despawn();
-                }
-                spawn_advanced_minion(&mut commands, &asset_server);
-                if let Ok((_, _, mut transform)) = player_query.single_mut() {
-                    transform.translation = Vec3::new(0.0, 2.0, 0.0);
-                }
-                commands.spawn(AudioPlayer::new(asset_server.load("sounds/npc/advance_pt.ogg")));
+                // เปลี่ยนจาก advanced_respawn_timer เป็น practice.advanced_timer
+                practice.advanced_timer.0 = Timer::from_seconds(0.1, TimerMode::Once);
             }
         }
         2 => {
-            let Ok((mut health, mut mana, mut transform)) = player_query.single_mut() else {
-                return;
-            };
-            let hp_healed = health.max - health.current;
-            let mp_healed = mana.max - mana.current;
-            health.current = health.max;
-            mana.current = mana.max;
-            crate::player::spawn_floating_damage_text(&mut commands, hp_healed, transform.translation + Vec3::new(0.0, 2.0, 0.0), FloatingDamageKind::Heal);
-            crate::player::spawn_floating_damage_text(&mut commands, mp_healed, transform.translation + Vec3::new(0.2, 2.2, 0.0), FloatingDamageKind::Heal);
-            commands.spawn(AudioPlayer::new(asset_server.load("sounds/npc/fullhpmp.ogg")));
-            transform.translation.z += 2.5;
+            if let Ok((mut health, mut mana, _)) = player_query.single_mut() {
+                health.current = health.max;
+                mana.current = mana.max;
+            }
+        }
+        3 => {
+            if window_query.is_empty() {
+                let Ok(dialog_entity) = dialog_query.single() else { return; };
+                spawn_guardian_alloc_window(&mut commands, dialog_entity, &fonts, &loc);
+                *focus = GuardianDialogFocus::Allocation; 
+            } else {
+                for entity in &window_query {
+                    commands.entity(entity).despawn();
+                }
+                *focus = GuardianDialogFocus::Menu;
+            }
         }
         _ => {}
     }
+    
+    commands.spawn(AudioPlayer::new(asset_server.load("sounds/ui_confirm.ogg")));
 }
 
 pub fn cleanup_guardian_ui_when_player_leave(
@@ -1052,7 +1032,6 @@ fn guardian_control_key(key: GuardianControlKey) -> &'static str {
         GuardianControlKey::MenuUp => "guardian_controls_menu_up",
         GuardianControlKey::MenuDown => "guardian_controls_menu_down",
         GuardianControlKey::MenuConfirm => "guardian_controls_menu_confirm",
-        GuardianControlKey::MenuSwitchAlloc => "guardian_controls_menu_switch_alloc",
         GuardianControlKey::MenuClose => "guardian_controls_menu_close",
 
         GuardianControlKey::AllocTitle => "guardian_controls_alloc_title",
@@ -1063,7 +1042,7 @@ fn guardian_control_key(key: GuardianControlKey) -> &'static str {
         GuardianControlKey::AllocAtkLeft => "guardian_controls_alloc_atk_left",
         GuardianControlKey::AllocAtkRight => "guardian_controls_alloc_atk_right",
         GuardianControlKey::AllocConfirm => "guardian_controls_alloc_confirm",
-        GuardianControlKey::AllocSwitchMenu => "guardian_controls_alloc_switch_menu",
+        GuardianControlKey::AllocClose => "guardian_controls_alloc_close",
     }
 }
 pub fn update_guardian_controls_language_and_focus(
@@ -1091,7 +1070,6 @@ pub fn update_guardian_controls_language_and_focus(
                 | GuardianControlKey::MenuUp
                 | GuardianControlKey::MenuDown
                 | GuardianControlKey::MenuConfirm
-                | GuardianControlKey::MenuSwitchAlloc
                 | GuardianControlKey::MenuClose
         );
 
@@ -1126,65 +1104,95 @@ fn spawn_guardian_controls_panel(
         .spawn((
             Node {
                 width: Val::Percent(100.0),
-                flex_direction: FlexDirection::Row,
-                column_gap: Val::Px(16.0),
+                flex_direction: FlexDirection::Column,
+                row_gap: Val::Px(4.0),
                 padding: UiRect::all(Val::Px(12.0)),
                 ..default()
             },
             BackgroundColor(Color::srgba(0.05, 0.05, 0.08, 0.9)),
         ))
-        .with_children(|row| {
-            // ฝั่ง Left Menu
-            row.spawn(Node {
-                flex_direction: FlexDirection::Column,
-                row_gap: Val::Px(4.0),
-                flex_grow: 1.0,
-                ..default()
-            })
-            .with_children(|col| {
-                spawn_control_label(
-                    col,
-                    GuardianControlKey::MenuTitle,
-                    fonts,
-                    loc,
-                    16.0,
-                    Color::srgb(1.0, 0.85, 0.2),
-                );
-
-                spawn_control_label(col, GuardianControlKey::MenuUp, fonts, loc, 14.0, Color::WHITE);
-                spawn_control_label(col, GuardianControlKey::MenuDown, fonts, loc, 14.0, Color::WHITE);
-                spawn_control_label(col, GuardianControlKey::MenuConfirm, fonts, loc, 14.0, Color::WHITE);
-                spawn_control_label(col, GuardianControlKey::MenuSwitchAlloc, fonts, loc, 14.0, Color::WHITE);
-                spawn_control_label(col, GuardianControlKey::MenuClose, fonts, loc, 14.0, Color::WHITE);
-            });
-
-            // ฝั่ง Element Allocation Panel
-            row.spawn(Node {
-                flex_direction: FlexDirection::Column,
-                row_gap: Val::Px(4.0),
-                flex_grow: 1.0,
-                ..default()
-            })
-            .with_children(|col| {
-                spawn_control_label(
-                    col,
-                    GuardianControlKey::AllocTitle,
-                    fonts,
-                    loc,
-                    16.0,
-                    Color::srgb(1.0, 0.85, 0.2),
-                );
-
-                spawn_control_label(col, GuardianControlKey::AllocUp, fonts, loc, 14.0, Color::WHITE);
-                spawn_control_label(col, GuardianControlKey::AllocDown, fonts, loc, 14.0, Color::WHITE);
-                spawn_control_label(col, GuardianControlKey::AllocIncrease, fonts, loc, 14.0, Color::WHITE);
-                spawn_control_label(col, GuardianControlKey::AllocDecrease, fonts, loc, 14.0, Color::WHITE);
-                spawn_control_label(col, GuardianControlKey::AllocAtkLeft, fonts, loc, 14.0, Color::WHITE);
-                spawn_control_label(col, GuardianControlKey::AllocAtkRight, fonts, loc, 14.0, Color::WHITE);
-                spawn_control_label(col, GuardianControlKey::AllocConfirm, fonts, loc, 14.0, Color::WHITE);
-                spawn_control_label(col, GuardianControlKey::AllocSwitchMenu, fonts, loc, 14.0, Color::WHITE);
-            });
+        .with_children(|col| {
+            spawn_control_label(col, GuardianControlKey::MenuTitle, fonts, loc, 16.0, Color::srgb(1.0, 0.85, 0.2));
+            spawn_control_label(col, GuardianControlKey::MenuUp, fonts, loc, 14.0, Color::WHITE);
+            spawn_control_label(col, GuardianControlKey::MenuDown, fonts, loc, 14.0, Color::WHITE);
+            spawn_control_label(col, GuardianControlKey::MenuConfirm, fonts, loc, 14.0, Color::WHITE);
+            spawn_control_label(col, GuardianControlKey::MenuClose, fonts, loc, 14.0, Color::WHITE);
         });
+}
+fn spawn_alloc_controls_panel(
+    parent: &mut ChildSpawnerCommands,
+    fonts: &GameFonts,
+    loc: &Localization,
+) {
+    parent
+        .spawn(Node {
+            flex_direction: FlexDirection::Column,
+            row_gap: Val::Px(4.0),
+            padding: UiRect::all(Val::Px(12.0)),
+            ..default()
+        })
+        .with_children(|col| {
+            spawn_control_label(col, GuardianControlKey::AllocTitle, fonts, loc, 16.0, Color::srgb(1.0, 0.85, 0.2));
+            spawn_control_label(col, GuardianControlKey::AllocUp, fonts, loc, 14.0, Color::WHITE);
+            spawn_control_label(col, GuardianControlKey::AllocDown, fonts, loc, 14.0, Color::WHITE);
+            spawn_control_label(col, GuardianControlKey::AllocIncrease, fonts, loc, 14.0, Color::WHITE);
+            spawn_control_label(col, GuardianControlKey::AllocDecrease, fonts, loc, 14.0, Color::WHITE);
+            spawn_control_label(col, GuardianControlKey::AllocAtkLeft, fonts, loc, 14.0, Color::WHITE);
+            spawn_control_label(col, GuardianControlKey::AllocAtkRight, fonts, loc, 14.0, Color::WHITE);
+            spawn_control_label(col, GuardianControlKey::AllocConfirm, fonts, loc, 14.0, Color::WHITE);
+            spawn_control_label(col, GuardianControlKey::AllocClose, fonts, loc, 14.0, Color::WHITE);
+        });
+}
+fn spawn_guardian_alloc_window(
+    commands: &mut Commands,
+    dialog_entity: Entity,
+    fonts: &GameFonts,
+    loc: &Localization,
+) {
+    commands.entity(dialog_entity).with_children(|root| {
+        root.spawn((
+            GuardianAllocWindow,
+            Node {
+                position_type: PositionType::Absolute,
+                width: Val::Percent(100.0),
+                height: Val::Percent(100.0),
+                justify_content: JustifyContent::Center,
+                align_items: AlignItems::Center,
+                ..default()
+            },
+        ))
+        .with_children(|center| {
+            center
+                .spawn((
+                    Node {
+                        flex_direction: FlexDirection::Column,
+                        row_gap: Val::Px(14.0),
+                        padding: UiRect::all(Val::Px(20.0)),
+                        ..default()
+                    },
+                    BackgroundColor(Color::srgba(0.04, 0.04, 0.08, 0.96)),
+                ))
+                .with_children(|window| {
+                    window.spawn((
+                        Text::new(loc.get("alloc_window_title")),
+                        TextFont { font: fonts.abc3dz.clone(), font_size: 24.0, ..default() },
+                        TextColor(Color::srgb(1.0, 0.85, 0.2)),
+                    ));
+                    window
+                        .spawn(Node {
+                            flex_direction: FlexDirection::Row,
+                            column_gap: Val::Px(24.0),
+                            align_items: AlignItems::FlexStart,
+                            ..default()
+                        })
+                        .with_children(|row| {
+                            spawn_alloc_panel(row, fonts, loc);          // แผงจัดสรร
+                            spawn_element_bonus_table(row, fonts, loc);  // ตาราง Elemental/10
+                            spawn_alloc_controls_panel(row, fonts, loc); // 👈 ปุ่มควบคุมฝั่งจัดสรร
+                        });
+                });
+        });
+    });
 }
 
 fn spawn_control_label(
@@ -1223,4 +1231,103 @@ fn any_gp_trigger(gamepads: &Query<&Gamepad>, button: GamepadButton) -> bool {
         }
     }
     false
+}
+
+//alloc window
+const ELEMENT_BONUS_TABLE: [(&str, [f32; 6]); 5] = [
+    //           Atk    Def    CritRate CritDmg  HP     MP
+    ("water",  [0.2,   0.0,   0.0,     0.0,     0.0,   10.0]),
+    ("fire",   [0.8,   0.0,   0.0,     0.02,    0.0,   0.0]),
+    ("wind",   [0.0,   0.0,   0.005,   0.01,    0.0,   0.0]),
+    ("earth",  [0.0,   0.6,   0.0,     0.0,     8.0,   0.0]),
+    ("inw",    [0.15,  0.15,  0.001,   0.005,   2.0,   2.0]),
+];
+
+fn format_element_bonus(column: usize, value: f32) -> String {
+    if value == 0.0 {
+        return "-".to_string();
+    }
+    match column {
+        2 | 3 => format!("{:.1}%", value * 100.0), // Crit Rate / Crit Dmg แสดงเป็น %
+        _ => {
+            if value.fract() == 0.0 { format!("{:.0}", value) } else { format!("{}", value) }
+        }
+    }
+}
+
+fn spawn_element_bonus_table(
+    parent: &mut ChildSpawnerCommands,
+    fonts: &GameFonts,
+    loc: &Localization,
+) {
+    parent
+        .spawn((
+            Node {
+                flex_direction: FlexDirection::Column,
+                row_gap: Val::Px(8.0),
+                padding: UiRect::all(Val::Px(12.0)),
+                ..default()
+            },
+            BackgroundColor(Color::srgba(0.08, 0.08, 0.12, 0.9)),
+        ))
+        .with_children(|panel| {
+            panel.spawn((
+                Text::new(loc.get("element_bonus_title")),
+                TextFont { font: fonts.abc3dz.clone(), font_size: 20.0, ..default() },
+                TextColor(Color::WHITE),
+            ));
+            panel
+                .spawn(Node {
+                    display: Display::Grid,
+                    grid_template_columns: vec![
+                        GridTrack::px(110.0), // Elemental/10
+                        GridTrack::px(70.0),  // Atk
+                        GridTrack::px(70.0),  // Def
+                        GridTrack::px(90.0),  // Crit Rate
+                        GridTrack::px(90.0),  // Crit Dmg
+                        GridTrack::px(60.0),  // HP
+                        GridTrack::px(60.0),  // MP
+                    ],
+                    row_gap: Val::Px(6.0),
+                    column_gap: Val::Px(8.0),
+                    ..default()
+                })
+                .with_children(|grid| {
+                    let headers = [
+                        loc.get("elemental_per_10"),
+                        loc.get("atk_label"),
+                        loc.get("def_label"),
+                        loc.get("crit_rate_label"),
+                        loc.get("crit_dmg_label"),
+                        loc.get("hp_label"),
+                        loc.get("mp_label"),
+                    ];
+                    for header in headers {
+                        grid.spawn((
+                            Text::new(header),
+                            TextFont { font: fonts.abc3dz.clone(), font_size: 16.0, ..default() },
+                            TextColor(Color::srgb(1.0, 0.85, 0.2)),
+                        ));
+                    }
+                    for (element_key, bonuses) in ELEMENT_BONUS_TABLE {
+                        grid.spawn((
+                            Text::new(loc.get(element_key)),
+                            TextFont { font: fonts.abc3dz.clone(), font_size: 16.0, ..default() },
+                            TextColor(Color::WHITE),
+                        ));
+                        for (column, value) in bonuses.iter().enumerate() {
+                            let color = if *value > 0.0 {
+                                Color::srgb(0.25, 1.0, 0.35)  // มีโบนัส = เขียว
+                            } else {
+                                Color::srgb(0.45, 0.45, 0.50) // ไม่มี = เทาจาง
+                            };
+                            grid.spawn((
+                                Text::new(format_element_bonus(column, *value)),
+                                TextFont { font: fonts.abc3dz.clone(), font_size: 16.0, ..default() },
+                                TextColor(color),
+                            ));
+                        }
+                    }
+                });
+        });
 }

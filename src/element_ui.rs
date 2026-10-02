@@ -384,9 +384,9 @@ fn close_status_and_controls_when_guardian_dialog_open(
     }
 
     // ปิดหน้าต่างสถานะผู้เล่น
-    for entity in &status_query {
-        commands.entity(entity).despawn();
-    }
+    // for entity in &status_query {
+    //     commands.entity(entity).despawn();
+    // }
 
     // ปิดหน้าต่าง controls
     for entity in &controls_query {

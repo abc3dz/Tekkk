@@ -253,11 +253,11 @@ pub fn elemental_multiplier(
         (Fire, Inw) => 0.75,
 
         // Inw
-        (Inw, Water) => 1.0,
-        (Inw, Earth) => 1.0,
-        (Inw, Wind) => 1.0,
-        (Inw, Fire) => 1.0,
-        (Inw, Inw) => 1.0,
+        (Inw, Water) => 1.2,
+        (Inw, Earth) => 1.2,
+        (Inw, Wind) => 1.2,
+        (Inw, Fire) => 1.2,
+        (Inw, Inw) => 1.2,
 
         // Neutral
         _ => 1.0,
