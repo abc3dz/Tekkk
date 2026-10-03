@@ -8,12 +8,11 @@ use crate::components::*;
 use crate::npc::{
     advanced_practice::AdvancedPracticePlugin,
     basic_practice::BasicPracticePlugin,
-    basic_practice::spawn_basic_practice_gun,
-    advanced_practice::spawn_advanced_minion,
     practice_common::PracticeCommonPlugin,
 };
 use crate::cel_shader::*;
 use crate::pause_menu::GameMode;
+use crate::element_ui::*;
 
 pub struct GuardianPlugin;
 
@@ -607,6 +606,119 @@ fn element_key(element: Element) -> &'static str {
         Element::Neutral => "neutral",
     }
 }
+fn spawn_player_status_section(
+    parent: &mut ChildSpawnerCommands,
+    fonts: &GameFonts,
+    loc: &Localization,
+) {
+    parent
+        .spawn((
+            Node {
+                width: Val::Percent(100.0),
+                flex_direction: FlexDirection::Column,
+                row_gap: Val::Px(4.0),
+                padding: UiRect::all(Val::Px(10.0)),
+                ..default()
+            },
+            BackgroundColor(Color::srgba(0.12, 0.12, 0.18, 0.75)),
+        ))
+        .with_children(|status| {
+            status.spawn((
+                Text::new(loc.get("player_status_title")),
+                TextFont {
+                    font: fonts.abc3dz.clone(),
+                    font_size: 18.0,
+                    ..default()
+                },
+                TextColor(Color::srgb(1.0, 0.85, 0.2)),
+                Node {
+                    width: Val::Percent(100.0),
+                    margin: UiRect::bottom(Val::Px(8.0)),
+                    ..default()
+                },
+            ));
+
+            let status_rows = [
+                (
+                    loc.get("hp_label"),
+                    PlayerStatusValueText::Hp,
+                    Some(PlayerStatusBonusText::Hp),
+                ),
+                (
+                    loc.get("mp_label"),
+                    PlayerStatusValueText::Mp,
+                    Some(PlayerStatusBonusText::Mp),
+                ),
+                (
+                    loc.get("atk_label"),
+                    PlayerStatusValueText::Attack,
+                    Some(PlayerStatusBonusText::Attack),
+                ),
+                (
+                    loc.get("def_label"),
+                    PlayerStatusValueText::Defense,
+                    Some(PlayerStatusBonusText::Defense),
+                ),
+                (
+                    loc.get("crit_rate_label"),
+                    PlayerStatusValueText::CriticalRate,
+                    Some(PlayerStatusBonusText::CriticalRate),
+                ),
+                (
+                    loc.get("crit_dmg_label"),
+                    PlayerStatusValueText::CriticalDamage,
+                    Some(PlayerStatusBonusText::CriticalDamage),
+                ),
+                (
+                    loc.get("element_label"),
+                    PlayerStatusValueText::AtkAndDefElement,
+                    None,
+                ),
+            ];
+
+            for (label, value_marker, bonus_marker) in status_rows {
+                status
+                    .spawn((
+                        Text::new(format!("{}: ", label)),
+                        TextFont {
+                            font: fonts.abc3dz.clone(),
+                            font_size: 18.0,
+                            ..default()
+                        },
+                        TextColor(Color::WHITE),
+                        Node {
+                            width: Val::Percent(100.0),
+                            ..default()
+                        },
+                    ))
+                    .with_children(|text| {
+                        text.spawn((
+                            TextSpan::default(),
+                            TextFont {
+                                font: fonts.abc3dz.clone(),
+                                font_size: 18.0,
+                                ..default()
+                            },
+                            TextColor(Color::WHITE),
+                            value_marker,
+                        ));
+
+                        if let Some(bonus_marker) = bonus_marker {
+                            text.spawn((
+                                TextSpan::default(),
+                                TextFont {
+                                    font: fonts.abc3dz.clone(),
+                                    font_size: 18.0,
+                                    ..default()
+                                },
+                                TextColor(Color::srgb(0.25, 1.0, 0.35)),
+                                bonus_marker,
+                            ));
+                        }
+                    });
+            }
+        });
+}
 
 fn spawn_alloc_panel(
     parent: &mut ChildSpawnerCommands,
@@ -628,19 +740,47 @@ fn spawn_alloc_panel(
         .with_children(|panel| {
             panel.spawn((
                 Text::new(loc.get("redistribute_elements")),
-                TextFont { font: fonts.abc3dz.clone(), font_size: 20.0, ..default() },
+                TextFont {
+                    font: fonts.abc3dz.clone(),
+                    font_size: 20.0,
+                    ..default()
+                },
                 TextColor(Color::WHITE),
             ));
+
             panel.spawn((
                 AllocPoolText,
                 Text::new(format!("{}: 0", loc.get("neutral_pool"))),
-                TextFont { font_size: 18.0, ..default() },
+                TextFont {
+                    font_size: 18.0,
+                    ..default()
+                },
                 TextColor(Color::srgb(1.0, 0.85, 0.2)),
             ));
+
             for element in ALL_ELEMENTS {
                 spawn_alloc_row(panel, element, fonts, loc);
             }
+
             spawn_atk_element_row(panel, fonts, loc);
+
+            // เส้นคั่น
+            panel.spawn((
+                Node {
+                    width: Val::Percent(100.0),
+                    height: Val::Px(1.0),
+                    margin: UiRect {
+                        top: Val::Px(12.0),
+                        bottom: Val::Px(4.0),
+                        ..default()
+                    },
+                    ..default()
+                },
+                BackgroundColor(Color::srgba(1.0, 1.0, 1.0, 0.15)),
+            ));
+
+            // 👇 เพิ่มส่วน Status ตรงนี้
+            spawn_player_status_section(panel, fonts, loc);
         });
 }
 
@@ -859,25 +999,6 @@ fn spawn_atk_element_row(
                 }
             });
         });
-}
-
-pub fn guardian_dialog_focus_keyboard(
-    keyboard: Res<ButtonInput<KeyCode>>,
-    gamepads: Query<&Gamepad>,
-    dialog_open: Res<GuardianDialogOpen>,
-    mut focus: ResMut<GuardianDialogFocus>,
-) {
-    if !dialog_open.0 {
-        return;
-    }
-    let tab_pressed = keyboard.just_pressed(KeyCode::Tab)
-        || any_gp_just_pressed(&gamepads, GamepadButton::Select);
-    if tab_pressed {
-        *focus = match *focus {
-            GuardianDialogFocus::Menu => GuardianDialogFocus::Allocation,
-            GuardianDialogFocus::Allocation => GuardianDialogFocus::Menu,
-        };
-    }
 }
 
 pub fn guardian_atk_selection_keyboard(
@@ -1186,9 +1307,18 @@ fn spawn_guardian_alloc_window(
                             ..default()
                         })
                         .with_children(|row| {
-                            spawn_alloc_panel(row, fonts, loc);          // แผงจัดสรร
-                            spawn_element_bonus_table(row, fonts, loc);  // ตาราง Elemental/10
-                            spawn_alloc_controls_panel(row, fonts, loc); // 👈 ปุ่มควบคุมฝั่งจัดสรร
+                            spawn_alloc_panel(row, fonts, loc); // แผงจัดสรร (+ Player Status)
+
+                            // 👇 คอลัมน์กลาง: ตารางโบนัส บน + แผงควบคุม ล่าง
+                            row.spawn(Node {
+                                flex_direction: FlexDirection::Column,
+                                row_gap: Val::Px(14.0),
+                                ..default()
+                            })
+                            .with_children(|middle| {
+                                spawn_element_bonus_table(middle, fonts, loc); // ตารางบอกว่าอัพอะไรได้อะไร
+                                spawn_alloc_controls_panel(middle, fonts, loc); // แผงควบคุมอยู่ใต้ตาราง
+                            });
                         });
                 });
         });
