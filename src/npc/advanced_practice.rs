@@ -37,49 +37,6 @@ impl Plugin for AdvancedPracticePlugin {
     }
 }
 
-// pub fn guardian_dialog_advanced_input(
-//     mut commands: Commands,
-//     keyboard: Res<ButtonInput<KeyCode>>,
-//     gamepads: Query<&Gamepad>,
-//     asset_server: Res<AssetServer>,
-//     mut basic_practice_active: ResMut<BasicPracticeActive>,
-//     mut advanced_practice_active: ResMut<AdvancedPracticeActive>,
-//     mut advanced_respawn_timer: ResMut<AdvancedMinionRespawnTimer>,
-//     dialog_query: Query<Entity, With<GuardianDialogUI>>,
-//     practice_query: Query<Entity, With<PracticeEntity>>,
-//     mut player_query: Query<&mut Transform, With<Player>>,
-// ) {
-//     if dialog_query.is_empty() {
-//         return;
-//     }
-
-//     let gamepad_advanced_pressed = gamepads.iter().any(|gamepad| {gamepad.just_pressed(GamepadButton::West)});
-//     let advanced_pressed = keyboard.just_pressed(KeyCode::Digit2) || gamepad_advanced_pressed;
-
-//     if !advanced_pressed {
-//         return;
-//     }
-
-//     commands.spawn(AudioPlayer::new(asset_server.load("sounds/npc/advance_pt.ogg")));
-
-//     basic_practice_active.0 = false;
-//     advanced_practice_active.0 = true;
-//     advanced_respawn_timer.0.reset();
-
-//     for entity in &practice_query {
-//         commands.entity(entity).despawn();
-//     }
-
-//     spawn_advanced_minion(
-//         &mut commands,
-//         &asset_server,
-//     );
-
-//     if let Ok(mut player_tf) = player_query.single_mut() {
-//         player_tf.translation = Vec3::new(0.0, 0.0, 0.0);
-//     }
-// }
-
 pub fn spawn_advanced_minion(
     commands: &mut Commands,
     asset_server: &Res<AssetServer>,

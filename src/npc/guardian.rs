@@ -435,8 +435,10 @@ pub fn guardian_menu_keyboard(
     mut selection: ResMut<GuardianMenuSelection>,
     basic_active: Res<BasicPracticeActive>,
     advanced_active: Res<AdvancedPracticeActive>,
-    window_query: Query<(), With<GuardianAllocWindow>>, // เพิ่ม
+    window_query: Query<(), With<GuardianAllocWindow>>,
     mut button_query: Query<(&GuardianMenuAction, &mut BackgroundColor), With<GuardianMenuButton>>,
+    mut commands: Commands,
+    asset_server: Res<AssetServer>,
 ) {
     if !dialog_open.0 {
         return;
@@ -458,10 +460,16 @@ pub fn guardian_menu_keyboard(
             } else {
                 selection.index -= 1;
             }
+            commands.spawn(AudioPlayer::new(asset_server.load("sounds/npc/scroll_menu.ogg")));
         }
         if down_pressed {
             selection.index = (selection.index + 1) % MENU_COUNT;
+            commands.spawn((
+                    AudioPlayer::new(asset_server.load("sounds/npc/scroll_menu.ogg")),
+                    PlaybackSettings::ONCE.with_speed(1.5),
+                ));
         }
+        
     }
     let menu_focused = *focus == GuardianDialogFocus::Menu;
     let window_open = !window_query.is_empty();
@@ -520,6 +528,9 @@ pub fn guardian_menu_confirm_keyboard(
     if !confirm_pressed {
         return;
     }
+    let Ok((mut health, mut mana, mut transform)) = player_query.single_mut() else {
+        return;
+    };
 
     match selection.index {
         0 => {
@@ -530,25 +541,37 @@ pub fn guardian_menu_confirm_keyboard(
                     commands.entity(entity).despawn();
                 }
                 // เปลี่ยนจาก respawn_timer เป็น practice.basic_timer
-                practice.basic_timer.0 = Timer::from_seconds(0.1, TimerMode::Once); 
+                practice.basic_timer.0 = Timer::from_seconds(0.1, TimerMode::Once);
+                commands.spawn(AudioPlayer::new(asset_server.load("sounds/npc/basic_pt.ogg")));
+            } else{
+                transform.translation = Vec3::new(0.0, 1.5, 0.0);
+                commands.spawn((
+                    AudioPlayer::new(asset_server.load("sounds/npc/basic_pt.ogg")),
+                    PlaybackSettings::ONCE.with_speed(1.5),
+                ));
             }
         }
         1 => {
-            // เปลี่ยนจาก advanced_practice_active เป็น practice.advanced_active
             practice.advanced_active.0 = !practice.advanced_active.0;
             if !practice.advanced_active.0 {
                 for entity in &practice_query {
                     commands.entity(entity).despawn();
                 }
-                // เปลี่ยนจาก advanced_respawn_timer เป็น practice.advanced_timer
                 practice.advanced_timer.0 = Timer::from_seconds(0.1, TimerMode::Once);
+                commands.spawn(AudioPlayer::new(asset_server.load("sounds/npc/advance_pt.ogg")));
+            } else {
+                transform.translation = Vec3::new(0.0, 1.5, 0.0);
+                commands.spawn((
+                    AudioPlayer::new(asset_server.load("sounds/npc/advance_pt.ogg")),
+                    PlaybackSettings::ONCE.with_speed(1.5),
+                ));
             }
+            
         }
         2 => {
-            if let Ok((mut health, mut mana, _)) = player_query.single_mut() {
-                health.current = health.max;
-                mana.current = mana.max;
-            }
+            health.current = health.max;
+            mana.current = mana.max;
+            
         }
         3 => {
             if window_query.is_empty() {
@@ -561,11 +584,10 @@ pub fn guardian_menu_confirm_keyboard(
                 }
                 *focus = GuardianDialogFocus::Menu;
             }
+            commands.spawn(AudioPlayer::new(asset_server.load("sounds/npc/alloc.ogg")));
         }
         _ => {}
     }
-    
-    commands.spawn(AudioPlayer::new(asset_server.load("sounds/ui_confirm.ogg")));
 }
 
 pub fn cleanup_guardian_ui_when_player_leave(
@@ -1008,6 +1030,8 @@ pub fn guardian_atk_selection_keyboard(
     focus: Res<GuardianDialogFocus>,
     mut atk_selection: ResMut<GuardianAllocSelection>,
     mut player_query: Query<&mut AtkAndDefElement, With<Player>>,
+    mut commands: Commands,
+    asset_server: Res<AssetServer>,
 ) {
     if !dialog_open.0 || *focus != GuardianDialogFocus::Allocation {
         return;
@@ -1027,9 +1051,17 @@ pub fn guardian_atk_selection_keyboard(
         || any_gp_just_pressed(&gamepads, GamepadButton::DPadRight);
     if left_pressed {
         atk_selection.index = (atk_selection.index + count - 1) % count;
+        commands.spawn((
+            AudioPlayer::new(asset_server.load("sounds/npc/scroll_menu.ogg")),
+            PlaybackSettings::ONCE.with_speed(2.5),
+        ));
     }
     if right_pressed {
         atk_selection.index = (atk_selection.index + 1) % count;
+        commands.spawn((
+            AudioPlayer::new(asset_server.load("sounds/npc/scroll_menu.ogg")),
+            PlaybackSettings::ONCE.with_speed(3.5),
+        ));
     }
     if atk_selection.index >= count {
         atk_selection.index = 0;
@@ -1039,6 +1071,10 @@ pub fn guardian_atk_selection_keyboard(
         || any_gp_just_pressed(&gamepads, GamepadButton::East);
     if confirm_pressed {
         atk_element.0 = selected_element;
+        commands.spawn((
+            AudioPlayer::new(asset_server.load("sounds/npc/confirm.ogg")),
+            PlaybackSettings::ONCE.with_speed(1.5),
+        ));
     }
 }
 
@@ -1053,6 +1089,8 @@ pub fn guardian_alloc_point_keyboard(
     mut decrease_repeat: ResMut<GuardianAllocDecreaseRepeat>,
     mut press_state: Local<GuardianAllocPressState>,
     mut player_query: Query<(&mut ElementMastery, &mut ElementPointPool), With<Player>>,
+    mut commands: Commands,
+    asset_server: Res<AssetServer>,
 ) {
     if !dialog_open.0 || *focus != GuardianDialogFocus::Allocation {
         press_state.increase = false;
@@ -1079,9 +1117,17 @@ pub fn guardian_alloc_point_keyboard(
         || any_gp_just_pressed(&gamepads, GamepadButton::DPadDown);
     if up_pressed {
         point_selection.index = (point_selection.index + count - 1) % count;
+        commands.spawn((
+            AudioPlayer::new(asset_server.load("sounds/npc/scroll_menu.ogg")),
+            PlaybackSettings::ONCE.with_speed(1.5),
+        ));
     }
     if down_pressed {
         point_selection.index = (point_selection.index + 1) % count;
+        commands.spawn((
+            AudioPlayer::new(asset_server.load("sounds/npc/scroll_menu.ogg")),
+            PlaybackSettings::ONCE.with_speed(0.5),
+        ));
     }
     if point_selection.index >= count {
         point_selection.index = 0;
@@ -1101,6 +1147,10 @@ pub fn guardian_alloc_point_keyboard(
         if increase_repeat.0.just_finished() {
             increase_element_from_pool(mastery, pool, selected_element);
         }
+        commands.spawn((
+            AudioPlayer::new(asset_server.load("sounds/npc/increase_exp.ogg")),
+            PlaybackSettings::ONCE.with_speed(1.5),
+        ));
     } else {
         increase_repeat.0.reset();
     }
@@ -1113,6 +1163,10 @@ pub fn guardian_alloc_point_keyboard(
         if decrease_repeat.0.just_finished() {
             decrease_element_to_pool(mastery, pool, selected_element);
         }
+        commands.spawn((
+            AudioPlayer::new(asset_server.load("sounds/npc/increase_exp.ogg")),
+            PlaybackSettings::ONCE.with_speed(0.5),
+        ));
     } else {
         decrease_repeat.0.reset();
     }

@@ -152,10 +152,10 @@ pub fn spawn_settings_screen(
             // DISPLAY MODE
             // ==========================================
 
-            let display_mode_text = DISPLAY_MODES
-                .get(settings.pending_display_mode_index)
-                .copied()
-                .unwrap_or("Windowed");
+            // let display_mode_text = DISPLAY_MODES
+            //     .get(settings.pending_display_mode_index)
+            //     .copied()
+            //     .unwrap_or("Windowed");
             let mode_key = match DISPLAY_MODES[settings.pending_display_mode_index] {
                 "Fullscreen" => "fullscreen",
                 "Borderless" => "borderless",
@@ -284,7 +284,9 @@ fn settings_input(
     mut settings: ResMut<SettingsState>,
     mut pause_state: ResMut<PauseMenuState>,
     mut apply_request: ResMut<SettingsApplyRequest>,
-    mut loc: ResMut<Localization>, 
+    mut loc: ResMut<Localization>,
+    mut commands: Commands,
+    asset_server: Res<AssetServer>,
 ) {
     let up = keyboard.just_pressed(KeyCode::ArrowUp)
         || keyboard.just_pressed(KeyCode::KeyW)
@@ -334,6 +336,10 @@ fn settings_input(
             SettingsItem::Apply => SettingsItem::Language,        // <-- แก้
             SettingsItem::Back => SettingsItem::Apply,
         };
+        // commands.spawn((
+        //     AudioPlayer::new(asset_server.load("sounds/npc/scroll_menu.ogg")),
+        //     PlaybackSettings::ONCE.with_speed(3.7),
+        // ));
     }
 
     // ==========================================
@@ -349,6 +355,10 @@ fn settings_input(
             SettingsItem::Apply => SettingsItem::Back,
             SettingsItem::Back => SettingsItem::Resolution,
         };
+        // commands.spawn((
+        //     AudioPlayer::new(asset_server.load("sounds/npc/scroll_menu.ogg")),
+        //     PlaybackSettings::ONCE.with_speed(4.7),
+        // ));
     }
 
     // ==========================================
@@ -359,31 +369,58 @@ fn settings_input(
         SettingsItem::Resolution => {
             if left && settings.pending_resolution_index > 0 {
                 settings.pending_resolution_index -= 1;
+                commands.spawn((
+                    AudioPlayer::new(asset_server.load("sounds/setting/resolution.ogg")),
+                    PlaybackSettings::ONCE.with_speed(0.4),
+                ));
             }
 
             if right && settings.pending_resolution_index < RESOLUTIONS.len() - 1{
                 settings.pending_resolution_index += 1;
+                commands.spawn((
+                    AudioPlayer::new(asset_server.load("sounds/setting/resolution.ogg")),
+                    PlaybackSettings::ONCE.with_speed(0.8),
+                ));
             }
+            
         }
 
         SettingsItem::DisplayMode => {
             if left && settings.pending_display_mode_index > 0 {
                 settings.pending_display_mode_index -= 1;
+                commands.spawn((
+                    AudioPlayer::new(asset_server.load("sounds/setting/resolution.ogg")),
+                    PlaybackSettings::ONCE.with_speed(2.4),
+                ));
             }
 
             if right && settings.pending_display_mode_index < DISPLAY_MODES.len() - 1{
                 settings.pending_display_mode_index += 1;
+                commands.spawn((
+                    AudioPlayer::new(asset_server.load("sounds/setting/resolution.ogg")),
+                    PlaybackSettings::ONCE.with_speed(2.8),
+                ));
             }
+            
         }
 
         SettingsItem::MasterVolume => {
             if left {
                 settings.pending_master_volume = (settings.pending_master_volume - 0.05).max(0.0);
+                commands.spawn((
+                    AudioPlayer::new(asset_server.load("sounds/setting/sound.ogg")),
+                    PlaybackSettings::ONCE.with_speed(1.8),
+                ));
             }
 
             if right {
                 settings.pending_master_volume = (settings.pending_master_volume + 0.05).min(1.0);
+                commands.spawn((
+                    AudioPlayer::new(asset_server.load("sounds/setting/sound.ogg")),
+                    PlaybackSettings::ONCE.with_speed(0.8),
+                ));
             }
+            
         }
         SettingsItem::Language => {
             if left || right {
@@ -392,7 +429,12 @@ fn settings_input(
                     Language::Thai => Language::NorthernThai,
                     Language::NorthernThai => Language::English,
                 };
+                commands.spawn((
+                AudioPlayer::new(asset_server.load("sounds/setting/change_lang.ogg")),
+                PlaybackSettings::ONCE.with_speed(0.8),
+            ));
             }
+            
         }
         _ => {}
     }
@@ -408,6 +450,10 @@ fn settings_input(
                 settings.current_display_mode_index = settings.pending_display_mode_index;
                 settings.current_master_volume = settings.pending_master_volume;
                 apply_request.0 = true;
+                commands.spawn((
+                    AudioPlayer::new(asset_server.load("sounds/setting/setting_confirm.ogg")),
+                    PlaybackSettings::ONCE.with_speed(1.2),
+                ));
             }
 
             SettingsItem::Back => {

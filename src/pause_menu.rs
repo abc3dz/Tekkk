@@ -87,6 +87,8 @@ fn toggle_pause(
     mut next_state: ResMut<NextState<GameMode>>,
     guardian_dialog_open: Res<GuardianDialogOpen>,
     guardian_esc_consumed: Res<GuardianDialogEscConsumed>,
+    mut commands: Commands,
+    asset_server: Res<AssetServer>,
 ) {
     let keyboard_pressed = keyboard.just_pressed(KeyCode::Escape);
     let gamepad_pressed = gamepads.iter().any(|gamepad| gamepad.just_pressed(GamepadButton::Start));
@@ -106,9 +108,14 @@ fn toggle_pause(
     match state.get() {
         GameMode::Playing => {
             next_state.set(GameMode::Paused);
+            commands.spawn(AudioPlayer::new(asset_server.load("sounds/pause/pause.ogg")));
         }
         GameMode::Paused => {
             next_state.set(GameMode::Playing);
+            commands.spawn((
+                AudioPlayer::new(asset_server.load("sounds/npc/basic_pt.ogg")),
+                PlaybackSettings::ONCE.with_speed(2.5),
+            ));
         }
     }
 }
@@ -543,6 +550,8 @@ pub fn pause_menu_input(
     mut save_request: ResMut<SaveRequest>,
     mut load_request: ResMut<LoadRequest>,
     mut settings: ResMut<SettingsState>,
+    mut commands: Commands,
+    asset_server: Res<AssetServer>,
 ) {
     let up = keyboard.just_pressed(KeyCode::ArrowUp)
         || keyboard.just_pressed(KeyCode::KeyW)
@@ -568,6 +577,10 @@ pub fn pause_menu_input(
                     PauseMenuItem::Settings => PauseMenuItem::Load,
                     PauseMenuItem::Resume => PauseMenuItem::Settings,
                 };
+                commands.spawn((
+                    AudioPlayer::new(asset_server.load("sounds/npc/scroll_menu.ogg")),
+                    PlaybackSettings::ONCE.with_speed(2.7),
+                ));
             }
 
             if down {
@@ -577,6 +590,10 @@ pub fn pause_menu_input(
                     PauseMenuItem::Settings => PauseMenuItem::Resume,
                     PauseMenuItem::Resume => PauseMenuItem::Save,
                 };
+                commands.spawn((
+                    AudioPlayer::new(asset_server.load("sounds/npc/scroll_menu.ogg")),
+                    PlaybackSettings::ONCE.with_speed(0.7),
+                ));
             }
 
             if confirm {
@@ -596,7 +613,12 @@ pub fn pause_menu_input(
                     PauseMenuItem::Resume => {
                         next_state.set(GameMode::Playing);
                     }
+                    
                 }
+                commands.spawn((
+                    AudioPlayer::new(asset_server.load("sounds/npc/confirm.ogg")),
+                    PlaybackSettings::ONCE.with_speed(0.7),
+                ));
             }
         }
 
@@ -617,6 +639,10 @@ pub fn pause_menu_input(
                 let slot = menu_state.selected_slot + 1;
                 save_request.slot = Some(slot);
                 menu_state.screen = PauseMenuScreen::Main;
+                commands.spawn((
+                    AudioPlayer::new(asset_server.load("sounds/pause/save.ogg")),
+                    PlaybackSettings::ONCE.with_speed(2.7),
+                ));
             }
         }
 
@@ -637,6 +663,10 @@ pub fn pause_menu_input(
                 let slot = menu_state.selected_slot + 1;
                 load_request.slot = Some(slot);
                 menu_state.screen = PauseMenuScreen::Main;
+                commands.spawn((
+                    AudioPlayer::new(asset_server.load("sounds/pause/load.ogg")),
+                    PlaybackSettings::ONCE.with_speed(2.7),
+                ));
             }
         }
         PauseMenuScreen::Settings => {return;}

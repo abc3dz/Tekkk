@@ -114,48 +114,6 @@ let gun_entity = commands
     );
 }
 
-// pub fn guardian_dialog_basic_input(
-//     mut commands: Commands,
-//     keyboard: Res<ButtonInput<KeyCode>>,
-//     gamepads: Query<&Gamepad>,
-//     asset_server: Res<AssetServer>,
-//     mut basic_practice_active: ResMut<BasicPracticeActive>,
-//     mut advanced_practice_active: ResMut<AdvancedPracticeActive>,
-//     mut respawn_timer: ResMut<BasicGunRespawnTimer>,
-//     dialog_query: Query<Entity, With<GuardianDialogUI>>,
-//     practice_query: Query<Entity, With<PracticeEntity>>,
-//     mut player_query: Query<&mut Transform, With<Player>>,
-// ) {
-//     if dialog_query.is_empty() {
-//         return;
-//     }
-
-//     let gamepad_basic_pressed = gamepads.iter().any(|gamepad| {gamepad.just_pressed(GamepadButton::South,)});
-//     let basic_pressed = keyboard.just_pressed(KeyCode::Digit1) || gamepad_basic_pressed;
-//     if !basic_pressed {
-//         return;
-//     }
-
-//     commands.spawn(AudioPlayer::new(asset_server.load("sounds/npc/basic_pt.ogg")));
-//     basic_practice_active.0 = true;
-//     advanced_practice_active.0 = false;
-//     respawn_timer.0.reset();
-
-//     for entity in &practice_query {
-//         commands.entity(entity).despawn();
-//     }
-
-//     if let Ok(mut transform) = player_query.single_mut() {
-//         transform.translation =
-//             Vec3::new(0.0, 0.0, 0.0);
-//     }
-
-//     spawn_basic_practice_gun(
-//         &mut commands,
-//         &asset_server,
-//     );
-// }
-
 pub fn rotate_basic_practice_gun_to_player(
     player_query: Query<&Transform, (With<Player>, Without<BasicPracticeGun>)>,
     mut gun_query: Query<&mut Transform, (With<BasicPracticeGun>, Without<Player>)>,
