@@ -22,7 +22,7 @@ pub fn spawn_desert(
         Transform::from_xyz(0.0, 0.0, 0.0),
         DespawnOnExit(GameScene::Desert),
     ));
-    //warp
+    //warp to hub
     commands.spawn((
         CurrentScene,
         WarpToHub,
@@ -30,6 +30,7 @@ pub fn spawn_desert(
         Transform::from_xyz(5.0, 1.0, 15.0),
         DespawnOnExit(GameScene::Desert),
     ));
+    //warp to floating island
     commands.spawn((
         CurrentScene,
         WarpToFloatingIsland,
@@ -37,6 +38,7 @@ pub fn spawn_desert(
         Transform::from_xyz(17.5, 1.0, -48.0),
         DespawnOnExit(GameScene::Desert),
     ));
+    
     //mountain left
     commands.spawn((
         RigidBody::Static,

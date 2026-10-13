@@ -50,12 +50,23 @@ pub fn spawn_floating_island(
         Transform::from_xyz(41.0, 34.4, -23.12),
         DespawnOnExit(GameScene::FloatingIsland),
     ));
-    //warp
+    //warp to desert
     commands.spawn((
         WarpToDesert,
         CurrentScene,
         Sensor,
         Collider::cuboid(2.0, 2.0, 2.0),
         Transform::from_xyz(0.0, 1.0, -5.0),
+        DespawnOnExit(GameScene::FloatingIsland),
+    ));
+    //warp to lagoon
+    commands.spawn((
+        WarpToLagoon,
+        CurrentScene,
+        Sensor,
+        Collider::cuboid(2.0, 2.0, 2.0),
+        Transform::from_xyz(5.0, 1.0, 0.6),
+        //Transform::from_xyz(38.58, 35.23, -20.62),
+        DespawnOnExit(GameScene::FloatingIsland),
     ));
 }

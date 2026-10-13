@@ -20,6 +20,7 @@ impl Plugin for PlayerPlugin {
             spawn_player,
             setup_player_status_ui
         ))
+        .add_systems(Update,debug_print_player_position_on_f.run_if(in_state(GameMode::Playing)),)
         .add_systems(Update, (
             setup_player_animation_player,
             player_movement,
@@ -119,20 +120,11 @@ fn apply_gamepad_deadzone(
 fn player_movement(
     keyboard: Res<ButtonInput<KeyCode>>,
     gamepads: Query<&Gamepad>,
-    mut player_query: Query<
-        (
-            &Health,
-            &MoveSpeed,
-            &mut LinearVelocity,
-            &mut Transform,
-        ),
-        With<Player>,
-    >,
+    mut player_query: Query<(&Health,&MoveSpeed,&mut LinearVelocity,&mut Transform,),With<Player>,>,
     dialog_query: Query<(), With<GuardianDialogUI>>,
     mut commands: Commands,
     asset_server: Res<AssetServer>,
 ) {
-
     let Ok((health,speed, mut velocity, mut transform)) = player_query.single_mut()
     else { return };
     if health.current <= 0 {
@@ -2455,4 +2447,25 @@ fn player_power_update(
             .entity(entity)
             .remove::<PlayerPowerTimer>();
     }
+}
+fn debug_print_player_position_on_f(
+    keyboard: Res<ButtonInput<KeyCode>>,
+    player_query: Query<&Transform, With<Player>>,
+) {
+    if !keyboard.just_pressed(KeyCode::KeyF) {
+        return;
+    }
+
+    let Ok(player_tf) = player_query.single() else {
+        warn!("Player not found");
+        return;
+    };
+
+    let root_pos = player_tf.translation;
+
+    // เอาไว้ copy ไปวาง collider/พื้น/กล่องต่อได้เลย
+    info!(
+        "Transform::from_xyz({:.3}, {:.3}, {:.3})",
+        root_pos.x, root_pos.y, root_pos.z
+    );
 }

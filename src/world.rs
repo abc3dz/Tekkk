@@ -48,7 +48,26 @@ impl Plugin for WorldPlugin {
         
         .add_systems(OnEnter(GameScene::FloatingIsland), (floating_island::spawn_floating_island, setup_floating_island_light))
         .add_systems(Update, check_warp_to_desert_from_floating.run_if(in_state(GameScene::FloatingIsland)))
-        .add_systems(OnExit(GameScene::FloatingIsland), cleanup_current_scene);
+        .add_systems(OnExit(GameScene::FloatingIsland), cleanup_current_scene)
+
+        .add_systems(Update,lagoon::check_warp_to_lagoon.run_if(in_state(GameScene::FloatingIsland)),)
+        // Loading Lagoon
+        .add_systems(OnEnter(GameScene::LoadingLagoon), spawn_loading_ui)
+        .add_systems(Update,lagoon::go_to_lagoon.run_if(in_state(GameScene::LoadingLagoon)),)
+        .add_systems(OnExit(GameScene::LoadingLagoon), cleanup_loading_ui)
+        // Lagoon Scene
+        .add_systems(OnEnter(GameScene::Lagoon),(lagoon::spawn_lagoon,lagoon::setup_lagoon_light,lagoon::spawn_back_to_floating_island_portal,volcano::spawn_portal_to_volcano_in_lagoon))
+        .add_systems(Update,lagoon::check_warp_back_to_floating_island.run_if(in_state(GameScene::Lagoon)),)
+        .add_systems(Update,volcano::check_warp_to_volcano.run_if(in_state(GameScene::Lagoon)),)
+        .add_systems(OnExit(GameScene::Lagoon), cleanup_current_scene)
+        // Loading Volcano
+        .add_systems(OnEnter(GameScene::LoadingVolcano), spawn_loading_ui)
+        .add_systems(Update,volcano::go_to_volcano.run_if(in_state(GameScene::LoadingVolcano)),)
+        .add_systems(OnExit(GameScene::LoadingVolcano), cleanup_loading_ui)
+        // Volcano Scene
+        .add_systems(OnEnter(GameScene::Volcano),(volcano::spawn_volcano,volcano::setup_volcano_light,volcano::spawn_back_to_lagoon_portal,),)
+        .add_systems(Update,volcano::check_warp_back_to_lagoon.run_if(in_state(GameScene::Volcano)),)
+        .add_systems(OnExit(GameScene::Volcano), cleanup_current_scene);
     }
 }
 
