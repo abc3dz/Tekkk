@@ -2,71 +2,78 @@ use bevy::prelude::*;
 
 use crate::components::*;
 use crate::biomes::*;
-use crate::npc::guardian::GuardianPlugin;
-use crate::enemy::enemy_muamua::*;
-use crate::enemy::enemy_muanim::*;
 use crate::warp_portal::*;
-use crate::enemy::enemy_choky::*;
 use crate::biomes::mtr_quicksand::*;
+use crate::npc::guardian::*;
+use crate::enemy::*;
 
 pub struct WorldPlugin;
 
 impl Plugin for WorldPlugin {
     fn build(&self, app: &mut App) {app
         .init_state::<GameScene>()
+        //hub
         .add_plugins(GuardianPlugin)
+        .add_plugins(WarpPortalPlugin)
+        //desert
         .add_plugins(EnemyMuamuaPlugin)
         .add_plugins(EnemyMuanimPlugin)
-        .add_plugins(WarpPortalPlugin)
         .add_plugins(EnemyChokyPlugin)
         .add_plugins(MaterialPlugin::<QuicksandMaterial>::default())
+        //flaoting island
+        .add_plugins(FiJaarPlugin)
+        //lagoon
+        .add_plugins(LgFrogzyPlugin)
         
         .add_systems(OnEnter(GameScene::LoadingHub), spawn_loading_ui)
         .add_systems(Update, go_to_hub.run_if(in_state(GameScene::LoadingHub)))
         .add_systems(OnExit(GameScene::LoadingHub), cleanup_loading_ui)
 
-        .add_systems(OnEnter(GameScene::Hub), (hub::spawn_hub, setup_hub_light, spawn_warp_portal))
-        .add_systems(Update, check_warp_to_desert.run_if(in_state(GameScene::Hub)))
+        .add_systems(OnEnter(GameScene::Hub), (spawn_hub, setup_hub_light, spawn_warp_portal))
+        .add_systems(Update, desert::check_warp_to_desert.run_if(in_state(GameScene::Hub)))
+        .add_systems(Update, check_warp_to_lagoon.run_if(in_state(GameScene::Hub)),)
         .add_systems(OnExit(GameScene::Hub), cleanup_current_scene)
 
         .add_systems(OnEnter(GameScene::LoadingDesert), spawn_loading_ui)
-        .add_systems(Update, go_to_desert.run_if(in_state(GameScene::LoadingDesert)))
+        .add_systems(Update, desert::go_to_desert.run_if(in_state(GameScene::LoadingDesert)))
         .add_systems(OnExit(GameScene::LoadingDesert), cleanup_loading_ui)
 
-        .add_systems(OnEnter(GameScene::Desert), (desert::spawn_desert, setup_desert_light))
-        .add_systems(Update, check_warp_to_hub.run_if(in_state(GameScene::Desert)))
-        .add_systems(Update, check_warp_to_floating_island.run_if(in_state(GameScene::Desert))) 
+        .add_systems(OnEnter(GameScene::Desert), (spawn_desert, setup_desert_light))
+        .add_systems(Update, desert::check_warp_to_hub.run_if(in_state(GameScene::Desert)))
+        .add_systems(Update, floating_island::check_warp_to_floating_island.run_if(in_state(GameScene::Desert))) 
         
         .add_systems(OnExit(GameScene::Desert), cleanup_current_scene)
 
-        .add_systems(OnEnter(GameScene::Desert),spawn_quicksand,)
-        .add_systems(Update,update_quicksand_shader.run_if(in_state(GameScene::Desert)))
+        // .add_systems(OnEnter(GameScene::Desert),spawn_quicksand,)
+        // .add_systems(Update,update_quicksand_shader.run_if(in_state(GameScene::Desert)))
 
         .add_systems(OnEnter(GameScene::LoadingFloatingIsland), spawn_loading_ui)
         .add_systems(Update, go_to_floating_island.run_if(in_state(GameScene::LoadingFloatingIsland)))
         .add_systems(OnExit(GameScene::LoadingFloatingIsland), cleanup_loading_ui)
         
-        .add_systems(OnEnter(GameScene::FloatingIsland), (floating_island::spawn_floating_island, setup_floating_island_light))
+        .add_systems(OnEnter(GameScene::FloatingIsland), (spawn_floating_island, setup_floating_island_light))
         .add_systems(Update, check_warp_to_desert_from_floating.run_if(in_state(GameScene::FloatingIsland)))
         .add_systems(OnExit(GameScene::FloatingIsland), cleanup_current_scene)
+        //move platforms in floating island
+        .add_systems(FixedUpdate, update_auto_platforms)
 
-        .add_systems(Update,lagoon::check_warp_to_lagoon.run_if(in_state(GameScene::FloatingIsland)),)
+        .add_systems(Update,check_warp_to_lagoon.run_if(in_state(GameScene::FloatingIsland)),)
         // Loading Lagoon
         .add_systems(OnEnter(GameScene::LoadingLagoon), spawn_loading_ui)
-        .add_systems(Update,lagoon::go_to_lagoon.run_if(in_state(GameScene::LoadingLagoon)),)
+        .add_systems(Update,go_to_lagoon.run_if(in_state(GameScene::LoadingLagoon)),)
         .add_systems(OnExit(GameScene::LoadingLagoon), cleanup_loading_ui)
         // Lagoon Scene
-        .add_systems(OnEnter(GameScene::Lagoon),(lagoon::spawn_lagoon,lagoon::setup_lagoon_light,lagoon::spawn_back_to_floating_island_portal,volcano::spawn_portal_to_volcano_in_lagoon))
-        .add_systems(Update,lagoon::check_warp_back_to_floating_island.run_if(in_state(GameScene::Lagoon)),)
-        .add_systems(Update,volcano::check_warp_to_volcano.run_if(in_state(GameScene::Lagoon)),)
+        .add_systems(OnEnter(GameScene::Lagoon),(spawn_lagoon, setup_lagoon_light, spawn_back_to_floating_island_portal, spawn_portal_to_volcano_in_lagoon))
+        .add_systems(Update,check_warp_back_to_floating_island.run_if(in_state(GameScene::Lagoon)),)
+        .add_systems(Update,check_warp_to_volcano.run_if(in_state(GameScene::Lagoon)),)
         .add_systems(OnExit(GameScene::Lagoon), cleanup_current_scene)
         // Loading Volcano
         .add_systems(OnEnter(GameScene::LoadingVolcano), spawn_loading_ui)
-        .add_systems(Update,volcano::go_to_volcano.run_if(in_state(GameScene::LoadingVolcano)),)
+        .add_systems(Update,go_to_volcano.run_if(in_state(GameScene::LoadingVolcano)),)
         .add_systems(OnExit(GameScene::LoadingVolcano), cleanup_loading_ui)
         // Volcano Scene
-        .add_systems(OnEnter(GameScene::Volcano),(volcano::spawn_volcano,volcano::setup_volcano_light,volcano::spawn_back_to_lagoon_portal,),)
-        .add_systems(Update,volcano::check_warp_back_to_lagoon.run_if(in_state(GameScene::Volcano)),)
+        .add_systems(OnEnter(GameScene::Volcano),(spawn_volcano,setup_volcano_light,spawn_back_to_lagoon_portal,),)
+        .add_systems(Update,check_warp_back_to_lagoon.run_if(in_state(GameScene::Volcano)),)
         .add_systems(OnExit(GameScene::Volcano), cleanup_current_scene);
     }
 }
@@ -106,131 +113,4 @@ fn cleanup_current_scene(
     for entity in &query {
         commands.entity(entity).despawn();
     }
-}
-fn go_to_hub(
-    mut next_state: ResMut<NextState<GameScene>>,
-    mut scene_spawn: ResMut<SceneSpawnPoint>,
-) {
-    scene_spawn.position = Some(Vec3::new(0.0, 2.0, 0.0));
-    next_state.set(GameScene::Hub);
-}
-fn go_to_desert(
-    mut next_state: ResMut<NextState<GameScene>>,
-    mut scene_spawn: ResMut<SceneSpawnPoint>,
-) {
-    scene_spawn.position = Some(Vec3::new(0.0, 2.0, 0.0));
-    next_state.set(GameScene::Desert);
-}
-fn check_warp_to_desert(
-    player_query: Query<&Transform, With<Player>>,
-    warp_query: Query<&Transform, With<WarpToDesert>>,
-    mut next_state: ResMut<NextState<GameScene>>,
-) {
-    let Ok(player_tf) = player_query.single()
-    else { return };
-
-    for warp_tf in &warp_query {
-        let distance = player_tf.translation.distance(warp_tf.translation);
-
-        if distance < 2.0 {
-            next_state.set(GameScene::LoadingDesert);
-        }
-    }
-}
-fn check_warp_to_hub(
-    player_query: Query<&Transform, With<Player>>,
-    warp_query: Query<&Transform, With<WarpToHub>>,
-    mut next_state: ResMut<NextState<GameScene>>,
-) {
-    let Ok(player_tf) = player_query.single() 
-    else { return };
-
-    for warp_tf in &warp_query {
-        let distance = player_tf.translation.distance(warp_tf.translation);
-        if distance < 2.0 {
-            next_state.set(GameScene::LoadingHub);
-        }
-    }
-}
-
-fn setup_hub_light(mut commands: Commands) {
-    commands.spawn((
-        DirectionalLight {
-            illuminance: 50_000.0,
-            shadows_enabled: true,
-            ..default()
-        },
-        Transform::from_rotation(Quat::from_euler(
-            EulerRot::XYZ,
-            -0.8,
-            -0.3,
-            0.0,
-        )),
-        CurrentScene,
-    ));
-}
-
-fn setup_desert_light(mut commands: Commands) {
-    commands.spawn((
-        DirectionalLight {
-            illuminance: 15_000.0,
-            shadows_enabled: true,
-            ..default()
-        },
-        Transform::from_rotation(Quat::from_euler(
-            EulerRot::XYZ,
-            -0.8,
-            -0.3,
-            0.0,
-        )),
-        CurrentScene,
-    ));
-}
-fn go_to_floating_island(
-    mut next_state: ResMut<NextState<GameScene>>,
-    mut scene_spawn: ResMut<SceneSpawnPoint>,
-) {
-    scene_spawn.position = Some(Vec3::new(0.0, 2.0, 0.0));
-    next_state.set(GameScene::FloatingIsland);
-    println!("Entering FloatingIsland");
-}
-
-fn check_warp_to_floating_island(
-    player_query: Query<&Transform, With<Player>>,
-    warp_query: Query<&Transform, With<WarpToFloatingIsland>>,
-    mut next_state: ResMut<NextState<GameScene>>,
-) {
-    let Ok(player_tf) = player_query.single() else { return };
-    for warp_tf in &warp_query {
-        let distance = player_tf.translation.distance(warp_tf.translation);
-        if distance < 2.0 {
-            next_state.set(GameScene::LoadingFloatingIsland);
-        }
-    }
-}
-
-fn check_warp_to_desert_from_floating(
-    player_query: Query<&Transform, With<Player>>,
-    warp_query: Query<&Transform, With<WarpToDesert>>, // ใช้ Component เดิมเพื่อเดินทางกลับ
-    mut next_state: ResMut<NextState<GameScene>>,
-) {
-    let Ok(player_tf) = player_query.single() else { return };
-    for warp_tf in &warp_query {
-        let distance = player_tf.translation.distance(warp_tf.translation);
-        if distance < 2.0 {
-            next_state.set(GameScene::LoadingDesert);
-        }
-    }
-}
-
-fn setup_floating_island_light(mut commands: Commands) {
-    commands.spawn((
-        DirectionalLight {
-            illuminance: 40_000.0,
-            shadows_enabled: true,
-            ..default()
-        },
-        Transform::from_rotation(Quat::from_euler(EulerRot::XYZ,-0.8,-0.3,0.0)),
-        CurrentScene,
-    ));
 }

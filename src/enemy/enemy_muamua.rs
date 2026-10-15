@@ -809,24 +809,3 @@ fn update_muamua_hurt_and_dead(
         }
     }
 }
-fn check_muamua_defeat_goal(
-    defeated_count: Res<MuamuaDefeatedCount>,
-    mut completed: Local<bool>,
-) {
-    if *completed {
-        return;
-    }
-
-    if defeated_count.0 >= MUAMUA_DEFEAT_GOAL {
-        *completed = true;
-
-        info!("Quest complete: defeated 10 Muamua!");
-
-        // ตรงนี้ใส่สิ่งที่คุณต้องการให้เกิดขึ้นได้ เช่น
-        // - เปิดประตู
-        // - แสดง UI
-        // - หยุด spawn
-        // - ให้รางวัล
-        // - เปลี่ยนฉาก
-    }
-}

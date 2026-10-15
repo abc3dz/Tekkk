@@ -61,3 +61,59 @@ pub fn spawn_desert(
         DespawnOnExit(GameScene::Desert),
     ));
 }
+pub fn go_to_desert(
+    mut next_state: ResMut<NextState<GameScene>>,
+    mut scene_spawn: ResMut<SceneSpawnPoint>,
+) {
+    scene_spawn.position = Some(Vec3::new(0.0, 2.0, 0.0));
+    next_state.set(GameScene::Desert);
+}
+pub fn check_warp_to_desert(
+    player_query: Query<&Transform, With<Player>>,
+    warp_query: Query<&Transform, With<WarpToDesert>>,
+    mut next_state: ResMut<NextState<GameScene>>,
+) {
+    let Ok(player_tf) = player_query.single()
+    else { return };
+
+    for warp_tf in &warp_query {
+        let distance = player_tf.translation.distance(warp_tf.translation);
+
+        if distance < 2.0 {
+            next_state.set(GameScene::LoadingDesert);
+        }
+    }
+}
+
+pub fn check_warp_to_hub(
+    player_query: Query<&Transform, With<Player>>,
+    warp_query: Query<&Transform, With<WarpToHub>>,
+    mut next_state: ResMut<NextState<GameScene>>,
+) {
+    let Ok(player_tf) = player_query.single() 
+    else { return };
+
+    for warp_tf in &warp_query {
+        let distance = player_tf.translation.distance(warp_tf.translation);
+        if distance < 2.0 {
+            next_state.set(GameScene::LoadingHub);
+        }
+    }
+}
+
+pub fn setup_desert_light(mut commands: Commands) {
+    commands.spawn((
+        DirectionalLight {
+            illuminance: 15_000.0,
+            shadows_enabled: true,
+            ..default()
+        },
+        Transform::from_rotation(Quat::from_euler(
+            EulerRot::XYZ,
+            -0.8,
+            -0.3,
+            0.0,
+        )),
+        CurrentScene,
+    ));
+}

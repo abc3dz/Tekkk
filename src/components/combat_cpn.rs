@@ -112,6 +112,25 @@ impl BaseStats {
         critical_rate: 2.0,
         critical_damage: 5.0,
     };
+
+    //floating_island
+    pub const JAAR: Self = Self {
+        max_hp: 700.0,
+        max_mp: 0.0,
+        attack: 18.0,
+        defense: 11.0,
+        critical_rate: 2.0,
+        critical_damage: 5.0,
+    };
+    //lagoon
+    pub const FROGZY: Self = Self {
+        max_hp: 700.0,
+        max_mp: 0.0,
+        attack: 18.0,
+        defense: 11.0,
+        critical_rate: 2.0,
+        critical_damage: 5.0,
+    };
 }
 
 #[derive(Debug, Default, Clone, Copy)]
@@ -181,7 +200,7 @@ impl ElementExpReward {
         earth: ExpRange::new(4,5),
         inw: ExpRange::new(3,4),
     };
-
+    //desert
     pub const MUANIM: Self = Self {
         water: ExpRange::new(0, 0),
         fire: ExpRange::new(0, 0),
@@ -197,6 +216,22 @@ impl ElementExpReward {
         inw: ExpRange::new(2,2),
     };
     pub const CHOKY: Self = Self {
+        water: ExpRange::new(0, 0),
+        fire: ExpRange::new(5, 5),
+        wind: ExpRange::new(0, 0),
+        earth: ExpRange::new(30, 30),
+        inw: ExpRange::new(3,3),
+    };
+    //floating_island
+    pub const JAAR: Self = Self {
+        water: ExpRange::new(0, 0),
+        fire: ExpRange::new(5, 5),
+        wind: ExpRange::new(0, 0),
+        earth: ExpRange::new(30, 30),
+        inw: ExpRange::new(3,3),
+    };
+    //lagoon
+    pub const FROGZY: Self = Self {
         water: ExpRange::new(0, 0),
         fire: ExpRange::new(5, 5),
         wind: ExpRange::new(0, 0),

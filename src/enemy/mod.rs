@@ -1,3 +1,10 @@
 pub mod enemy_muamua;
+pub use enemy_muamua::*;
 pub mod enemy_choky;
+pub use enemy_choky::*;
 pub mod enemy_muanim;
+pub use enemy_muanim::*;
+pub mod fi_jaar;
+pub use fi_jaar::*;
+pub mod lg_frogzy;
+pub use lg_frogzy::*;

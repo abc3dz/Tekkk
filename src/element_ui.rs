@@ -35,10 +35,10 @@ struct ElementStatusUi;
 struct ControlsUiRoot;
 
 #[derive(Component, Clone, Copy)]
-enum PlayerStatusValueText { Hp, Mp, Attack, Defense, CriticalRate, CriticalDamage, AtkAndDefElement }
+pub enum PlayerStatusValueText { Hp, Mp, Attack, Defense, CriticalRate, CriticalDamage, AtkAndDefElement }
 
 #[derive(Component, Clone, Copy)]
-enum PlayerStatusBonusText { Hp, Mp, Attack, Defense, CriticalRate, CriticalDamage }
+pub enum PlayerStatusBonusText { Hp, Mp, Attack, Defense, CriticalRate, CriticalDamage }
 
 #[derive(Component, Clone, Copy)]
 enum ElementExpText { Water, Fire, Wind, Earth, Inw }
@@ -189,18 +189,13 @@ fn element_status_input(
     commands.spawn(AudioPlayer::new(asset_server.load("sounds/status_window.ogg")));
 }
 
-// 2. เพิ่ม loc: Res<Localization> เข้ามาเพื่อใช้แปลชื่อธาตุ
 fn update_element_status_ui(
-    loc: Res<Localization>, // <--- เพิ่มบรรทัดนี้
+    loc: Res<Localization>,
     player_query: Query<(&Health, &Mana, &BaseStats, &CombatStats, &ElementMastery, &AtkAndDefElement), With<Player>>,
-    ui_query: Query<&Node, With<ElementStatusUi>>,
     mut value_query: Query<(&PlayerStatusValueText, &mut TextSpan), (Without<PlayerStatusBonusText>, Without<ElementExpText>)>,
     mut bonus_query: Query<(&PlayerStatusBonusText, &mut TextSpan), (Without<PlayerStatusValueText>, Without<ElementExpText>)>,
     mut exp_query: Query<(&ElementExpText, &mut TextSpan), (Without<PlayerStatusValueText>, Without<PlayerStatusBonusText>)>,
 ) {
-    let Ok(ui_node) = ui_query.single() else { return };
-    if matches!(ui_node.display, Display::None) { return; }
-    
     let Ok((health, mana, base, combat, mastery, atk_and_def_element)) = player_query.single() else { return };
 
     let hp_bonus = combat.max_hp - base.max_hp;
@@ -218,8 +213,6 @@ fn update_element_status_ui(
             PlayerStatusValueText::Defense => format!("{:.1}", combat.defense),
             PlayerStatusValueText::CriticalRate => format!("{:.1}%", combat.critical_rate * 100.0),
             PlayerStatusValueText::CriticalDamage => format!("{:.1}%", combat.critical_damage * 100.0),
-            
-            // แก้ไขส่วนนี้: ดึงชื่อธาตุจาก lang.json แทนการใช้ {:?}
             PlayerStatusValueText::AtkAndDefElement => {
                 let element_name = match atk_and_def_element.0 {
                     Element::Water => loc.get("water"),
@@ -384,9 +377,9 @@ fn close_status_and_controls_when_guardian_dialog_open(
     }
 
     // ปิดหน้าต่างสถานะผู้เล่น
-    // for entity in &status_query {
-    //     commands.entity(entity).despawn();
-    // }
+    for entity in &status_query {
+        commands.entity(entity).despawn();
+    }
 
     // ปิดหน้าต่าง controls
     for entity in &controls_query {

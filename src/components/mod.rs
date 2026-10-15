@@ -24,3 +24,9 @@ pub use scene_cpn::*;
 
 pub mod ui_cpn;
 pub use ui_cpn::*;
+
+pub mod jaar_cpn;
+pub use jaar_cpn::*;
+
+pub mod frogzy_cpn;
+pub use frogzy_cpn::*;

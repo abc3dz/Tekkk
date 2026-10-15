@@ -359,7 +359,7 @@ fn player_footstep_from_animation_time(
         };
 
         if crossed(LEFT_FOOT_TIME) || crossed(RIGHT_FOOT_TIME) {
-            info!("PLAY FOOTSTEP");
+            //info!("PLAY FOOTSTEP");
 
             commands.spawn((AudioPlayer::new(asset_server.load("sounds/sfx_walk.ogg")),PlaybackSettings::DESPAWN));
         }
@@ -1508,9 +1508,9 @@ pub fn respawn_player_when_defeated(
 
         commands.spawn((
             AudioPlayer::new(
-                asset_server.load("sounds/sfx_game_over.ogg"),
+                asset_server.load("sounds/sfx_fall.ogg"),
             ),
-            PlaybackSettings::DESPAWN,
+            PlaybackSettings::DESPAWN.with_speed(1.8)
         ));
 
         return;

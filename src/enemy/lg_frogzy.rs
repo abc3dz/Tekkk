@@ -1,0 +1,832 @@
+use avian3d::prelude::*;
+use bevy::{
+    gltf::GltfAssetLabel,
+    prelude::*,
+};
+
+use crate::cel_shader::*;
+use crate::components::*;
+use crate::npc::practice_common::*;
+use crate::player::*;
+use crate::camera::*;
+use crate::pause_menu::GameMode;
+
+#[derive(Component, Debug)]
+pub struct EnemyFrogzy;
+
+pub struct LgFrogzyPlugin;
+
+impl Plugin for LgFrogzyPlugin {
+    fn build(&self, app: &mut App) {
+        app.insert_resource(FrogzyRespawnTimer(Timer::from_seconds(1.0, TimerMode::Once)))
+            .init_resource::<FrogzySpawnedCount>()
+            .add_systems(
+                OnEnter(GameScene::Lagoon),
+                (
+                    reset_enemy_frogzy_wave,
+                    setup_enemy_frogzy_animation_graph,
+                ),
+            )
+            .add_systems(
+                Update,
+                (
+                    spawn_enemy_frogzy,
+                    setup_enemy_frogzy_animation_player,
+                    provoke_enemy_frogzy_when_hurt,
+                    enemy_frogzy_behavior,
+                    update_enemy_frogzy_animation,
+                    update_frogzy_hurt_and_dead,
+                    spawn_frogzy_punch_hitbox,
+                    frogzy_punch_hit_player,
+                    despawn_frogzy_punch_hitbox,
+                )
+                    .chain()
+                    .run_if(in_state(GameScene::Lagoon).and(in_state(GameMode::Playing))),
+            );
+    }
+}
+
+const FROGZY_SPAWN_POSITION: Vec3 = Vec3::new(-10.0, 1.0, -10.0);
+const FROGZY_STOP_DISTANCE: f32 = 1.0;
+const FROGZY_MOVE_SPEED: f32 = 3.0;
+const FROGZY_LOSE_INTEREST_DISTANCE: f32 = 10.0;
+const FROGZY_PATROL_RADIUS: f32 = 8.0;
+
+fn spawn_enemy_frogzy(
+    mut commands: Commands,
+    asset_server: Res<AssetServer>,
+    mut spawned_count: ResMut<FrogzySpawnedCount>,
+) {
+    if spawned_count.0 >= FROGZY_SPAWN_LIMIT {
+        return;
+    }
+
+    let frogzy_scene = asset_server.load(
+        GltfAssetLabel::Scene(0).from_asset("enemy/Lg_Frogzy.glb"),
+    );
+
+    let random_angle = rand::random::<f32>() * std::f32::consts::TAU;
+    let initial_dir = Vec3::new(random_angle.cos(), 0.0, random_angle.sin()).normalize();
+
+    const FROGZY_BODY_Y: f32 = 1.0;
+
+    let base_stats = BaseStats::FROGZY;
+
+    let enemy_frogzy = commands
+        .spawn((
+            Name::new("Enemy Frogzy"),
+            Enemy,
+            EnemyFrogzy,
+            EnemyState::Patrol,
+            Health {
+                current: base_stats.max_hp as i32,
+                max: base_stats.max_hp as i32,
+            },
+            base_stats,
+            CombatStats::from(base_stats),
+            AtkAndDefElement(Element::Water),
+            ElementExpReward::FROGZY,
+            RigidBody::Dynamic,
+            Collider::capsule(0.45, 1.0),
+            LockedAxes::ROTATION_LOCKED,
+            LinearVelocity::ZERO,
+            Transform::from_translation(FROGZY_SPAWN_POSITION + Vec3::Y * FROGZY_BODY_Y),
+            DespawnOnExit(GameScene::Lagoon),
+        ))
+        .insert(PassivePatrol {
+            direction: initial_dir,
+            timer: Timer::from_seconds(3.0, TimerMode::Repeating),
+            center: FROGZY_SPAWN_POSITION,
+            radius: FROGZY_PATROL_RADIUS,
+        })
+        .with_children(|parent| {
+            parent.spawn((
+                SceneRoot(frogzy_scene),
+                Transform::from_xyz(0.0, -FROGZY_BODY_Y, 0.0),
+                ApplyToonMaterial,
+            ));
+        })
+        .id();
+
+    commands.entity(enemy_frogzy).insert((
+        CombatTarget,
+        FrogzyAttackTimer(Timer::from_seconds(
+            0.3,
+            TimerMode::Repeating,
+        )),
+    ));
+
+    spawn_enemy_health_bar(
+        &mut commands,
+        enemy_frogzy,
+    );
+
+    //respawn_timer.0.reset();
+    spawned_count.0 += 1;
+    //info!("Enemy frogzy spawned");
+}
+
+fn setup_enemy_frogzy_animation_graph(
+    mut commands: Commands,
+    asset_server: Res<AssetServer>,
+    mut graphs: ResMut<Assets<AnimationGraph>>,
+) {
+    let mut graph = AnimationGraph::new();
+
+    let idle = graph.add_clip(
+        asset_server.load(
+            GltfAssetLabel::Animation(3)
+                .from_asset("enemy/Lg_Frogzy.glb"),
+        ),
+        1.0,
+        graph.root,
+    );
+
+    let chase = graph.add_clip(
+        asset_server.load(
+            GltfAssetLabel::Animation(4)
+                .from_asset("enemy/Lg_Frogzy.glb"),
+        ),
+        1.0,
+        graph.root,
+    );
+
+    let attack = graph.add_clip(
+        asset_server.load(
+            GltfAssetLabel::Animation(0)
+                .from_asset("enemy/Lg_Frogzy.glb"),
+        ),
+        1.0,
+        graph.root,
+    );
+
+    let hurt = graph.add_clip(
+        asset_server.load(
+            GltfAssetLabel::Animation(2)
+                .from_asset("enemy/Lg_Frogzy.glb"),
+        ),
+        1.0,
+        graph.root,
+    );
+
+    let dead = graph.add_clip(
+        asset_server.load(
+            GltfAssetLabel::Animation(1)
+                .from_asset("enemy/Lg_Frogzy.glb"),
+        ),
+        1.0,
+        graph.root,
+    );
+
+    commands.insert_resource(EnemyFrogzyAnimationGraph {
+        graph: graphs.add(graph),
+        idle,
+        chase,
+        attack,
+        hurt,
+        dead,
+    });
+}
+
+fn setup_enemy_frogzy_animation_player(
+    mut commands: Commands,
+    animation_graph: Res<EnemyFrogzyAnimationGraph>,
+    mut animation_players: Query<
+        (Entity, &mut AnimationPlayer),
+        Added<AnimationPlayer>,
+    >,
+    child_of_query: Query<&ChildOf>,
+    frogzy_query: Query<(), With<EnemyFrogzy>>,
+) {
+    for (animation_entity, mut player) in &mut animation_players {
+        let Some(frogzy_root) = find_enemy_frogzy_root(
+            animation_entity,
+            &child_of_query,
+            &frogzy_query,
+        ) else {
+            continue;
+        };
+
+        commands.entity(animation_entity).insert((
+            AnimationGraphHandle(animation_graph.graph.clone()),
+            EnemyFrogzyAnimationTarget {
+                root: frogzy_root,
+            },
+            EnemyFrogzyAnimState::Idle,
+        ));
+
+        player.stop_all();
+        player.play(animation_graph.idle).repeat();
+    }
+}
+
+fn find_enemy_frogzy_root(
+    entity: Entity,
+    child_of_query: &Query<&ChildOf>,
+    frogzy_query: &Query<(), With<EnemyFrogzy>>,
+) -> Option<Entity> {
+    let mut current = entity;
+
+    loop {
+        if frogzy_query.get(current).is_ok() {
+            return Some(current);
+        }
+
+        let Ok(child_of) = child_of_query.get(current) else {
+            return None;
+        };
+
+        current = child_of.parent();
+    }
+}
+
+fn enemy_frogzy_behavior(
+    mut commands: Commands,
+    time: Res<Time>,
+    player_query: Query<
+        &Transform,
+        (
+            With<Player>,
+            Without<EnemyFrogzy>,
+        ),
+    >,
+    mut frogzy_query: Query<
+        (
+            Entity,
+            &mut Transform,
+            &mut LinearVelocity,
+            &mut EnemyState,
+            Option<&mut PassivePatrol>,
+            Option<&Provoked>,
+        ),
+        (
+            With<EnemyFrogzy>,
+            Without<Player>,
+        ),
+    >,
+) {
+    let Ok(player_transform) = player_query.single() else {
+        return;
+    };
+
+    for (
+        frogzy_entity,
+        mut frogzy_transform,
+        mut velocity,
+        mut enemy_state,
+        patrol_data,
+        provoked,
+    ) in &mut frogzy_query
+    {
+        // ถ้ากำลังเจ็บหรือตาย ให้หยุดก่อน
+        if matches!(*enemy_state, EnemyState::Hurt | EnemyState::Dead) {
+            velocity.x = 0.0;
+            velocity.z = 0.0;
+            continue;
+        }
+
+        // ==================================================
+        // กรณีที่ 1 : ยังไม่ถูกผู้เล่นโจมตี
+        // ให้เดินสุ่มอย่างเดียว แต่จำกัดพื้นที่ลาดตระเวน
+        // ==================================================
+        if provoked.is_none() {
+            if let Some(mut patrol) = patrol_data {
+                patrol.timer.tick(time.delta());
+
+                // คิดแค่ระนาบ XZ
+                let current_position = Vec3::new(
+                    frogzy_transform.translation.x,
+                    0.0,
+                    frogzy_transform.translation.z,
+                );
+
+                let patrol_center = Vec3::new(
+                    patrol.center.x,
+                    0.0,
+                    patrol.center.z,
+                );
+
+                let from_center = current_position - patrol_center;
+                let distance_from_center = from_center.length();
+
+                // ==================================================
+                // ถ้าออกนอกพื้นที่ลาดตระเวนแล้ว
+                // ให้บังคับหันกลับเข้ากลางพื้นที่
+                // ==================================================
+                if distance_from_center > patrol.radius {
+                    let inward_direction = if from_center.length_squared() > 0.0001 {
+                        (-from_center).normalize()
+                    } else {
+                        Vec3::new(0.0, 0.0, 1.0)
+                    };
+
+                    patrol.direction = inward_direction;
+
+                    // ยังไม่ต้องสุ่มทิศใหม่ตอนนี้ เพราะต้องการให้กลับเข้าพื้นที่ก่อน
+                    patrol.timer.reset();
+                }
+                // ==================================================
+                // ถ้ายังอยู่ในพื้นที่ และครบเวลาสุ่มทิศทาง
+                // ==================================================
+                else if patrol.timer.just_finished() {
+                    let random_angle = rand::random::<f32>() * std::f32::consts::TAU;
+
+                    let mut new_direction = Vec3::new(
+                        random_angle.cos(),
+                        0.0,
+                        random_angle.sin(),
+                    )
+                    .normalize();
+
+                    // ถ้าอยู่ใกล้ขอบพื้นที่ อย่าให้สุ่มทิศที่ชี้ออกนอกพื้นที่
+                    if patrol.radius > 0.0 && distance_from_center > patrol.radius * 0.75 {
+                        let outward_direction = from_center.normalize();
+
+                        // dot > 0 แปลว่าทิศใหม่กำลังชี้ออกจากศูนย์กลาง
+                        if new_direction.dot(outward_direction) > 0.0 {
+                            new_direction = -outward_direction;
+                        }
+                    }
+
+                    patrol.direction = new_direction;
+                }
+
+                // กันกรณีที่ direction เป็นศูนย์
+                let dir = if patrol.direction.length_squared() > 0.0001 {
+                    patrol.direction.normalize()
+                } else {
+                    Vec3::new(0.0, 0.0, 1.0)
+                };
+
+                velocity.x = dir.x * FROGZY_MOVE_SPEED;
+                velocity.z = dir.z * FROGZY_MOVE_SPEED;
+
+                if dir.length_squared() > 0.0001 {
+                    frogzy_transform.rotation =
+                        Quat::from_rotation_y(dir.x.atan2(dir.z));
+                }
+
+                *enemy_state = EnemyState::Patrol;
+            } else {
+                velocity.x = 0.0;
+                velocity.z = 0.0;
+                *enemy_state = EnemyState::Idle;
+            }
+
+            continue;
+        }
+
+        // ==================================================
+        // กรณีที่ 2 : ถูกผู้เล่นโจมตีแล้ว
+        // ให้ไล่และโจมตีผู้เล่น
+        // ==================================================
+        let to_player = player_transform.translation - frogzy_transform.translation;
+        let flat_direction = Vec3::new(to_player.x, 0.0, to_player.z);
+        let distance = flat_direction.length();
+
+        // ==================================================
+        // ถ้าผู้เล่นอยู่ไกลเกินระยะเลิกไล่
+        // ให้ลบ Provoked แล้วกลับไป Patrol
+        // ==================================================
+        if distance > FROGZY_LOSE_INTEREST_DISTANCE {
+            commands
+                .entity(frogzy_entity)
+                .remove::<Provoked>();
+
+            if let Some(mut patrol) = patrol_data {
+                *enemy_state = EnemyState::Patrol;
+
+                // รีเซ็ต timer และสุ่มทิศใหม่เพื่อให้กลับมานั่งเดินสุ่มต่อได้
+                patrol.timer.reset();
+
+                let random_angle = rand::random::<f32>() * std::f32::consts::TAU;
+                patrol.direction =
+                    Vec3::new(random_angle.cos(), 0.0, random_angle.sin()).normalize();
+
+                let dir = patrol.direction;
+
+                velocity.x = dir.x * FROGZY_MOVE_SPEED;
+                velocity.z = dir.z * FROGZY_MOVE_SPEED;
+
+                if dir.length_squared() > 0.0001 {
+                    frogzy_transform.rotation =
+                        Quat::from_rotation_y(dir.x.atan2(dir.z));
+                }
+            } else {
+                *enemy_state = EnemyState::Idle;
+                velocity.x = 0.0;
+                velocity.z = 0.0;
+            }
+
+            continue;
+        }
+
+        // ถ้าใกล้ผู้เล่นมากพอ ให้หยุดแล้วโจมตี
+        if distance <= FROGZY_STOP_DISTANCE {
+            velocity.x = 0.0;
+            velocity.z = 0.0;
+
+            if flat_direction.length_squared() > 0.0001 {
+                let direction = flat_direction.normalize();
+                frogzy_transform.rotation =
+                    Quat::from_rotation_y(direction.x.atan2(direction.z));
+            }
+
+            *enemy_state = EnemyState::Attack;
+            continue;
+        }
+
+        // ถ้ายังไม่ใกล้พอ ให้ไล่ผู้เล่น
+        let direction = if flat_direction.length_squared() > 0.0001 {
+            flat_direction.normalize()
+        } else {
+            Vec3::ZERO
+        };
+
+        velocity.x = direction.x * FROGZY_MOVE_SPEED;
+        velocity.z = direction.z * FROGZY_MOVE_SPEED;
+
+        if direction.length_squared() > 0.0001 {
+            frogzy_transform.rotation = Quat::from_rotation_y(direction.x.atan2(direction.z));
+        }
+
+        *enemy_state = EnemyState::Chase;
+    }
+}
+
+fn update_enemy_frogzy_animation(
+    animation_graph: Res<EnemyFrogzyAnimationGraph>,
+    frogzy_query: Query<&EnemyState, With<EnemyFrogzy>>,
+    mut animation_query: Query<
+        (
+            &EnemyFrogzyAnimationTarget,
+            &mut AnimationPlayer,
+            &mut EnemyFrogzyAnimState,
+        ),
+    >,
+    mut commands: Commands,
+    asset_server: Res<AssetServer>,
+) {
+    for (
+        animation_target,
+        mut animation_player,
+        mut current_animation,
+    ) in &mut animation_query
+    {
+        let Ok(enemy_state) =
+            frogzy_query.get(animation_target.root)
+        else {
+            continue;
+        };
+
+        let wanted_animation = match enemy_state {
+            EnemyState::Hurt => EnemyFrogzyAnimState::Hurt,
+            EnemyState::Dead => EnemyFrogzyAnimState::Dead,
+            EnemyState::Chase | EnemyState::Patrol => EnemyFrogzyAnimState::Chase,
+            EnemyState::Attack => EnemyFrogzyAnimState::Attack,
+            _ => EnemyFrogzyAnimState::Idle,
+        };
+
+        // Animation เดิมกำลังเล่นอยู่ ไม่ต้องเริ่มใหม่ทุก Frame
+        if *current_animation == wanted_animation {
+            continue;
+        }
+
+        animation_player.stop_all();
+
+        match wanted_animation {
+            EnemyFrogzyAnimState::Idle => {
+                animation_player
+                    .play(animation_graph.idle)
+                    .repeat();
+            }
+            EnemyFrogzyAnimState::Chase => {
+                animation_player
+                    .play(animation_graph.chase)
+                    .repeat();
+            }
+            EnemyFrogzyAnimState::Attack => {
+                animation_player
+                    .play(animation_graph.attack)
+                    .repeat();
+            }
+            EnemyFrogzyAnimState::Hurt => {
+                animation_player.play(animation_graph.hurt);
+                commands.spawn(AudioPlayer::new(asset_server.load("sounds/enemy/frogzy_hurt.ogg")));
+            }
+            EnemyFrogzyAnimState::Dead => {
+                animation_player.play(animation_graph.dead);
+                commands.spawn(AudioPlayer::new(asset_server.load("sounds/enemy/frogzy_dead.ogg")));
+            }
+        }
+
+        *current_animation = wanted_animation;
+    }
+}
+
+fn update_frogzy_hurt_and_dead(
+    mut commands: Commands,
+    time: Res<Time>,
+    mut frogzy_query: Query<
+        (
+            Entity,
+            &mut EnemyState,
+            &mut EnemyStateTimer,
+            &mut LinearVelocity,
+        ),
+        With<EnemyFrogzy>,
+    >,
+) {
+    for (
+        frogzy_entity,
+        mut enemy_state,
+        mut state_timer,
+        mut velocity,
+    ) in &mut frogzy_query
+    {
+        state_timer.0.tick(time.delta());
+
+        match *enemy_state {
+            EnemyState::Hurt => {
+                // Hurt ธรรมดาไม่กระเด็น
+                velocity.x = 0.0;
+                velocity.z = 0.0;
+            }
+            EnemyState::Dead => {
+                // ปล่อยให้กระเด็น 0.25 วินาที
+                if state_timer.0.elapsed_secs() >= 0.25 {
+                    velocity.x = 0.0;
+                    velocity.z = 0.0;
+                }
+            }
+            _ => {}
+        }
+
+        if !state_timer.0.is_finished() {
+            continue;
+        }
+
+        match *enemy_state {
+            EnemyState::Hurt => {
+                *enemy_state = EnemyState::Idle;
+                commands
+                    .entity(frogzy_entity)
+                    .remove::<EnemyStateTimer>();
+            }
+            EnemyState::Dead => {
+                commands
+                    .entity(frogzy_entity)
+                    .despawn();
+            }
+            _ => {
+                commands
+                    .entity(frogzy_entity)
+                    .remove::<EnemyStateTimer>();
+            }
+        }
+    }
+}
+
+fn spawn_frogzy_punch_hitbox(
+    mut commands: Commands,
+    time: Res<Time>,
+    mut frogzy_query: Query<
+        (
+            Entity,
+            &EnemyState,
+            &mut FrogzyAttackTimer,
+        ),
+        With<EnemyFrogzy>,
+    >,
+) {
+    for (
+        frogzy_entity,
+        enemy_state,
+        mut attack_timer,
+    ) in &mut frogzy_query
+    {
+        if !matches!(
+            *enemy_state,
+            EnemyState::Attack
+        ) {
+            attack_timer.0.reset();
+            continue;
+        }
+
+        attack_timer.0.tick(time.delta());
+
+        if !attack_timer.0.just_finished() {
+            continue;
+        }
+
+        commands
+            .entity(frogzy_entity)
+            .with_children(|parent| {
+                parent.spawn((
+                    FrogzyPunchHitbox {
+                        owner: frogzy_entity,
+                        has_hit: false,
+                        lifetime: Timer::from_seconds(
+                            0.20,
+                            TimerMode::Once,
+                        ),
+                    },
+                    Collider::sphere(0.35),
+                    Sensor,
+                    CollisionEventsEnabled,
+                    Transform::from_xyz(
+                        0.0,
+                        0.0,
+                        0.85,
+                    ),
+                ));
+            });
+    }
+}
+
+fn frogzy_punch_hit_player(
+    mut commands: Commands,
+    mut collision_reader: MessageReader<CollisionStart>,
+    mut hitbox_query: Query<&mut FrogzyPunchHitbox>,
+    frogzy_query: Query<
+        (&CombatStats, &AtkAndDefElement),
+        (
+            With<EnemyFrogzy>,
+            Without<Player>,
+        ),
+    >,
+    mut player_query: Query<
+        (
+            Entity,
+            &mut Health,
+            &CombatStats,
+            &AtkAndDefElement,
+            &GlobalTransform,
+        ),
+        (
+            With<Player>,
+            Without<EnemyFrogzy>,
+        ),
+    >,
+    anim_graph: Res<PlayerAnimationGraph>,
+    mut anim_query: Query<
+        (&mut AnimationPlayer, &mut PlayerAnimState),
+        With<PlayerAnimationTarget>,
+    >,
+    asset_server: Res<AssetServer>,
+    camera_query: Query<Entity, With<MainCamera>>,
+) {
+    let mut rng = rand::rng();
+
+    for event in collision_reader.read() {
+        let (
+            hitbox_entity,
+            other_body,
+        ) = if hitbox_query.contains(
+            event.collider1,
+        ) {
+            (
+                event.collider1,
+                event.body2
+                    .unwrap_or(event.collider2),
+            )
+        } else if hitbox_query.contains(
+            event.collider2,
+        ) {
+            (
+                event.collider2,
+                event.body1
+                    .unwrap_or(event.collider1),
+            )
+        } else {
+            continue;
+        };
+
+        let Ok(mut hitbox) =
+            hitbox_query.get_mut(hitbox_entity)
+        else {
+            continue;
+        };
+
+        if hitbox.has_hit {
+            continue;
+        }
+
+        let Ok((
+            player_entity,
+            mut player_health,
+            player_stats,
+            player_element,
+            player_global_transform,
+        )) = player_query.get_mut(other_body)
+        else {
+            continue;
+        };
+
+        let Ok((
+            frogzy_stats,
+            frogzy_element,
+        )) = frogzy_query.get(hitbox.owner)
+        else {
+            continue;
+        };
+
+        let (
+            base_damage,
+            is_critical,
+        ) = calculate_combat_damage(
+            frogzy_stats,
+            player_stats,
+            &mut rng,
+        );
+
+        let element_multiplier =
+            elemental_multiplier(
+                frogzy_element.0,
+                player_element.0,
+            );
+
+        let damage = (
+            base_damage as f32
+                * element_multiplier
+        )
+            .round()
+            .max(1.0) as i32;
+
+        player_health.current -= damage;
+        player_health.current = player_health.current.clamp(0, player_health.max);
+
+        if player_health.current > 0 {
+            play_player_hurt_animation(
+                &mut commands,
+                player_entity,
+                &anim_graph,
+                &mut anim_query,
+                &camera_query,
+                &asset_server,
+            );
+        }
+
+        spawn_floating_damage_text(
+            &mut commands,
+            damage,
+            player_global_transform.translation()
+                + Vec3::new(0.0, 2.0, 0.0),
+            FloatingDamageKind::PlayerHit,
+        );
+
+        hitbox.has_hit = true;
+
+        commands.spawn(AudioPlayer::new(asset_server.load("sounds/enemy/frogzy_atk.ogg")));
+
+        info!(
+            "Frogzy hit Player: damage={}, critical={}, HP={}/{}",
+            damage,
+            is_critical,
+            player_health.current,
+            player_health.max,
+        );
+    }
+}
+
+fn despawn_frogzy_punch_hitbox(
+    mut commands: Commands,
+    time: Res<Time>,
+    mut hitbox_query: Query<
+        (
+            Entity,
+            &mut FrogzyPunchHitbox,
+        ),
+    >,
+) {
+    for (
+        entity,
+        mut hitbox,
+    ) in &mut hitbox_query
+    {
+        hitbox.lifetime.tick(time.delta());
+
+        if hitbox.lifetime.is_finished() {
+            commands.entity(entity).despawn();
+        }
+    }
+}
+
+fn reset_enemy_frogzy_wave(
+    mut spawned_count: ResMut<FrogzySpawnedCount>,
+    mut respawn_timer: ResMut<FrogzyRespawnTimer>,
+) {
+    spawned_count.0 = 0;
+    respawn_timer.0.reset();
+}
+
+fn provoke_enemy_frogzy_when_hurt(
+    mut commands: Commands,
+    query: Query<(Entity, &EnemyState), With<EnemyFrogzy>>,
+) {
+    for (entity, state) in &query {
+        if matches!(*state, EnemyState::Hurt | EnemyState::Dead) {
+            commands.entity(entity).insert(Provoked);
+        }
+    }
+}

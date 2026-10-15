@@ -1,6 +1,12 @@
 pub mod hub;
+pub use hub::*;
 pub mod desert;
+pub use desert::*;
 pub mod mtr_quicksand;
+pub use mtr_quicksand::*;
 pub mod floating_island;
+pub use floating_island::*;
 pub mod lagoon;
+pub use lagoon::*;
 pub mod volcano;
+pub use volcano::*;

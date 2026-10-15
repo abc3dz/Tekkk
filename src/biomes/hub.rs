@@ -77,9 +77,42 @@ pub fn spawn_hub(
         DespawnOnExit(GameScene::Hub),
     ));
     commands.spawn((
+        WarpToLagoon,
+        CurrentScene,
+        Sensor,
+        Collider::cuboid(2.0, 2.0, 1.0),
+        Transform::from_xyz(10.0, 1.0, -15.0),
+        DespawnOnExit(GameScene::Hub),
+    ));
+    //sound
+    commands.spawn((
         AudioPlayer::new(asset_server.load("sounds/BGM_StartScene.ogg")),
         PlaybackSettings{mode: bevy::audio::PlaybackMode::Loop, volume:  bevy::audio::Volume::Linear(0.1), ..default()},
         MusicAudio,
         DespawnOnExit(GameScene::Hub),
+    ));
+}
+pub fn go_to_hub(
+    mut next_state: ResMut<NextState<GameScene>>,
+    mut scene_spawn: ResMut<SceneSpawnPoint>,
+) {
+    scene_spawn.position = Some(Vec3::new(0.0, 2.0, 0.0));
+    next_state.set(GameScene::Hub);
+}
+
+pub fn setup_hub_light(mut commands: Commands) {
+    commands.spawn((
+        DirectionalLight {
+            illuminance: 50_000.0,
+            shadows_enabled: true,
+            ..default()
+        },
+        Transform::from_rotation(Quat::from_euler(
+            EulerRot::XYZ,
+            -0.8,
+            -0.3,
+            0.0,
+        )),
+        CurrentScene,
     ));
 }
