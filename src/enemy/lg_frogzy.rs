@@ -46,11 +46,11 @@ impl Plugin for LgFrogzyPlugin {
     }
 }
 
-const FROGZY_SPAWN_POSITION: Vec3 = Vec3::new(-10.0, 1.0, -10.0);
+const FROGZY_SPAWN_POSITION: Vec3 = Vec3::new(0.0, 1.0, -5.0);
 const FROGZY_STOP_DISTANCE: f32 = 1.0;
 const FROGZY_MOVE_SPEED: f32 = 3.0;
 const FROGZY_LOSE_INTEREST_DISTANCE: f32 = 10.0;
-const FROGZY_PATROL_RADIUS: f32 = 8.0;
+const FROGZY_PATROL_RADIUS: f32 = 13.0;
 
 fn spawn_enemy_frogzy(
     mut commands: Commands,
@@ -87,7 +87,7 @@ fn spawn_enemy_frogzy(
             AtkAndDefElement(Element::Water),
             ElementExpReward::FROGZY,
             RigidBody::Dynamic,
-            Collider::capsule(0.45, 1.0),
+            Collider::capsule(0.3, 1.0),
             LockedAxes::ROTATION_LOCKED,
             LinearVelocity::ZERO,
             Transform::from_translation(FROGZY_SPAWN_POSITION + Vec3::Y * FROGZY_BODY_Y),
@@ -512,11 +512,11 @@ fn update_enemy_frogzy_animation(
             }
             EnemyFrogzyAnimState::Hurt => {
                 animation_player.play(animation_graph.hurt);
-                commands.spawn(AudioPlayer::new(asset_server.load("sounds/enemy/frogzy_hurt.ogg")));
+                commands.spawn((AudioPlayer::new(asset_server.load("sounds/enemy/lg/frogzy_hurt.ogg")), PlaybackSettings::DESPAWN));
             }
             EnemyFrogzyAnimState::Dead => {
                 animation_player.play(animation_graph.dead);
-                commands.spawn(AudioPlayer::new(asset_server.load("sounds/enemy/frogzy_dead.ogg")));
+                commands.spawn((AudioPlayer::new(asset_server.load("sounds/enemy/lg/frogzy_dead.ogg")), PlaybackSettings::DESPAWN));
             }
         }
 
@@ -777,7 +777,7 @@ fn frogzy_punch_hit_player(
 
         hitbox.has_hit = true;
 
-        commands.spawn(AudioPlayer::new(asset_server.load("sounds/enemy/frogzy_atk.ogg")));
+        commands.spawn((AudioPlayer::new(asset_server.load("sounds/enemy/lg/frogzy_atk.ogg")), PlaybackSettings::DESPAWN));
 
         info!(
             "Frogzy hit Player: damage={}, critical={}, HP={}/{}",

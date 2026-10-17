@@ -187,7 +187,7 @@ fn player_movement(
 
     if transform.translation.y < -5.0 {
         transform.translation = Vec3::new(0.0, 2.0, 0.0);
-        commands.spawn(AudioPlayer::new(asset_server.load("sounds/sfx_fall.ogg")));
+        commands.spawn((AudioPlayer::new(asset_server.load("sounds/sfx_fall.ogg")), PlaybackSettings::DESPAWN));
         velocity.x = 0.0;
         velocity.y = 0.0;
         velocity.z = 0.0;
@@ -496,7 +496,7 @@ pub fn player_jump_input(
     commands.entity(anim_entity).insert(
         PlayerJumpTimer(Timer::from_seconds(0.6, TimerMode::Once))
     );
-    commands.spawn(AudioPlayer::new(asset_server.load("sounds/sfx_jump.ogg")));
+    commands.spawn((AudioPlayer::new(asset_server.load("sounds/sfx_jump.ogg")), PlaybackSettings::DESPAWN));
 }
 
 pub fn player_jump_update(
@@ -586,7 +586,7 @@ pub fn spawn_player_dash_trail_during_dash(
 
         ));
         
-        commands.spawn(AudioPlayer::new(asset_server.load("sounds/moya_dash.ogg")));
+        commands.spawn((AudioPlayer::new(asset_server.load("sounds/moya_dash.ogg")), PlaybackSettings::DESPAWN));
     }
 }
 
@@ -635,7 +635,7 @@ pub fn play_player_hurt_animation(
                 ));
         }
     
-    commands.spawn(AudioPlayer::new(asset_server.load("sounds/moya_hurt.ogg")));
+    commands.spawn((AudioPlayer::new(asset_server.load("sounds/moya_hurt.ogg")), PlaybackSettings::DESPAWN));
 }
 
 pub fn player_return_after_hurt(
@@ -1477,7 +1477,7 @@ pub fn respawn_player_when_defeated(
     if *animation_state != PlayerAnimState::Dead {
         combo.current_index = None;
         combo.queued_next = false;
-        commands.spawn(AudioPlayer::new(asset_server.load("sounds/moya_dead.ogg")));
+        commands.spawn((AudioPlayer::new(asset_server.load("sounds/moya_dead.ogg")), PlaybackSettings::DESPAWN));
         if let Ok(camera_entity) = camera_query.single() {
             commands
                 .entity(camera_entity)
@@ -2053,7 +2053,7 @@ fn player_energy_input(
     anim_player.play(anim_graph.power);
 
     *anim_state = PlayerAnimState::Power;
-    commands.spawn(AudioPlayer::new(asset_server.load("sounds/moya_power.ogg")));
+    commands.spawn((AudioPlayer::new(asset_server.load("sounds/moya_power.ogg")), PlaybackSettings::DESPAWN));
     commands.entity(anim_entity).insert(
         PlayerPowerTimer(
             Timer::from_seconds(
@@ -2270,7 +2270,7 @@ fn player_energy_hit_enemy(
         let damage = (base_damage as f32 * element_multiplier).round().max(1.0) as i32;
         let target_position = target_transform.translation();
         if is_critical {
-            commands.spawn(AudioPlayer::new(asset_server.load("sounds/moya_power_detection.ogg")));
+            commands.spawn((AudioPlayer::new(asset_server.load("sounds/moya_power_detection.ogg")), PlaybackSettings::DESPAWN));
             if let Ok(camera_entity) = camera_query.single() {
                 commands.entity(camera_entity).insert(CameraShake::new(0.15, 0.08));
             }

@@ -30,3 +30,6 @@ pub use jaar_cpn::*;
 
 pub mod frogzy_cpn;
 pub use frogzy_cpn::*;
+
+pub mod dada_cpn;
+pub use dada_cpn::*;

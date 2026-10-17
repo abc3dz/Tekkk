@@ -502,12 +502,12 @@ fn update_enemy_muanim_animation(
             }
             EnemyMuanimAnimState::Hurt => {
                 animation_player.play(animation_graph.hurt);
-                commands.spawn(AudioPlayer::new(asset_server.load("sounds/enemy/muanim_hurt.ogg")));
+                commands.spawn((AudioPlayer::new(asset_server.load("sounds/enemy/muanim_hurt.ogg")),PlaybackSettings::DESPAWN));
             }
 
             EnemyMuanimAnimState::Dead => {
                 animation_player.play(animation_graph.dead);
-                commands.spawn(AudioPlayer::new(asset_server.load("sounds/enemy/muanim_dead.ogg")));
+                commands.spawn((AudioPlayer::new(asset_server.load("sounds/enemy/muanim_dead.ogg")),PlaybackSettings::DESPAWN));
             }
         }
 
@@ -760,7 +760,7 @@ fn muanim_punch_hit_player(
             FloatingDamageKind::PlayerHit,
         );
         hitbox.has_hit = true;
-        commands.spawn(AudioPlayer::new(asset_server.load("sounds/enemy/muanim_atk.ogg")));
+        commands.spawn((AudioPlayer::new(asset_server.load("sounds/enemy/muanim_atk.ogg")),PlaybackSettings::DESPAWN));
         info!(
             "muanim hit Player: damage={}, critical={}, HP={}/{}",
             damage,

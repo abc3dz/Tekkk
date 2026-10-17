@@ -460,13 +460,13 @@ pub fn guardian_menu_keyboard(
             } else {
                 selection.index -= 1;
             }
-            commands.spawn(AudioPlayer::new(asset_server.load("sounds/npc/scroll_menu.ogg")));
+            commands.spawn((AudioPlayer::new(asset_server.load("sounds/npc/scroll_menu.ogg")),PlaybackSettings::DESPAWN));
         }
         if down_pressed {
             selection.index = (selection.index + 1) % MENU_COUNT;
             commands.spawn((
                     AudioPlayer::new(asset_server.load("sounds/npc/scroll_menu.ogg")),
-                    PlaybackSettings::ONCE.with_speed(1.5),
+                    PlaybackSettings::DESPAWN.with_speed(1.5),
                 ));
         }
         
@@ -542,12 +542,12 @@ pub fn guardian_menu_confirm_keyboard(
                 }
                 // เปลี่ยนจาก respawn_timer เป็น practice.basic_timer
                 practice.basic_timer.0 = Timer::from_seconds(0.1, TimerMode::Once);
-                commands.spawn(AudioPlayer::new(asset_server.load("sounds/npc/basic_pt.ogg")));
+                commands.spawn((AudioPlayer::new(asset_server.load("sounds/npc/basic_pt.ogg")), PlaybackSettings::DESPAWN));
             } else{
                 transform.translation = Vec3::new(0.0, 1.5, 0.0);
                 commands.spawn((
                     AudioPlayer::new(asset_server.load("sounds/npc/basic_pt.ogg")),
-                    PlaybackSettings::ONCE.with_speed(1.5),
+                    PlaybackSettings::DESPAWN.with_speed(1.5),
                 ));
             }
         }
@@ -558,12 +558,12 @@ pub fn guardian_menu_confirm_keyboard(
                     commands.entity(entity).despawn();
                 }
                 practice.advanced_timer.0 = Timer::from_seconds(0.1, TimerMode::Once);
-                commands.spawn(AudioPlayer::new(asset_server.load("sounds/npc/advance_pt.ogg")));
+                commands.spawn((AudioPlayer::new(asset_server.load("sounds/npc/advance_pt.ogg")), PlaybackSettings::DESPAWN));
             } else {
                 transform.translation = Vec3::new(0.0, 1.5, 0.0);
                 commands.spawn((
                     AudioPlayer::new(asset_server.load("sounds/npc/advance_pt.ogg")),
-                    PlaybackSettings::ONCE.with_speed(1.5),
+                    PlaybackSettings::DESPAWN.with_speed(1.5),
                 ));
             }
             
@@ -584,7 +584,7 @@ pub fn guardian_menu_confirm_keyboard(
                 }
                 *focus = GuardianDialogFocus::Menu;
             }
-            commands.spawn(AudioPlayer::new(asset_server.load("sounds/npc/alloc.ogg")));
+            commands.spawn((AudioPlayer::new(asset_server.load("sounds/npc/alloc.ogg")), PlaybackSettings::DESPAWN));
         }
         _ => {}
     }
@@ -1053,14 +1053,14 @@ pub fn guardian_atk_selection_keyboard(
         atk_selection.index = (atk_selection.index + count - 1) % count;
         commands.spawn((
             AudioPlayer::new(asset_server.load("sounds/npc/scroll_menu.ogg")),
-            PlaybackSettings::ONCE.with_speed(2.5),
+            PlaybackSettings::DESPAWN.with_speed(2.5),
         ));
     }
     if right_pressed {
         atk_selection.index = (atk_selection.index + 1) % count;
         commands.spawn((
             AudioPlayer::new(asset_server.load("sounds/npc/scroll_menu.ogg")),
-            PlaybackSettings::ONCE.with_speed(3.5),
+            PlaybackSettings::DESPAWN.with_speed(3.5),
         ));
     }
     if atk_selection.index >= count {
@@ -1073,7 +1073,7 @@ pub fn guardian_atk_selection_keyboard(
         atk_element.0 = selected_element;
         commands.spawn((
             AudioPlayer::new(asset_server.load("sounds/npc/confirm.ogg")),
-            PlaybackSettings::ONCE.with_speed(1.5),
+            PlaybackSettings::DESPAWN.with_speed(1.5),
         ));
     }
 }
@@ -1119,54 +1119,137 @@ pub fn guardian_alloc_point_keyboard(
         point_selection.index = (point_selection.index + count - 1) % count;
         commands.spawn((
             AudioPlayer::new(asset_server.load("sounds/npc/scroll_menu.ogg")),
-            PlaybackSettings::ONCE.with_speed(1.5),
+            PlaybackSettings::DESPAWN.with_speed(1.5),
         ));
     }
     if down_pressed {
         point_selection.index = (point_selection.index + 1) % count;
         commands.spawn((
             AudioPlayer::new(asset_server.load("sounds/npc/scroll_menu.ogg")),
-            PlaybackSettings::ONCE.with_speed(0.5),
+            PlaybackSettings::DESPAWN.with_speed(0.5),
         ));
     }
     if point_selection.index >= count {
         point_selection.index = 0;
     }
     let selected_element = ALL_ELEMENTS[point_selection.index];
-    
-    let increase_pressed = keyboard.pressed(KeyCode::KeyU)
-        || any_gp_trigger(&gamepads, GamepadButton::RightTrigger);
-    let decrease_pressed = keyboard.pressed(KeyCode::KeyE)
-        || any_gp_trigger(&gamepads, GamepadButton::LeftTrigger);
-        
+    let increase_pressed = keyboard.pressed(KeyCode::KeyU) || any_gp_trigger(&gamepads, GamepadButton::RightTrigger);
+    let decrease_pressed = keyboard.pressed(KeyCode::KeyE) || any_gp_trigger(&gamepads, GamepadButton::LeftTrigger);
+
+    // Increase
     if increase_pressed && !press_state.increase {
+        let pool_before = pool.points;
+        let exp_before = mastery
+            .get(selected_element)
+            .map(|p| p.exp)
+            .unwrap_or(0);
+
         increase_element_from_pool(mastery, pool, selected_element);
+
+        let exp_after = mastery
+            .get(selected_element)
+            .map(|p| p.exp)
+            .unwrap_or(0);
+
+        // ถ้า pool ลดลง หรือ exp เพิ่มขึ้นจริง = เพิ่มสำเร็จ
+        let success = pool.points < pool_before || exp_after > exp_before;
+
+        if success {
+            commands.spawn((
+                AudioPlayer::new(asset_server.load("sounds/npc/increase_exp.ogg")),
+                PlaybackSettings::DESPAWN.with_speed(1.5),
+            ));
+        }
+
         increase_repeat.0.reset();
     } else if increase_pressed {
         increase_repeat.0.tick(time.delta());
+
         if increase_repeat.0.just_finished() {
+            let pool_before = pool.points;
+            let exp_before = mastery
+                .get(selected_element)
+                .map(|p| p.exp)
+                .unwrap_or(0);
+
             increase_element_from_pool(mastery, pool, selected_element);
+
+            let exp_after = mastery
+                .get(selected_element)
+                .map(|p| p.exp)
+                .unwrap_or(0);
+
+            let success = pool.points < pool_before || exp_after > exp_before;
+
+            if success {
+                commands.spawn((
+                    AudioPlayer::new(asset_server.load("sounds/npc/increase_exp.ogg")),
+                    PlaybackSettings::DESPAWN.with_speed(1.5),
+                ));
+            }
+
+            // ต้อง reset เพื่อให้กดค้างแล้วทำงานซ้ำได้
+            increase_repeat.0.reset();
         }
-        commands.spawn((
-            AudioPlayer::new(asset_server.load("sounds/npc/increase_exp.ogg")),
-            PlaybackSettings::ONCE.with_speed(1.5),
-        ));
     } else {
         increase_repeat.0.reset();
     }
-    
+
+    // Decrease
     if decrease_pressed && !press_state.decrease {
+        let pool_before = pool.points;
+        let exp_before = mastery
+            .get(selected_element)
+            .map(|p| p.exp)
+            .unwrap_or(0);
+
         decrease_element_to_pool(mastery, pool, selected_element);
+
+        let exp_after = mastery
+            .get(selected_element)
+            .map(|p| p.exp)
+            .unwrap_or(0);
+
+        // ถ้า pool เพิ่มขึ้น หรือ exp ลดลงจริง = ลดสำเร็จ
+        let success = pool.points > pool_before || exp_after < exp_before;
+
+        if success {
+            commands.spawn((
+                AudioPlayer::new(asset_server.load("sounds/npc/increase_exp.ogg")),
+                PlaybackSettings::DESPAWN.with_speed(0.5),
+            ));
+        }
+
         decrease_repeat.0.reset();
     } else if decrease_pressed {
         decrease_repeat.0.tick(time.delta());
+
         if decrease_repeat.0.just_finished() {
+            let pool_before = pool.points;
+            let exp_before = mastery
+                .get(selected_element)
+                .map(|p| p.exp)
+                .unwrap_or(0);
+
             decrease_element_to_pool(mastery, pool, selected_element);
+
+            let exp_after = mastery
+                .get(selected_element)
+                .map(|p| p.exp)
+                .unwrap_or(0);
+
+            let success = pool.points > pool_before || exp_after < exp_before;
+
+            if success {
+                commands.spawn((
+                    AudioPlayer::new(asset_server.load("sounds/npc/increase_exp.ogg")),
+                    PlaybackSettings::DESPAWN.with_speed(0.5),
+                ));
+            }
+
+            // ต้อง reset เพื่อให้กดค้างแล้วทำงานซ้ำได้
+            decrease_repeat.0.reset();
         }
-        commands.spawn((
-            AudioPlayer::new(asset_server.load("sounds/npc/increase_exp.ogg")),
-            PlaybackSettings::ONCE.with_speed(0.5),
-        ));
     } else {
         decrease_repeat.0.reset();
     }

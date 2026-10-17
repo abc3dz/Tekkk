@@ -37,22 +37,22 @@ pub fn spawn_floating_island(
     //ground
     commands.spawn((
         RigidBody::Static,
-        Collider::cylinder(9.8, 0.1),
+        Collider::cylinder(9.5, 0.1),
         Transform::from_xyz(0.0, 0.0, 1.25),
         DespawnOnExit(GameScene::FloatingIsland),
     ));
     //ground2
     commands.spawn((
         RigidBody::Static,
-        Collider::cuboid(25.6, 0.1, 28.5),
+        Collider::cuboid(21.0, 0.1, 23.0),
         Transform::from_xyz(8.7, 20.85, -13.1),
         DespawnOnExit(GameScene::FloatingIsland),
     ));
     //ground3
     commands.spawn((
         RigidBody::Static,
-        Collider::cylinder(12.5, 0.1),
-        Transform::from_xyz(41.0, 34.4, -23.12),
+        Collider::cylinder(14.0, 0.1),
+        Transform::from_xyz(40.0, 34.4, -23.12),
         DespawnOnExit(GameScene::FloatingIsland),
     ));
     
@@ -80,7 +80,7 @@ pub fn spawn_floating_island(
         Transform::from_xyz(3.7, 0.83, 2.98),
         AutoPlatform {
             min_y: 0.0,
-            max_y: 22.0,
+            max_y: 19.0,
             speed: 2.0,
             phase: AutoPlatformPhase::Rising,
             wait_timer: Timer::from_seconds(2.0, TimerMode::Once),
@@ -114,8 +114,8 @@ pub fn spawn_floating_island(
         WarpToDesert,
         CurrentScene,
         Sensor,
-        Collider::cuboid(2.0, 2.0, 2.0),
-        Transform::from_xyz(0.0, 1.0, -5.0),
+        Collider::cuboid(2.0, 2.0, 1.0),
+        Transform::from_xyz(5.0, 1.0, -5.0),
         DespawnOnExit(GameScene::FloatingIsland),
     ));
     //warp to lagoon
@@ -123,7 +123,7 @@ pub fn spawn_floating_island(
         WarpToLagoon,
         CurrentScene,
         Sensor,
-        Collider::cuboid(2.0, 2.0, 2.0),
+        Collider::cuboid(2.0, 2.0, 1.0),
         //Transform::from_xyz(5.0, 1.0, 0.6),
         Transform::from_xyz(38.58, 35.23, -20.62),
         DespawnOnExit(GameScene::FloatingIsland),

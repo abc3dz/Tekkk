@@ -149,7 +149,7 @@ pub fn minion_drain_player_life(
                 + Vec3::new(0.0, 2.0, 0.0),
             FloatingDamageKind::PlayerDrain,
         );
-        commands.spawn(AudioPlayer::new(asset_server.load("sounds/npc/advance_atk.ogg")));
+        commands.spawn((AudioPlayer::new(asset_server.load("sounds/npc/advance_atk.ogg")), PlaybackSettings::DESPAWN));
         minion_health.current += drain_amount;
         minion_health.current = minion_health.current.clamp(0, minion_health.max);
 

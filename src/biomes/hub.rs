@@ -72,7 +72,7 @@ pub fn spawn_hub(
         WarpToDesert,
         CurrentScene,
         Sensor,
-        Collider::cuboid(2.0, 2.0, 2.0),
+        Collider::cuboid(2.0, 2.0, 1.0),
         Transform::from_xyz(0.0, 1.0, -15.0),
         DespawnOnExit(GameScene::Hub),
     ));

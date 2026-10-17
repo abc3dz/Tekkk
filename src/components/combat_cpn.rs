@@ -76,7 +76,7 @@ impl BaseStats {
         attack: 5.0,
         defense: 2.0,
         critical_rate: 0.0,
-        critical_damage: 1.0,
+        critical_damage: 0.0,
     };
     pub const ADVANCED_PRACTICE_MINION: Self = Self {
         max_hp: 120.0,
@@ -84,7 +84,7 @@ impl BaseStats {
         attack: 9.0,
         defense: 8.0,
         critical_rate: 0.0,
-        critical_damage: 1.0,
+        critical_damage: 0.0,
     };
 
     //desert
@@ -94,7 +94,7 @@ impl BaseStats {
         attack: 10.0,
         defense: 5.0,
         critical_rate: 0.0,
-        critical_damage: 1.0,
+        critical_damage: 0.0,
     };
     pub const MUAMUA: Self = Self {
         max_hp: 200.0,
@@ -102,34 +102,43 @@ impl BaseStats {
         attack: 14.0,
         defense: 8.0,
         critical_rate: 0.0,
-        critical_damage: 1.0,
+        critical_damage: 0.0,
     };
     pub const CHOKY: Self = Self {
-        max_hp: 700.0,
+        max_hp: 650.0,
         max_mp: 0.0,
         attack: 18.0,
         defense: 11.0,
-        critical_rate: 2.0,
-        critical_damage: 5.0,
+        critical_rate: 0.7,
+        critical_damage: 3.0,
     };
 
     //floating_island
     pub const JAAR: Self = Self {
-        max_hp: 700.0,
+        max_hp: 120.0,
         max_mp: 0.0,
-        attack: 18.0,
-        defense: 11.0,
-        critical_rate: 2.0,
-        critical_damage: 5.0,
+        attack: 11.0,
+        defense: 6.0,
+        critical_rate: 0.0,
+        critical_damage: 0.0,
     };
     //lagoon
     pub const FROGZY: Self = Self {
-        max_hp: 700.0,
+        max_hp: 140.0,
         max_mp: 0.0,
-        attack: 18.0,
+        attack: 12.0,
+        defense: 7.0,
+        critical_rate: 0.0,
+        critical_damage: 0.0,
+    };
+    //volcano
+    pub const DADA: Self = Self {
+        max_hp: 300.0,
+        max_mp: 0.0,
+        attack: 17.0,
         defense: 11.0,
-        critical_rate: 2.0,
-        critical_damage: 5.0,
+        critical_rate: 0.7,
+        critical_damage: 2.0,
     };
 }
 
@@ -224,19 +233,27 @@ impl ElementExpReward {
     };
     //floating_island
     pub const JAAR: Self = Self {
-        water: ExpRange::new(0, 0),
-        fire: ExpRange::new(5, 5),
-        wind: ExpRange::new(0, 0),
-        earth: ExpRange::new(30, 30),
-        inw: ExpRange::new(3,3),
+        water: ExpRange::new(1, 1),
+        fire: ExpRange::new(0, 0),
+        wind: ExpRange::new(10, 10),
+        earth: ExpRange::new(0, 0),
+        inw: ExpRange::new(1,1),
     };
     //lagoon
     pub const FROGZY: Self = Self {
-        water: ExpRange::new(0, 0),
-        fire: ExpRange::new(5, 5),
+        water: ExpRange::new(10,10),
+        fire: ExpRange::new(1, 1),
         wind: ExpRange::new(0, 0),
-        earth: ExpRange::new(30, 30),
-        inw: ExpRange::new(3,3),
+        earth: ExpRange::new(0, 0),
+        inw: ExpRange::new(1,1),
+    };
+    //volcano
+    pub const DADA: Self = Self {
+        water: ExpRange::new(0, 0),
+        fire: ExpRange::new(20, 20),
+        wind: ExpRange::new(3, 3),
+        earth: ExpRange::new(0, 0),
+        inw: ExpRange::new(2,2),
     };
 }
 
@@ -392,7 +409,7 @@ pub fn increase_element_from_pool(
     pool: &mut ElementPointPool,
     element: Element,
 ) -> bool {
-    if pool.points == 0 {
+    if pool.points <= 0 {
         return false;
     }
     let Some(progress) = mastery.get_mut(element) else {

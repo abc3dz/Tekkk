@@ -46,11 +46,11 @@ impl Plugin for FiJaarPlugin {
     }
 }
 
-const JAAR_SPAWN_POSITION: Vec3 = Vec3::new(0.0, 1.0, 0.0);
+const JAAR_SPAWN_POSITION: Vec3 = Vec3::new(7.62,21.68, -8.23);
 const JAAR_STOP_DISTANCE: f32 = 1.0;
 const JAAR_MOVE_SPEED: f32 = 3.0;
 const JAAR_LOSE_INTEREST_DISTANCE: f32 = 10.0;
-const JAAR_PATROL_RADIUS: f32 = 8.0;
+const JAAR_PATROL_RADIUS: f32 = 6.0;
 
 fn spawn_enemy_jaar(
     mut commands: Commands,
@@ -87,7 +87,7 @@ fn spawn_enemy_jaar(
             AtkAndDefElement(Element::Wind),
             ElementExpReward::JAAR,
             RigidBody::Dynamic,
-            Collider::capsule(0.45, 1.0),
+            Collider::capsule(0.45, 0.7),
             LockedAxes::ROTATION_LOCKED,
             LinearVelocity::ZERO,
             Transform::from_translation(JAAR_SPAWN_POSITION + Vec3::Y * JAAR_BODY_Y),
@@ -456,15 +456,11 @@ fn update_enemy_jaar_animation(
             }
             EnemyJaarAnimState::Hurt => {
                 animation_player.play(animation_graph.hurt);
-                commands.spawn(AudioPlayer::new(
-                    asset_server.load("sounds/enemy/jaar_hurt.ogg"),
-                ));
+                commands.spawn((AudioPlayer::new(asset_server.load("sounds/enemy/fi/jaar_hurt.ogg")), PlaybackSettings::DESPAWN));
             }
             EnemyJaarAnimState::Dead => {
                 animation_player.play(animation_graph.dead);
-                commands.spawn(AudioPlayer::new(
-                    asset_server.load("sounds/enemy/jaar_dead.ogg"),
-                ));
+                commands.spawn((AudioPlayer::new(asset_server.load("sounds/enemy/fi/jaar_dead.ogg")), PlaybackSettings::DESPAWN));
             }
         }
 
@@ -685,9 +681,7 @@ fn jaar_punch_hit_player(
 
         hitbox.has_hit = true;
 
-        commands.spawn(AudioPlayer::new(
-            asset_server.load("sounds/enemy/jaar_atk.ogg"),
-        ));
+        commands.spawn((AudioPlayer::new(asset_server.load("sounds/enemy/fi/jaar_atk.ogg")), PlaybackSettings::DESPAWN));
 
         info!(
             "Jaar hit Player: damage={}, critical={}, HP={}/{}",

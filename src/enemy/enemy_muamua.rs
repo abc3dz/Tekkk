@@ -504,12 +504,12 @@ fn update_enemy_muamua_animation(
             }
             EnemyMuamuaAnimState::Hurt => {
                 animation_player.play(animation_graph.hurt);
-                commands.spawn(AudioPlayer::new(asset_server.load("sounds/enemy/muamua_hurt.ogg")));
+                commands.spawn((AudioPlayer::new(asset_server.load("sounds/enemy/muamua_hurt.ogg")),PlaybackSettings::DESPAWN));
             }
 
             EnemyMuamuaAnimState::Dead => {
                 animation_player.play(animation_graph.dead);
-                commands.spawn(AudioPlayer::new(asset_server.load("sounds/enemy/muamua_dead.ogg")));
+                commands.spawn((AudioPlayer::new(asset_server.load("sounds/enemy/muamua_dead.ogg")),PlaybackSettings::DESPAWN));
             }
         }
 
@@ -693,7 +693,7 @@ fn muamua_punch_hit_player(
             FloatingDamageKind::PlayerHit,
         );
         hitbox.has_hit = true;
-        commands.spawn(AudioPlayer::new(asset_server.load("sounds/enemy/muamua_atk.ogg")));
+        commands.spawn((AudioPlayer::new(asset_server.load("sounds/enemy/muamua_atk.ogg")),PlaybackSettings::DESPAWN));
         info!(
             "Muamua hit Player: damage={}, critical={}, HP={}/{}",
             damage,

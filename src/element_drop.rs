@@ -362,7 +362,7 @@ pub fn collect_element_drops(
         }
 
         commands.entity(drop_entity).despawn();
-        commands.spawn(AudioPlayer::new(asset_server.load("sounds/get_element.ogg")));
+        commands.spawn((AudioPlayer::new(asset_server.load("sounds/get_element.ogg")), PlaybackSettings::DESPAWN));
     }
 }
 

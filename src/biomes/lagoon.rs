@@ -543,7 +543,7 @@ pub fn spawn_back_to_floating_island_portal(
         Mesh3d(mesh),
         MeshMaterial3d(material),
         Transform::from_translation(portal_position),
-        WarpToDesert,
+        WarpToFloatingIsland,
         CurrentScene,
     ));
 }

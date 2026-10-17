@@ -26,7 +26,7 @@ pub fn spawn_desert(
     commands.spawn((
         CurrentScene,
         WarpToHub,
-        Collider::cuboid(2.0, 2.0, 2.0),
+        Collider::cuboid(2.0, 2.0, 1.0),
         Transform::from_xyz(5.0, 1.0, 15.0),
         DespawnOnExit(GameScene::Desert),
     ));
@@ -34,7 +34,7 @@ pub fn spawn_desert(
     commands.spawn((
         CurrentScene,
         WarpToFloatingIsland,
-        Collider::cuboid(2.0, 2.0, 2.0),
+        Collider::cuboid(2.0, 2.0, 1.0),
         Transform::from_xyz(17.5, 1.0, -48.0),
         DespawnOnExit(GameScene::Desert),
     ));
@@ -58,6 +58,13 @@ pub fn spawn_desert(
         RigidBody::Static,
         Collider::cuboid(100.0, 10.0, 0.3),
         Transform::from_xyz(0.0, 0.0, -55.0),
+        DespawnOnExit(GameScene::Desert),
+    ));
+    //sound
+    commands.spawn((
+        AudioPlayer::new(asset_server.load("sounds/BGM_Dimension.ogg")),
+        PlaybackSettings{mode: bevy::audio::PlaybackMode::Loop, volume:  bevy::audio::Volume::Linear(0.1), ..default()},
+        MusicAudio,
         DespawnOnExit(GameScene::Desert),
     ));
 }

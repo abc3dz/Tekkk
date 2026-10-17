@@ -275,26 +275,9 @@ const CHOKY_MOVE_SPEED: f32 = 3.0;
 
 fn enemy_choky_chase_player(
     mut commands: Commands,
-    player_query: Query<
-        &Transform,
-        (
-            With<Player>,
-            Without<EnemyChoky>,
-        ),
-    >,
-    mut choky_query: Query<
-        (
-            Entity,
-            &mut Transform,
-            &mut LinearVelocity,
-            &mut EnemyState,
-            Option<&EnemyInvestigateDirection>,
-        ),
-        (
-            With<EnemyChoky>,
-            Without<Player>,
-        ),
-    >,
+    asset_server: Res<AssetServer>,
+    player_query: Query<&Transform,(With<Player>,Without<EnemyChoky>,),>,
+    mut choky_query: Query<(Entity,&mut Transform,&mut LinearVelocity,&mut EnemyState,Option<&EnemyInvestigateDirection>,Option<&ChokyHuntSoundPlayed>,),(With<EnemyChoky>,Without<Player>,),>,
     muamua_defeated: Res<MuamuaDefeatedCount>,
 ) {
     let Ok(player_transform) = player_query.single() else {
@@ -310,6 +293,7 @@ fn enemy_choky_chase_player(
         mut velocity,
         mut enemy_state,
         investigate,
+        hunt_sound_played,
     ) in &mut choky_query
     {
         if investigate.is_some() {
@@ -337,16 +321,12 @@ fn enemy_choky_chase_player(
             continue;
         }
 
-        let to_player =
-            player_transform.translation
-                - choky_transform.translation;
-
-        let flat_direction = Vec3::new(
-            to_player.x,
-            0.0,
-            to_player.z,
-        );
-
+        // เล่นเสียงครั้งเดียวตอนเริ่มล่า
+        if hunt_sound_played.is_none() {
+            commands.spawn((AudioPlayer::new(asset_server.load("sounds/enemy/choky_start.ogg")),PlaybackSettings::DESPAWN));
+            commands.entity(choky_entity).insert(ChokyHuntSoundPlayed);}
+        let to_player = player_transform.translation - choky_transform.translation;
+        let flat_direction = Vec3::new(to_player.x,0.0,to_player.z,);
         let distance = flat_direction.length();
 
         // ถ้าใกล้พอในระยะโจมตี ให้หยุดแล้ว Attack
@@ -441,12 +421,12 @@ fn update_enemy_choky_animation(
             }
             EnemyChokyAnimState::Hurt => {
                 animation_player.play(animation_graph.hurt);
-                commands.spawn(AudioPlayer::new(asset_server.load("sounds/enemy/choky_hurt.ogg")));
+                commands.spawn((AudioPlayer::new(asset_server.load("sounds/enemy/choky_hurt.ogg")),PlaybackSettings::DESPAWN));
             }
 
             EnemyChokyAnimState::Dead => {
                 animation_player.play(animation_graph.dead);
-                commands.spawn(AudioPlayer::new(asset_server.load("sounds/enemy/choky_dead.ogg")));
+                commands.spawn((AudioPlayer::new(asset_server.load("sounds/enemy/choky_dead.ogg")),PlaybackSettings::DESPAWN));
             }
         }
 
@@ -687,7 +667,7 @@ fn choky_punch_hit_player(
             FloatingDamageKind::PlayerHit,
         );
         hitbox.has_hit = true;
-        commands.spawn(AudioPlayer::new(asset_server.load("sounds/enemy/choky_atk.ogg")));
+        commands.spawn((AudioPlayer::new(asset_server.load("sounds/enemy/choky_atk.ogg")),PlaybackSettings::DESPAWN));
         info!(
             "choky hit Player: damage={}, critical={}, HP={}/{}",
             damage,

@@ -185,8 +185,7 @@ fn element_status_input(
 
         spawn_element_status_ui(&mut commands, &fonts, &loc, dialog_query);
     }
-
-    commands.spawn(AudioPlayer::new(asset_server.load("sounds/status_window.ogg")));
+    commands.spawn((AudioPlayer::new(asset_server.load("sounds/status_window.ogg")), PlaybackSettings::DESPAWN));
 }
 
 fn update_element_status_ui(
@@ -334,7 +333,7 @@ fn game_controls_input(
         spawn_controls_ui(&mut commands, &fonts, &loc, dialog_query);
     }
 
-    commands.spawn(AudioPlayer::new(asset_server.load("sounds/control_window.ogg")));
+    commands.spawn((AudioPlayer::new(asset_server.load("sounds/control_window.ogg")), PlaybackSettings::DESPAWN));
 }
 
 // ระบบตรวจสอบการเปลี่ยนภาษา

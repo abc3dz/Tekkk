@@ -36,3 +36,6 @@ pub struct ChokyAttackTimer(pub Timer);
 
 #[derive(Resource, Default)]
 pub struct ChokyHasSpawned(pub bool);
+
+#[derive(Component)]
+pub struct ChokyHuntSoundPlayed;

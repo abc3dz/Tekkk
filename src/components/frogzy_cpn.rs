@@ -37,7 +37,7 @@ pub struct FrogzyAttackTimer(pub Timer);
 #[derive(Resource)]
 pub struct FrogzyRespawnTimer(pub Timer);
 
-pub const FROGZY_SPAWN_LIMIT: u32 = 5;
+pub const FROGZY_SPAWN_LIMIT: u32 = 7;
 
 #[derive(Resource, Default, Debug)]
 pub struct FrogzySpawnedCount(pub u32);

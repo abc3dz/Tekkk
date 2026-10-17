@@ -24,7 +24,8 @@ impl Plugin for WorldPlugin {
         .add_plugins(FiJaarPlugin)
         //lagoon
         .add_plugins(LgFrogzyPlugin)
-        
+        //volcano
+        .add_plugins(VnDadaPlugin)
         .add_systems(OnEnter(GameScene::LoadingHub), spawn_loading_ui)
         .add_systems(Update, go_to_hub.run_if(in_state(GameScene::LoadingHub)))
         .add_systems(OnExit(GameScene::LoadingHub), cleanup_loading_ui)

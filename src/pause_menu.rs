@@ -108,13 +108,13 @@ fn toggle_pause(
     match state.get() {
         GameMode::Playing => {
             next_state.set(GameMode::Paused);
-            commands.spawn(AudioPlayer::new(asset_server.load("sounds/pause/pause.ogg")));
+            commands.spawn((AudioPlayer::new(asset_server.load("sounds/pause/pause.ogg")), PlaybackSettings::DESPAWN));
         }
         GameMode::Paused => {
             next_state.set(GameMode::Playing);
             commands.spawn((
-                AudioPlayer::new(asset_server.load("sounds/npc/basic_pt.ogg")),
-                PlaybackSettings::ONCE.with_speed(2.5),
+                AudioPlayer::new(asset_server.load("sounds/pause/pause.ogg")),
+                PlaybackSettings::DESPAWN.with_speed(2.5),
             ));
         }
     }
@@ -579,7 +579,7 @@ pub fn pause_menu_input(
                 };
                 commands.spawn((
                     AudioPlayer::new(asset_server.load("sounds/npc/scroll_menu.ogg")),
-                    PlaybackSettings::ONCE.with_speed(2.7),
+                    PlaybackSettings::DESPAWN.with_speed(2.7),
                 ));
             }
 
@@ -592,7 +592,7 @@ pub fn pause_menu_input(
                 };
                 commands.spawn((
                     AudioPlayer::new(asset_server.load("sounds/npc/scroll_menu.ogg")),
-                    PlaybackSettings::ONCE.with_speed(0.7),
+                    PlaybackSettings::DESPAWN.with_speed(0.7),
                 ));
             }
 
@@ -617,7 +617,7 @@ pub fn pause_menu_input(
                 }
                 commands.spawn((
                     AudioPlayer::new(asset_server.load("sounds/npc/confirm.ogg")),
-                    PlaybackSettings::ONCE.with_speed(0.7),
+                    PlaybackSettings::DESPAWN.with_speed(0.7),
                 ));
             }
         }
@@ -641,7 +641,7 @@ pub fn pause_menu_input(
                 menu_state.screen = PauseMenuScreen::Main;
                 commands.spawn((
                     AudioPlayer::new(asset_server.load("sounds/pause/save.ogg")),
-                    PlaybackSettings::ONCE.with_speed(2.7),
+                    PlaybackSettings::DESPAWN.with_speed(2.7),
                 ));
             }
         }
@@ -665,7 +665,7 @@ pub fn pause_menu_input(
                 menu_state.screen = PauseMenuScreen::Main;
                 commands.spawn((
                     AudioPlayer::new(asset_server.load("sounds/pause/load.ogg")),
-                    PlaybackSettings::ONCE.with_speed(2.7),
+                    PlaybackSettings::DESPAWN.with_speed(2.7)
                 ));
             }
         }
