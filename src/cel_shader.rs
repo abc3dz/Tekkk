@@ -5,7 +5,6 @@ use bevy::{
     shader::ShaderRef,
 };
 use bevy::scene::SceneInstanceReady;
-//use crate::components::*;
 
 const TOON_SHADER_PATH: &str = "shaders/toon.wgsl";
 
@@ -44,82 +43,67 @@ impl Default for ToonExtension {
 #[derive(Component)]
 pub struct ApplyToonMaterial;
 
+// เพิ่ม component นี้สำหรับบังคับ texture
+#[derive(Component)]
+pub struct TextureOverride(pub Handle<Image>);
+
 impl MaterialExtension for ToonExtension {
     fn fragment_shader() -> ShaderRef {
         TOON_SHADER_PATH.into()
     }
 }
+
 pub struct CelShaderPlugin;
+
 impl Plugin for CelShaderPlugin {
-    fn build(&self, app: &mut App) {app
-        .add_plugins(MaterialPlugin::<ToonMaterial>::default())
-        //.add_systems(Startup, test_spawn)
-        .add_observer(apply_toon_material);
+    fn build(&self, app: &mut App) {
+        app.add_plugins(MaterialPlugin::<ToonMaterial>::default())
+            .add_observer(apply_toon_material);
     }
 }
-
-// pub fn test_spawn(
-//     mut commands: Commands,
-//     asset_server: Res<AssetServer>,
-// ) {
-//     commands
-//         .spawn((
-//             HubOnly,
-//             Npc,
-//             GuardianNpc,
-//             Transform {
-//                 translation: Vec3::new(-5.0, 1.25, -6.0),
-//                 ..default()
-//             },
-//         ))
-//         .with_children(|parent| {
-//             parent.spawn((
-//                 SceneRoot(asset_server.load(GltfAssetLabel::Scene(0).from_asset("npc/Guardian.glb"))),
-//                 ApplyToonMaterial,
-//                 Transform::from_xyz(0.0, -1.25, 0.0),
-//             ));
-//         });
-// }
 
 fn apply_toon_material(
     scene_ready: On<SceneInstanceReady>,
     mut commands: Commands,
     children: Query<&Children>,
-    toon_scenes: Query<(), With<ApplyToonMaterial>>,
+    toon_scenes: Query<Option<&TextureOverride>, With<ApplyToonMaterial>>,
     mesh_materials: Query<&MeshMaterial3d<StandardMaterial>>,
     standard_materials: Res<Assets<StandardMaterial>>,
     mut toon_materials: ResMut<Assets<ToonMaterial>>,
 ) {
     let scene_root = scene_ready.entity;
 
-    // ทำเฉพาะ SceneRoot ที่มี marker
-    if toon_scenes.get(scene_root).is_err() {
+    // ทำเฉพาะ SceneRoot ที่มี ApplyToonMaterial
+    let Ok(texture_override) = toon_scenes.get(scene_root) else {
         return;
-    }
+    };
 
     for descendant in children.iter_descendants(scene_root) {
-        let Ok(old_handle) = mesh_materials.get(descendant)
-        else {
+        let Ok(old_handle) = mesh_materials.get(descendant) else {
             continue;
         };
 
-        let Some(old_material) = standard_materials.get(old_handle.id())
-        else {
+        let Some(old_material) = standard_materials.get(old_handle.id()) else {
             continue;
         };
 
-        // Clone เพื่อรักษา texture เดิมจาก GLB
+        // Clone เพื่อรักษาข้อมูลเดิมจาก GLB
         let mut base_material = old_material.clone();
 
         base_material.perceptual_roughness = 1.0;
         base_material.metallic = 0.0;
         base_material.reflectance = 0.0;
 
-        let toon_handle =
-            toon_materials.add(ExtendedMaterial {
-                base: base_material,
-                extension: ToonExtension::default(),
-            });
+        // ถ้ามี TextureOverride ให้บังคับใช้ texture นั้น
+        if let Some(texture_override) = texture_override {
+            base_material.base_color_texture = Some(texture_override.0.clone());
+            base_material.base_color = Color::WHITE;
+        }
+
+        let toon_handle = toon_materials.add(ExtendedMaterial {
+            base: base_material,
+            extension: ToonExtension::default(),
+        });
 
         commands
             .entity(descendant)

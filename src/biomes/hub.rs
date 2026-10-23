@@ -4,6 +4,7 @@ use avian3d::prelude::*;
 
 use crate::components::*;
 use crate::cel_shader::*;
+use crate::musical;
 
 pub fn spawn_hub(
     mut commands: Commands,
@@ -57,16 +58,80 @@ pub fn spawn_hub(
         Transform::from_xyz(9.5, 1.5, 16.0),
         DespawnOnExit(GameScene::Hub),
     ));
-    //wall front right
+    //doorstopper
     commands.spawn((
         RigidBody::Static,
         Collider::cylinder(0.3, 5.0),
         //Transform::from_xyz(9.5, 1.0, 16.0),
         Transform::from_xyz(0.0, 1.2, 16.5)
         .with_rotation(Quat::from_rotation_z(std::f32::consts::FRAC_PI_2)),
-    // หมุน 90° รอบแกน X → cylinder จะนอนตามแกน Z
+         // หมุน 90° รอบแกน X → cylinder จะนอนตามแกน Z
         DespawnOnExit(GameScene::Hub),
     ));
+    //chair wood
+    commands.spawn((
+        RigidBody::Static,
+        Collider::cuboid(1.69, 0.1, 1.84),
+        Transform::from_xyz(-14.17, 0.7,-13.2),
+        DespawnOnExit(GameScene::Hub),
+    ));
+    //tree near cw 
+    commands.spawn((
+        RigidBody::Static,
+        Collider::cuboid(0.3, 3.0, 0.3),
+        Transform::from_xyz(-12.6, 1.5,-14.0),
+        DespawnOnExit(GameScene::Hub),
+    ));
+    //tree1 back
+    commands.spawn((
+        RigidBody::Static,
+        Collider::cuboid(0.3, 1.5, 0.3),
+        Transform::from_xyz(-7.4, 0.75,-14.5),
+        DespawnOnExit(GameScene::Hub),
+    ));
+    //tree2 back
+    commands.spawn((
+        RigidBody::Static,
+        Collider::cuboid(0.3, 1.5, 0.3),
+        Transform::from_xyz(-5.8, 0.75,-14.11),
+        DespawnOnExit(GameScene::Hub),
+    ));
+    //tree3 back
+    commands.spawn((
+        RigidBody::Static,
+        Collider::cuboid(0.3, 1.5, 0.3),
+        Transform::from_xyz(-4.0, 0.75,-13.65),
+        DespawnOnExit(GameScene::Hub),
+    ));
+    //pillar back 
+    commands.spawn((
+        RigidBody::Static,
+        Collider::cuboid(0.42, 3.0, 0.39),
+        Transform::from_xyz(-7.3, 1.5,-9.5),
+        DespawnOnExit(GameScene::Hub),
+    ));
+
+    musical::spawn_drum_at(
+        &mut commands,
+        &asset_server,
+        Transform::from_xyz(0.0, 0.0, 9.5),
+    );
+    musical::spawn_bass_at(
+        &mut commands,
+        &asset_server,
+        Transform::from_xyz(-2.2, 0.0, 9.5),
+    );
+    musical::spawn_guitar_at(
+        &mut commands,
+        &asset_server,
+        Transform::from_xyz(2.4, 0.0, 9.5),
+    );
+    musical::spawn_turntable_at(
+        &mut commands,
+        &asset_server,
+        Transform::from_xyz(2.4, 0.0, 7.5),
+    );
+
     //warp
     commands.spawn((
         WarpToDesert,

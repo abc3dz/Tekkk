@@ -5,21 +5,10 @@ use avian3d::prelude::*;
 use crate::components::*;
 use crate::cel_shader::*;
 
-#[derive(Component, PartialEq, Clone, Copy)]
-pub enum AutoPlatformPhase {
-    Rising,
-    Waiting,
-    Hidden,
-}
-
 #[derive(Component)]
-pub struct AutoPlatform {
-    pub min_y: f32,
-    pub max_y: f32,
-    pub speed: f32,
-    pub phase: AutoPlatformPhase,
-    pub wait_timer: Timer,
-    pub hidden_timer: Timer,
+pub struct LocalWarpGate {
+    pub destination: Vec3,
+    pub radius: f32,
 }
 
 pub fn spawn_floating_island(
@@ -45,7 +34,7 @@ pub fn spawn_floating_island(
     commands.spawn((
         RigidBody::Static,
         Collider::cuboid(21.0, 0.1, 23.0),
-        Transform::from_xyz(8.7, 20.85, -13.1),
+        Transform::from_xyz(8.7, 20.95, -13.1),
         DespawnOnExit(GameScene::FloatingIsland),
     ));
     //ground3
@@ -56,58 +45,69 @@ pub fn spawn_floating_island(
         DespawnOnExit(GameScene::FloatingIsland),
     ));
     
-    // Mesh ของแพลตฟอร์ม ใช้ร่วมกันสองอัน
-    let platform_mesh = meshes.add(Cuboid::new(4.0, 0.5, 4.0));
+    //Local Warp Gates
+    let warp_gate_mesh = meshes.add(Cuboid::new(2.0, 3.0, 0.35));
 
-    // สีแพลตฟอร์ม
-    let platform_material_1 = materials.add(StandardMaterial {
-        base_color: Color::srgb(0.25, 0.65, 1.0),
+    let warp_gate_material = materials.add(StandardMaterial {
+        base_color: Color::srgb(1.0, 0.0, 0.0),     // สีประตู = แดง
+        normal_map_texture: Some(asset_server.load("textures/tt2_nm.png")), // แปะ normal map
+        // base_color_texture: Some(asset_server.load("textures/tt2.png")), // ถ้าอยากได้ลายสีพื้นผิวด้วยค่อยเปิดบรรทัดนี้
+        perceptual_roughness: 0.03,  // ผิวกึ่งมัน = ไฮไลต์วิ่งตามลายนูนชัดขึ้นมาก
+        metallic: 0.03,
+        unlit: false,        // ⚠️ สำคัญมาก: ต้องเป็น false ไม่งั้น normal map จะไม่มีผลเลย
+        double_sided: true,
+        cull_mode: None,
+        flip_normal_map_y: true,
+        
         ..default()
     });
 
-    let platform_material_2 = materials.add(StandardMaterial {
-        base_color: Color::srgb(0.95, 0.65, 0.2),
-        ..default()
-    });
+    // ประตูชั้นที่ 1 -> ไปออกประตูชั้นที่ 2/1
+    commands.spawn((
+        LocalWarpGate {
+            destination: Vec3::new(0.464, 21.680, -3.793),
+            radius: 1.5,
+        },
+        Sensor,
+        Collider::cuboid(2.0, 3.0, 1.0),
+        Mesh3d(warp_gate_mesh.clone()),
+        MeshMaterial3d(warp_gate_material.clone()),
+        Transform::from_xyz(0.829, 0.830, 7.027),
+        CurrentScene,
+        DespawnOnExit(GameScene::FloatingIsland),
+    ));
 
-    // Platform อันที่ 1
+    // จุดออกประตูชั้นที่ 2/1
+    // อันนี้เป็นแค่ภาพประตูปลายทาง ไม่มีระบบวาร์ปกลับ
+    // commands.spawn((
+    //     Mesh3d(warp_gate_mesh.clone()),
+    //     MeshMaterial3d(warp_gate_material.clone()),
+    //     Transform::from_xyz(0.464, 21.680, -3.793),
+    //     DespawnOnExit(GameScene::FloatingIsland),
+    // ));
+
+    // ประตูชั้นที่ 2/2 -> ไปออกประตูชั้นที่ 3
     commands.spawn((
-        RigidBody::Kinematic,
-        Collider::cuboid(4.0, 0.5, 4.0),
-        Mesh3d(platform_mesh.clone()),
-        MeshMaterial3d(platform_material_1),
-        Visibility::Visible,
-        Transform::from_xyz(3.7, 0.83, 2.98),
-        AutoPlatform {
-            min_y: 0.0,
-            max_y: 19.0,
-            speed: 2.0,
-            phase: AutoPlatformPhase::Rising,
-            wait_timer: Timer::from_seconds(2.0, TimerMode::Once),
-            hidden_timer: Timer::from_seconds(1.0, TimerMode::Once),
+        LocalWarpGate {
+            destination: Vec3::new(29.989, 35.230, -22.517),
+            radius: 1.5,
         },
-        LinearVelocity(Vec3::new(0.0, 2.0, 0.0)),
+        Sensor,
+        Collider::cuboid(2.0, 3.0, 1.0),
+        Mesh3d(warp_gate_mesh.clone()),
+        MeshMaterial3d(warp_gate_material.clone()),
+        Transform::from_xyz(15.858, 21.680, -22.981),
+        CurrentScene,
         DespawnOnExit(GameScene::FloatingIsland),
     ));
-    // Platform อันที่ 2
-    commands.spawn((
-        RigidBody::Kinematic,
-        Collider::cuboid(4.0, 0.5, 4.0),
-        Mesh3d(platform_mesh.clone()),
-        MeshMaterial3d(platform_material_2),
-        Visibility::Visible,
-        Transform::from_xyz(18.58, 21.68, -21.48),
-        AutoPlatform {
-            min_y: 20.0,
-            max_y: 34.0,
-            speed: 2.0,
-            phase: AutoPlatformPhase::Rising,
-            wait_timer: Timer::from_seconds(2.0, TimerMode::Once),
-            hidden_timer: Timer::from_seconds(1.0, TimerMode::Once),
-        },
-        LinearVelocity(Vec3::new(0.0, 2.0, 0.0)),
-        DespawnOnExit(GameScene::FloatingIsland),
-    ));
+
+    // จุดออกประตูชั้นที่ 3
+    // commands.spawn((
+    //     Mesh3d(warp_gate_mesh.clone()),
+    //     MeshMaterial3d(warp_gate_material.clone()),
+    //     Transform::from_xyz(29.989, 35.230, -22.517),
+    //     DespawnOnExit(GameScene::FloatingIsland),
+    // ));
     
     //warp to desert
     commands.spawn((
@@ -126,6 +126,13 @@ pub fn spawn_floating_island(
         Collider::cuboid(2.0, 2.0, 1.0),
         //Transform::from_xyz(5.0, 1.0, 0.6),
         Transform::from_xyz(38.58, 35.23, -20.62),
+        DespawnOnExit(GameScene::FloatingIsland),
+    ));
+    //sound
+    commands.spawn((
+        AudioPlayer::new(asset_server.load("sounds/BGM_Dimension.ogg")),
+        PlaybackSettings{mode: bevy::audio::PlaybackMode::Loop, volume:  bevy::audio::Volume::Linear(0.1), ..default()},
+        MusicAudio,
         DespawnOnExit(GameScene::FloatingIsland),
     ));
 }
@@ -179,72 +186,49 @@ pub fn setup_floating_island_light(mut commands: Commands) {
     ));
 }
 
-pub fn update_auto_platforms(
-    mut commands: Commands,
+pub fn update_local_warp_gates(
     time: Res<Time>,
-    mut query: Query<(
-        Entity,
-        &mut Transform,
-        &mut LinearVelocity,
-        &mut Visibility,
-        &mut AutoPlatform,
-    )>,
+    mut player_query: Query<
+        (&mut Transform, Option<&mut LinearVelocity>),
+        (With<Player>, Without<LocalWarpGate>),
+    >,
+    gate_query: Query<(&Transform, &LocalWarpGate), Without<Player>>,
+    mut cooldown: Local<f32>,
 ) {
-    for (entity, mut tf, mut vel, mut visibility, mut platform) in &mut query {
-        match platform.phase {
-            AutoPlatformPhase::Rising => {
-                vel.0.x = 0.0;
-                vel.0.z = 0.0;
-                vel.0.y = platform.speed;
+    const WARP_COOLDOWN: f32 = 1.0;
 
-                // ถ้าถึงจุดสูงสุด
-                if tf.translation.y >= platform.max_y {
-                    tf.translation.y = platform.max_y;
-                    vel.0 = Vec3::ZERO;
+    if *cooldown > 0.0 {
+        *cooldown -= time.delta().as_secs_f32();
 
-                    platform.phase = AutoPlatformPhase::Waiting;
-                    platform.wait_timer.reset();
-                }
-            }
-
-            AutoPlatformPhase::Waiting => {
-                vel.0 = Vec3::ZERO;
-
-                platform.wait_timer.tick(time.delta());
-
-                // ค้างครบ 2 วินาที แล้วหายไป
-                if platform.wait_timer.is_finished() {
-                    platform.phase = AutoPlatformPhase::Hidden;
-
-                    *visibility = Visibility::Hidden;
-
-                    // ปิดการชน
-                    commands.entity(entity).insert(CollisionLayers::NONE);
-
-                    platform.hidden_timer.reset();
-                }
-            }
-
-            AutoPlatformPhase::Hidden => {
-                vel.0 = Vec3::ZERO;
-
-                platform.hidden_timer.tick(time.delta());
-
-                // หายไปครบเวลาแล้ว กลับมาที่จุดเริ่มต้นและเลื่อนขึ้นใหม่
-                if platform.hidden_timer.is_finished() {
-                    tf.translation.y = platform.min_y;
-
-                    *visibility = Visibility::Visible;
-
-                    // เปิดการชนอีกครั้ง
-                    commands.entity(entity).insert(CollisionLayers::ALL);
-
-                    platform.phase = AutoPlatformPhase::Rising;
-                    vel.0.x = 0.0;
-                    vel.0.z = 0.0;
-                    vel.0.y = platform.speed;
-                }
-            }
+        if *cooldown < 0.0 {
+            *cooldown = 0.0;
         }
+
+        return;
+    }
+
+    let Ok((mut player_tf, player_vel)) = player_query.single_mut() else {
+        return;
+    };
+
+    let mut target_destination: Option<Vec3> = None;
+
+    for (gate_tf, gate) in &gate_query {
+        let distance = player_tf.translation.distance(gate_tf.translation);
+
+        if distance < gate.radius {
+            target_destination = Some(gate.destination);
+            break;
+        }
+    }
+
+    if let Some(destination) = target_destination {
+        player_tf.translation = destination;
+
+        if let Some(mut vel) = player_vel {
+            vel.0 = Vec3::ZERO;
+        }
+
+        *cooldown = WARP_COOLDOWN;
     }
 }
