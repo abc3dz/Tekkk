@@ -110,26 +110,54 @@ pub fn spawn_hub(
         Transform::from_xyz(-7.3, 1.5,-9.5),
         DespawnOnExit(GameScene::Hub),
     ));
+    //moutain back
+    commands.spawn((
+        RigidBody::Static,
+        Collider::cuboid(55.0, 15.0, 1.0),
+        Transform::from_xyz(0.0, 0.0,-18.6),
+        DespawnOnExit(GameScene::Hub),
+    ));
+    //moutain left
+    commands.spawn((
+        RigidBody::Static,
+        Collider::cuboid(1.0, 15.0, 55.0),
+        Transform::from_xyz(-18.0, 0.0,0.0),
+        DespawnOnExit(GameScene::Hub),
+    ));
+    //moutain right
+    commands.spawn((
+        RigidBody::Static,
+        Collider::cuboid(1.0, 15.0, 55.0),
+        Transform::from_xyz(18.0, 0.0,0.0),
+        DespawnOnExit(GameScene::Hub),
+    ));
+    //end scene
+    commands.spawn((
+        RigidBody::Static,
+        Collider::cuboid(55.0, 15.0, 1.0),
+        Transform::from_xyz(0.0, 0.0,19.35),
+        DespawnOnExit(GameScene::Hub),
+    ));
 
     musical::spawn_drum_at(
         &mut commands,
         &asset_server,
-        Transform::from_xyz(0.0, 0.0, 9.5),
+        Transform::from_xyz(0.0, 0.1, 7.5),
     );
     musical::spawn_bass_at(
         &mut commands,
         &asset_server,
-        Transform::from_xyz(-2.2, 0.0, 9.5),
+        Transform::from_xyz(-2.4, 0.1, 8.5),
     );
     musical::spawn_guitar_at(
         &mut commands,
         &asset_server,
-        Transform::from_xyz(2.4, 0.0, 9.5),
+        Transform::from_xyz(-1.4, 0.1, 9.5),
     );
     musical::spawn_turntable_at(
         &mut commands,
         &asset_server,
-        Transform::from_xyz(2.4, 0.0, 7.5),
+        Transform::from_xyz(2.4, 0.1, 8.5),
     );
 
     //warp
@@ -156,6 +184,24 @@ pub fn spawn_hub(
         MusicAudio,
         DespawnOnExit(GameScene::Hub),
     ));
+    //txt
+    commands.spawn((
+        Node {
+            position_type: PositionType::Absolute,
+            top: Val::Px(12.0),
+            right: Val::Px(12.0),
+            ..default()
+        },
+        Text::new("Tekkk V.0.0.1"),
+        TextFont {
+            font_size: 24.0,
+            ..default()
+        },
+        TextColor(Color::WHITE),
+        CurrentScene,
+        DespawnOnExit(GameScene::Hub),
+    ));
+
 }
 pub fn go_to_hub(
     mut next_state: ResMut<NextState<GameScene>>,

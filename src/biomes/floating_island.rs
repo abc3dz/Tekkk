@@ -26,14 +26,14 @@ pub fn spawn_floating_island(
     //ground
     commands.spawn((
         RigidBody::Static,
-        Collider::cylinder(9.5, 0.1),
+        Collider::cylinder(10.0, 0.1),
         Transform::from_xyz(0.0, 0.0, 1.25),
         DespawnOnExit(GameScene::FloatingIsland),
     ));
     //ground2
     commands.spawn((
         RigidBody::Static,
-        Collider::cuboid(21.0, 0.1, 23.0),
+        Collider::cylinder(14.0, 0.1),
         Transform::from_xyz(8.7, 20.95, -13.1),
         DespawnOnExit(GameScene::FloatingIsland),
     ));
@@ -41,7 +41,7 @@ pub fn spawn_floating_island(
     commands.spawn((
         RigidBody::Static,
         Collider::cylinder(14.0, 0.1),
-        Transform::from_xyz(40.0, 34.4, -23.12),
+        Transform::from_xyz(41.0, 34.4, -23.12),
         DespawnOnExit(GameScene::FloatingIsland),
     ));
     
