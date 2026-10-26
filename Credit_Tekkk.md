@@ -1,7 +1,6 @@
-# Third Party Assets
-
-bevy_wind_waker_shader by Jan Hohenheim.
-Source: https://github.com/janhohenheim/bevy_wind_waker_shader
+# Image Ref
+OpenClipart-Vectors
+https://pixabay.com/vectors/sound-loudspeaker-speaker-music-148055/
 
 Licensed under MIT OR Apache-2.0.
 
@@ -35,15 +34,21 @@ https://freesound.org/people/SoundBiterSFX/sounds/731509/
 https://freesound.org/people/Domarius/sounds/459345/
 (CC BY 4.0)
 
-https://freesound.org/people/Corruptinator/sounds/457172/
-(CC BY 4.0)
+https://freesound.org/people/SpaceJoe/sounds/510945/
+(CC0)
 
-https://freesound.org/people/chrisbrowne626/sounds/201262/
-(CC BY 3.0)
+https://freesound.org/people/Breviceps/sounds/520846/
+(CC0)
+
+https://freesound.org/people/qubodup/sounds/442957/
+(CC0)
+
+https://freesound.org/people/rafaelzimrp/sounds/570858/
+(CC0)
 
 # Tools
 
-Blender, Krita, LMMS, VSC
+Blender, Krita, LMMS, VSC, Audacity, FontForge
 
 # Engine
 

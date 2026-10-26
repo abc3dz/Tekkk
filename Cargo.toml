@@ -4,10 +4,7 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
-bevy = {
-    version = "0.18",
-    features = ["debug"]
-}
+bevy = "0.18"
 avian3d = "0.6"
 bevy_framepace = "0.20"
 rand = "0.9"
@@ -17,3 +14,8 @@ chrono = "0.4"
 
 [target.'cfg(target_arch = "wasm32")'.dependencies]
 getrandom = { version = "0.3", features = ["wasm_js"] }
+
+[profile.release]
+lto = "thin"
+codegen-units = 1
+strip = true
