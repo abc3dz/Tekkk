@@ -4,7 +4,7 @@ use bevy::{
     render::render_resource::AsBindGroup,
     shader::ShaderRef,
 };
-
+use avian3d::prelude::*; 
 use crate::components::*;
 
 const QUICKSAND_SHADER_PATH: &str = "shaders/quicksand.wgsl";
@@ -58,6 +58,11 @@ pub fn spawn_quicksand(
         MeshMaterial3d(quicksand_material),
         Transform::from_xyz(0.0,0.03,-28.0),
         CurrentScene,
+        // ===== เพิ่มส่วนตรวจจับการเหยียบทรายดูด =====
+        RigidBody::Static,
+        Collider::cuboid(50.0, 2.0, 12.0),
+        Sensor,
+        CollidingEntities::default(),
     ));
 }
 

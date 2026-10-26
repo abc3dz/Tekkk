@@ -31,13 +31,13 @@ pub fn spawn_desert(
         DespawnOnExit(GameScene::Desert),
     ));
     //warp to floating island
-    commands.spawn((
-        CurrentScene,
-        WarpToFloatingIsland,
-        Collider::cuboid(2.0, 2.0, 1.0),
-        Transform::from_xyz(17.5, 1.0, -48.0),
-        DespawnOnExit(GameScene::Desert),
-    ));
+    // commands.spawn((
+    //     CurrentScene,
+    //     WarpToFloatingIsland,
+    //     Collider::cuboid(2.0, 2.0, 1.0),
+    //     Transform::from_xyz(17.5, 1.0, -48.0),
+    //     DespawnOnExit(GameScene::Desert),
+    // ));
     
     //mountain left
     commands.spawn((
@@ -151,13 +151,36 @@ pub fn spawn_desert(
         Transform::from_xyz(-12.26, 0.2,-41.07).with_rotation(Quat::from_rotation_x(25f32.to_radians())),
         DespawnOnExit(GameScene::Desert),
     ));
-    //end scene
+    //cactus wall
+    commands.spawn((
+        RigidBody::Static,
+        Collider::cuboid(0.8, 3.2, 0.9),
+        Transform::from_xyz(-18.1, 0.0,3.25),
+        DespawnOnExit(GameScene::Desert),
+    ));
+    //cactus end
+    commands.spawn((
+        RigidBody::Static,
+        Collider::cuboid(0.8, 4.2, 0.9),
+        Transform::from_xyz(-7.26, 0.0,8.2),
+        DespawnOnExit(GameScene::Desert),
+    ));
+    //rock end
+    commands.spawn((
+        RigidBody::Static,
+        Collider::cuboid(1.4, 2.9, 1.87),
+        Transform::from_xyz(-12.9, 0.0,10.81),
+        DespawnOnExit(GameScene::Desert),
+    ));
+    //end
     commands.spawn((
         RigidBody::Static,
         Collider::cuboid(55.0, 10.0, 1.0),
         Transform::from_xyz(0.0, 0.0,36.82),
         DespawnOnExit(GameScene::Desert),
     ));
+    
+    
     //sound
     commands.spawn((
         AudioPlayer::new(asset_server.load("sounds/BGM_Dimension.ogg")),

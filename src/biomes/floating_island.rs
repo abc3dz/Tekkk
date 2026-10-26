@@ -44,7 +44,97 @@ pub fn spawn_floating_island(
         Transform::from_xyz(41.0, 34.4, -23.12),
         DespawnOnExit(GameScene::FloatingIsland),
     ));
-    
+    //three 1/1
+    commands.spawn((
+        RigidBody::Static,
+        Collider::cuboid(0.3, 2.62, 0.3),
+        Transform::from_xyz(-3.06, 0.0,-1.38),
+        DespawnOnExit(GameScene::FloatingIsland),
+    ));
+    //three 1/2
+    commands.spawn((
+        RigidBody::Static,
+        Collider::cuboid(0.3, 2.1, 0.3),
+        Transform::from_xyz(-1.4, 0.0,0.38),
+        DespawnOnExit(GameScene::FloatingIsland),
+    ));
+    //three 1/3
+    commands.spawn((
+        RigidBody::Static,
+        Collider::cuboid(0.3, 2.1, 0.3),
+        Transform::from_xyz(0.35, 0.0,5.2),
+        DespawnOnExit(GameScene::FloatingIsland),
+    ));
+    //three 1/4
+    commands.spawn((
+        RigidBody::Static,
+        Collider::cuboid(0.3, 2.1, 0.3),
+        Transform::from_xyz(2.7, 0.0,6.9),
+        DespawnOnExit(GameScene::FloatingIsland),
+    ));
+    //three 2/1
+    commands.spawn((
+        RigidBody::Static,
+        Collider::cuboid(0.3, 2.1, 0.3),
+        Transform::from_xyz(10.91, 20.95,-7.02),
+        DespawnOnExit(GameScene::FloatingIsland),
+    ));
+    //rock 2/1
+    commands.spawn((
+        RigidBody::Static,
+        Collider::cuboid(1.2, 1.85, 1.87),
+        Transform::from_xyz(3.9, 20.95,-5.2),
+        DespawnOnExit(GameScene::FloatingIsland),
+    ));
+    //three 2/2
+    commands.spawn((
+        RigidBody::Static,
+        Collider::cuboid(0.3, 5.1, 0.3),
+        Transform::from_xyz(14.0, 20.95,-16.74),
+        DespawnOnExit(GameScene::FloatingIsland),
+    ));
+    //rock 3/1
+    commands.spawn((
+        RigidBody::Static,
+        Collider::cuboid(1.4, 2.9, 1.87),
+        Transform::from_xyz(33.2, 34.4,-22.59),
+        DespawnOnExit(GameScene::FloatingIsland),
+    ));
+    //pillar1
+    commands.spawn((
+        RigidBody::Static,
+        Collider::cuboid(0.8, 8.0, 0.8),
+        Transform::from_xyz(35.9, 34.4,-23.96),
+        DespawnOnExit(GameScene::FloatingIsland),
+    ));
+    //pillar2
+    commands.spawn((
+        RigidBody::Static,
+        Collider::cuboid(0.8, 8.0, 0.8),
+        Transform::from_xyz(35.9, 34.4,-17.12),
+        DespawnOnExit(GameScene::FloatingIsland),
+    ));
+    //pillar3
+    commands.spawn((
+        RigidBody::Static,
+        Collider::cuboid(0.8, 8.0, 0.8),
+        Transform::from_xyz(41.0, 34.4,-23.96),
+        DespawnOnExit(GameScene::FloatingIsland),
+    ));
+    //pillar4
+    commands.spawn((
+        RigidBody::Static,
+        Collider::cuboid(0.8, 8.0, 0.8),
+        Transform::from_xyz(41.0, 34.4,-17.12),
+        DespawnOnExit(GameScene::FloatingIsland),
+    ));
+    //three 2/2
+    commands.spawn((
+        RigidBody::Static,
+        Collider::cuboid(0.3, 5.1, 0.3),
+        Transform::from_xyz(43.21, 34.4,-28.75),
+        DespawnOnExit(GameScene::FloatingIsland),
+    ));
     //Local Warp Gates
     let warp_gate_mesh = meshes.add(Cuboid::new(2.0, 3.0, 0.35));
 

@@ -8,6 +8,7 @@ use crate::camera::*;
 use crate::element_drop::*;
 use crate::cel_shader::*;
 use crate::pause_menu::GameMode;
+use crate::biomes::Quicksand;
 
 pub struct PlayerPlugin;
 
@@ -21,6 +22,15 @@ impl Plugin for PlayerPlugin {
             setup_player_status_ui
         ))
         .add_systems(Update,debug_print_player_position_on_f.run_if(in_state(GameMode::Playing)),)
+    //     .add_systems(
+    // Update,
+    //         (
+    //             drain_player_in_quicksand,
+    //             update_quicksand_hurt_timer,
+    //         )
+    //             .chain()
+    //             .run_if(in_state(GameMode::Playing)),
+    //     )
         .add_systems(Update, (
             setup_player_animation_player,
             player_movement,
@@ -34,7 +44,13 @@ impl Plugin for PlayerPlugin {
             player_dash_update,
             update_player_dash_effect,
             update_player_animation,
+            ).chain().run_if(in_state(GameMode::Playing)))
+        .add_systems(Update, (
             player_footstep_from_animation_time,
+            drain_player_in_quicksand,
+            ).chain().run_if(in_state(GameMode::Playing)))
+        .add_systems(Update, (
+            update_quicksand_hurt_timer,
             update_player_status_ui,
             rebuild_player_combat_stats_from_exp,
             update_floating_damage_text,
@@ -2468,4 +2484,131 @@ fn debug_print_player_position_on_f(
         "Transform::from_xyz({:.3}, {:.3}, {:.3})",
         root_pos.x, root_pos.y, root_pos.z
     );
+}
+const QUICKSAND_DRAIN_PER_SECOND: i32 = 50;
+
+fn drain_player_in_quicksand(
+    mut commands: Commands,
+    time: Res<Time>,
+    anim_graph: Res<PlayerAnimationGraph>,
+
+    // ✅ แก้ตรงนี้: เอา & ออก
+    asset_server: Res<AssetServer>,
+    camera_query: Query<Entity, With<MainCamera>>,
+
+    mut player_query: Query<
+        (Entity, &GlobalTransform, &mut Health, &mut LinearVelocity),
+        With<Player>,
+    >,
+    quicksand_query: Query<(&CollidingEntities, &GlobalTransform), With<Quicksand>>,
+    mut drain_timer_query: Query<&mut QuicksandDrainTimer, With<Player>>,
+    mut hurt_timer_query: Query<&mut QuicksandHurtTimer, With<Player>>,
+    mut anim_query: Query<
+        (&mut AnimationPlayer, &mut PlayerAnimState),
+        With<PlayerAnimationTarget>,
+    >,
+    dialog_query: Query<(), With<GuardianDialogUI>>,
+) {
+    if !dialog_query.is_empty() {
+        return;
+    }
+
+    let Ok((player_entity, player_gt, mut health, mut velocity)) =
+        player_query.single_mut()
+    else {
+        return;
+    };
+
+    if health.current <= 0 {
+        return;
+    }
+
+    let player_pos = player_gt.translation();
+
+    let mut in_quicksand = false;
+    for (colliding_entities, quicksand_gt) in &quicksand_query {
+        if !colliding_entities.contains(&player_entity) {
+            continue;
+        }
+        if player_pos.y <= quicksand_gt.translation().y + 1.2 {
+            in_quicksand = true;
+            break;
+        }
+    }
+
+    if !in_quicksand {
+        if drain_timer_query.get(player_entity).is_ok() {
+            commands
+                .entity(player_entity)
+                .remove::<QuicksandDrainTimer>();
+        }
+        return;
+    }
+
+    let Ok(mut drain_timer) = drain_timer_query.get_mut(player_entity) else {
+        commands.entity(player_entity).insert(QuicksandDrainTimer(
+            Timer::from_seconds(0.2, TimerMode::Repeating),
+        ));
+        return;
+    };
+
+    drain_timer.0.tick(time.delta());
+
+    if !drain_timer.0.just_finished() {
+        return;
+    }
+
+    // ลดพลัง
+    health.current = (health.current - QUICKSAND_DRAIN_PER_SECOND).clamp(0, health.max);
+
+    // Spawn ตัวเลขลอยขึ้น
+    spawn_floating_damage_text(
+        &mut commands,
+        QUICKSAND_DRAIN_PER_SECOND,
+        player_pos + Vec3::new(0.0, 2.0, 0.0),
+        FloatingDamageKind::PlayerHit,
+    );
+
+    // ===== เล่น Animation Hurt + สั่นกล้อง + เสียง =====
+    let Ok((mut anim_player, mut anim_state)) = anim_query.single_mut() else {
+        return;
+    };
+
+    // ป้องกันการเล่น Hurt ซ้ำถ้ายังอยู่ในช่วง cooldown หรือตายแล้ว
+    if *anim_state == PlayerAnimState::Dead
+        || hurt_timer_query.get(player_entity).is_ok()
+    {
+        return;
+    }
+
+    // หยุดการเคลื่อนไหวระหว่างเล่นท่าเจ็บ
+    velocity.x = 0.0;
+    velocity.z = 0.0;
+
+    // เรียก helper — ผ่าน & เข้าไป
+    play_player_hurt_animation(
+        &mut commands,
+        player_entity,
+        &anim_graph,
+        &mut anim_query,
+        &camera_query,
+        &asset_server,
+    );
+
+    // ใส่ Cooldown กัน Hurt ถี่เกินไป
+    commands.entity(player_entity).insert(QuicksandHurtTimer(
+        Timer::from_seconds(0.2, TimerMode::Once),
+    ));
+}
+fn update_quicksand_hurt_timer(
+    mut commands: Commands,
+    time: Res<Time>,
+    mut query: Query<(Entity, &mut QuicksandHurtTimer)>,
+) {
+    for (entity, mut timer) in &mut query {
+        timer.0.tick(time.delta());
+        if timer.0.is_finished() {
+            commands.entity(entity).remove::<QuicksandHurtTimer>();
+        }
+    }
 }

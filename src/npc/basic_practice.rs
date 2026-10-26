@@ -20,12 +20,11 @@ impl Plugin for BasicPracticePlugin {
             .insert_resource(
                 BasicGunRespawnTimer(
                     Timer::from_seconds(
-                        3.0,
+                        1.0,
                         TimerMode::Once,
                     ),
                 ),
             )
-            //.add_systems(Update,guardian_dialog_basic_input.run_if(in_state(GameScene::Hub)),)
             .add_systems(Update,(
                     rotate_basic_practice_gun_to_player,
                     basic_practice_gun_shoot_projectile,
@@ -100,10 +99,6 @@ let gun_entity = commands
                     0.0,
                 ),
                 ApplyToonMaterial
-                // WindWakerShaderBuilder::default()
-                //     .time_of_day(TimeOfDay::Day)
-                //     .weather(Weather::Sunny)
-                //     .build(),
             ));
         })
         .id();
@@ -160,17 +155,27 @@ pub fn basic_practice_gun_shoot_projectile(
         }
 
         let direction = direction.normalize();
-        let speed = 5.0;
         let mut spawn_pos = gun_tf.translation + direction * 0.3;
         spawn_pos.y = 0.5;
         let yaw = direction.x.atan2(direction.z);
+        let speed = 20.0;
+        let max_distance = 50.0;
+        let lifetime = max_distance / speed;
 
         commands.spawn((
             PracticeEntity,
-            BasicPracticeProjectile {velocity: direction * speed, hp_damage: 5},
-            ProjectileLifetime(Timer::from_seconds(4.0, TimerMode::Once)),
+            BasicPracticeProjectile {
+                velocity: direction * speed,
+                hp_damage: 5,
+            },
+            ProjectileLifetime(Timer::from_seconds(lifetime, TimerMode::Once)),
             SceneRoot(asset_server.load(GltfAssetLabel::Scene(0).from_asset("npc/BasicPracticeProjectile.glb"))),
-            Transform {translation: spawn_pos, rotation: Quat::from_rotation_y(yaw), scale: Vec3::splat(1.0), ..default()},
+            Transform {
+                translation: spawn_pos,
+                rotation: Quat::from_rotation_y(yaw),
+                scale: Vec3::splat(1.0),
+                ..default()
+            },
             AudioPlayer::new(asset_server.load("sounds/npc/basic_atk.ogg")),
             PlaybackSettings::DESPAWN,
             GlobalTransform::default(),

@@ -44,12 +44,12 @@ impl Plugin for EnemyMuamuaPlugin {
     }
 }
 
-const MUAMUA_SPAWN_POSITION: Vec3 = Vec3::new(5.0, 1.0, -30.0);
+const MUAMUA_SPAWN_POSITION: Vec3 = Vec3::new(5.0, 1.0, -18.0);
 const MUAMUA_MAX_ALIVE: usize = 3;
 const MUAMUA_CHASE_RANGE: f32 = 10.0;
 const MUAMUA_STOP_DISTANCE: f32 = 1.0;
 const MUAMUA_MOVE_SPEED: f32 = 3.0;
-const MUAMUA_PATROL_RADIUS: f32 = 8.0;
+const MUAMUA_PATROL_RADIUS: f32 = 10.0;
 
 fn spawn_enemy_muamua(
     mut commands: Commands,

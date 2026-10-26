@@ -31,7 +31,7 @@ impl Plugin for WorldPlugin {
         .add_systems(OnExit(GameScene::LoadingHub), cleanup_loading_ui)
 
         .add_systems(OnEnter(GameScene::Hub), (spawn_hub, setup_hub_light, spawn_warp_portal))
-        .add_systems(Update, desert::check_warp_to_desert.run_if(in_state(GameScene::Hub)))
+        .add_systems(Update, check_warp_to_desert.run_if(in_state(GameScene::Hub)))
         .add_systems(Update, check_warp_to_lagoon.run_if(in_state(GameScene::Hub)),)
         .add_systems(OnExit(GameScene::Hub), cleanup_current_scene)
 
@@ -45,8 +45,8 @@ impl Plugin for WorldPlugin {
         
         .add_systems(OnExit(GameScene::Desert), cleanup_current_scene)
 
-        // .add_systems(OnEnter(GameScene::Desert),spawn_quicksand,)
-        // .add_systems(Update,update_quicksand_shader.run_if(in_state(GameScene::Desert)))
+        .add_systems(OnEnter(GameScene::Desert),spawn_quicksand,)
+        .add_systems(Update,update_quicksand_shader.run_if(in_state(GameScene::Desert)))
 
         .add_systems(OnEnter(GameScene::LoadingFloatingIsland), spawn_loading_ui)
         .add_systems(Update, go_to_floating_island.run_if(in_state(GameScene::LoadingFloatingIsland)))
@@ -55,8 +55,8 @@ impl Plugin for WorldPlugin {
         .add_systems(OnEnter(GameScene::FloatingIsland), (spawn_floating_island, setup_floating_island_light))
         .add_systems(Update, check_warp_to_desert_from_floating.run_if(in_state(GameScene::FloatingIsland)))
         .add_systems(OnExit(GameScene::FloatingIsland), cleanup_current_scene)
-        //move platforms in floating island
-        .add_systems(FixedUpdate, update_auto_platforms)
+        //the warp in floating island
+        .add_systems(Update, update_local_warp_gates)
 
         .add_systems(Update,check_warp_to_lagoon.run_if(in_state(GameScene::FloatingIsland)),)
         // Loading Lagoon

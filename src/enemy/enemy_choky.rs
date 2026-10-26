@@ -11,6 +11,12 @@ use crate::player::*;
 use crate::camera::*;
 use crate::pause_menu::GameMode;
 
+const CHOKY_SPAWN_POSITION: Vec3 = Vec3::new(-15.0, 0.0, -50.0);
+const CHOKY_CHASE_RANGE: f32 = 10.0;
+const CHOKY_STOP_DISTANCE: f32 = 1.0;
+const CHOKY_RETURN_STOP_DISTANCE: f32 = 0.25;
+const CHOKY_MOVE_SPEED: f32 = 3.0;
+
 #[derive(Component, Debug)]
 pub struct EnemyChoky;
 
@@ -56,7 +62,7 @@ fn spawn_enemy_choky(
             .from_asset("enemy/EnemyChoky.glb"),
     );
 
-    let spawn_position = Vec3::new(-12.0, 0.0, -45.0);
+    let spawn_position = CHOKY_SPAWN_POSITION;
 
     const CHOKY_BODY_Y: f32 = 1.0;
 
@@ -76,7 +82,7 @@ fn spawn_enemy_choky(
             CombatStats::from(base_stats),
             AtkAndDefElement(Element::Earth),
             ElementExpReward::CHOKY,
-            RigidBody::Dynamic,
+            RigidBody::Kinematic,
             Collider::capsule(0.45, 1.0),
             LockedAxes::ROTATION_LOCKED,
             LinearVelocity::ZERO,
@@ -94,12 +100,7 @@ fn spawn_enemy_choky(
 
     commands.entity(enemy_choky).insert((
         CombatTarget,
-        ChokyAttackTimer(
-            Timer::from_seconds(
-                0.3,
-                TimerMode::Repeating,
-            ),
-        ),
+        ChokyAttackTimer(Timer::from_seconds(0.3,TimerMode::Repeating,),),
     ));
 
     spawn_enemy_health_bar(
@@ -269,22 +270,31 @@ fn find_enemy_choky_root(
     }
 }
 
-//const CHOKY_CHASE_RANGE: f32 = 10.0;
-const CHOKY_STOP_DISTANCE: f32 = 1.0;
-const CHOKY_MOVE_SPEED: f32 = 3.0;
-
 fn enemy_choky_chase_player(
     mut commands: Commands,
     asset_server: Res<AssetServer>,
-    player_query: Query<&Transform,(With<Player>,Without<EnemyChoky>,),>,
-    mut choky_query: Query<(Entity,&mut Transform,&mut LinearVelocity,&mut EnemyState,Option<&EnemyInvestigateDirection>,Option<&ChokyHuntSoundPlayed>,),(With<EnemyChoky>,Without<Player>,),>,
+    player_query: Query<
+        &Transform,
+        (With<Player>, Without<EnemyChoky>),
+    >,
+    mut choky_query: Query<
+        (
+            Entity,
+            &mut Transform,
+            &mut LinearVelocity,
+            &mut EnemyState,
+            Option<&EnemyInvestigateDirection>,
+            Option<&ChokyHuntSoundPlayed>,
+        ),
+        (With<EnemyChoky>, Without<Player>),
+    >,
     muamua_defeated: Res<MuamuaDefeatedCount>,
 ) {
     let Ok(player_transform) = player_query.single() else {
         return;
     };
 
-    let choky_can_hunt =
+    let muamua_completed =
         muamua_defeated.0 >= MUAMUA_DEFEAT_GOAL;
 
     for (
@@ -302,7 +312,7 @@ fn enemy_choky_chase_player(
                 .remove::<EnemyInvestigateDirection>();
         }
 
-        // ถ้าเจ็บหรือตายอยู่ ยังไม่ให้ไล่
+        // ถ้าเจ็บหรือตายอยู่ ยังไม่ให้ไล่หรือเดินกลับ
         if matches!(
             *enemy_state,
             EnemyState::Hurt | EnemyState::Dead
@@ -312,53 +322,119 @@ fn enemy_choky_chase_player(
             continue;
         }
 
-        // ถ้า Muamua ยังถูกกำจัดไม่ถึง 10 ตัว
-        // ให้ Choky ยืนเฉย ๆ ยังไม่ไล่ผู้เล่น
-        if !choky_can_hunt {
-            velocity.x = 0.0;
-            velocity.z = 0.0;
-            *enemy_state = EnemyState::Idle;
-            continue;
-        }
+        // ระยะจาก Choky ไป Player
+        let to_player =
+            player_transform.translation - choky_transform.translation;
 
-        // เล่นเสียงครั้งเดียวตอนเริ่มล่า
-        if hunt_sound_played.is_none() {
-            commands.spawn((AudioPlayer::new(asset_server.load("sounds/enemy/choky_start.ogg")),PlaybackSettings::DESPAWN));
-            commands.entity(choky_entity).insert(ChokyHuntSoundPlayed);}
-        let to_player = player_transform.translation - choky_transform.translation;
-        let flat_direction = Vec3::new(to_player.x,0.0,to_player.z,);
-        let distance = flat_direction.length();
+        let flat_to_player = Vec3::new(
+            to_player.x,
+            0.0,
+            to_player.z,
+        );
 
-        // ถ้าใกล้พอในระยะโจมตี ให้หยุดแล้ว Attack
-        if distance <= CHOKY_STOP_DISTANCE {
-            velocity.x = 0.0;
-            velocity.z = 0.0;
+        let player_distance = flat_to_player.length();
 
-            if flat_direction.length_squared() > 0.0001 {
-                let direction = flat_direction.normalize();
+        // ระยะจาก Choky ไปจุดเกิด
+        let to_spawn =
+            CHOKY_SPAWN_POSITION - choky_transform.translation;
 
-                choky_transform.rotation =
-                    Quat::from_rotation_y(
-                        direction.x.atan2(direction.z),
-                    );
+        let flat_to_spawn = Vec3::new(
+            to_spawn.x,
+            0.0,
+            to_spawn.z,
+        );
+
+        let spawn_distance = flat_to_spawn.length();
+
+        let player_in_chase_radius =
+            player_distance <= CHOKY_CHASE_RANGE;
+
+        // ถ้า Muamua ถูกกำจัดครบแล้ว ให้ไล่ทันทีไม่จำกัดรัศมี
+        // ถ้ายังไม่ครบ จะไล่เฉพาะเมื่อผู้เล่นอยู่ในระยะ 10 เมตร
+        let should_chase_player =
+            muamua_completed || player_in_chase_radius;
+
+        if should_chase_player {
+            // เล่นเสียงครั้งเดียวตอนเริ่มล่า
+            if hunt_sound_played.is_none() {
+                commands.spawn((
+                    AudioPlayer::new(
+                        asset_server
+                            .load("sounds/enemy/choky_start.ogg"),
+                    ),
+                    PlaybackSettings::DESPAWN,
+                ));
+
+                commands
+                    .entity(choky_entity)
+                    .insert(ChokyHuntSoundPlayed);
             }
 
-            *enemy_state = EnemyState::Attack;
-            continue;
+            // ถ้าใกล้พอในระยะโจมตี ให้หยุดแล้ว Attack
+            if player_distance <= CHOKY_STOP_DISTANCE {
+                velocity.x = 0.0;
+                velocity.z = 0.0;
+
+                if flat_to_player.length_squared() > 0.0001 {
+                    let direction = flat_to_player.normalize();
+
+                    choky_transform.rotation =
+                        Quat::from_rotation_y(
+                            direction.x.atan2(direction.z),
+                        );
+                }
+
+                *enemy_state = EnemyState::Attack;
+                continue;
+            }
+
+            // ไล่ตามผู้เล่น
+            let direction = flat_to_player.normalize();
+
+            velocity.x = direction.x * CHOKY_MOVE_SPEED;
+            velocity.z = direction.z * CHOKY_MOVE_SPEED;
+
+            choky_transform.rotation =
+                Quat::from_rotation_y(
+                    direction.x.atan2(direction.z),
+                );
+
+            *enemy_state = EnemyState::Chase;
+        } else {
+            // ผู้เล่นอยู่นอกระยะไล่ล่า และ Muamua ยังไม่ครบ
+            // ให้เดินกลับจุดเกิด
+
+            // ถ้าต้องการให้เสียงเริ่มล่าเล่นใหม่ทุกครั้งที่ผู้เล่นเข้าระยะอีกครั้ง
+            // ให้ลบ ChokyHuntSoundPlayed ตอนกลับจุดเกิด
+            if hunt_sound_played.is_some() {
+                commands
+                    .entity(choky_entity)
+                    .remove::<ChokyHuntSoundPlayed>();
+            }
+
+            // ถ้าถึงจุดเกิดแล้ว ให้ยืนเฉย ๆ
+            if spawn_distance <= CHOKY_RETURN_STOP_DISTANCE {
+                velocity.x = 0.0;
+                velocity.z = 0.0;
+
+                *enemy_state = EnemyState::Idle;
+                continue;
+            }
+
+            // เดินกลับจุดเกิด
+            let direction = flat_to_spawn.normalize();
+
+            velocity.x = direction.x * CHOKY_MOVE_SPEED;
+            velocity.z = direction.z * CHOKY_MOVE_SPEED;
+
+            choky_transform.rotation =
+                Quat::from_rotation_y(
+                    direction.x.atan2(direction.z),
+                );
+
+            // ใช้ Chase เพื่อให้เล่นอนิเมชันขณะเดินกลับ
+            *enemy_state = EnemyState::Chase;
         }
-
-        // นอกนั้นให้ไล่ตามผู้เล่นเสมอ
-        let direction = flat_direction.normalize();
-
-        velocity.x = direction.x * CHOKY_MOVE_SPEED;
-        velocity.z = direction.z * CHOKY_MOVE_SPEED;
-
-        choky_transform.rotation =
-            Quat::from_rotation_y(
-                direction.x.atan2(direction.z),
-            );
-
-        *enemy_state = EnemyState::Chase;
     }
 }
 
@@ -437,7 +513,6 @@ fn update_enemy_choky_animation(
 fn update_choky_hurt_and_dead(
     mut commands: Commands,
     time: Res<Time>,
-
     mut choky_query: Query<
         (
             Entity,
@@ -447,6 +522,7 @@ fn update_choky_hurt_and_dead(
         ),
         With<EnemyChoky>,
     >,
+    warp_query: Query<(), With<WarpToFloatingIsland>>,
 ) {
     for (
         choky_entity,
@@ -460,6 +536,19 @@ fn update_choky_hurt_and_dead(
 
         state_timer.0.tick(time.delta());
 
+        // ถ้าตายแล้ว ให้สร้างวาร์ปทันที
+        if matches!(*enemy_state, EnemyState::Dead) {
+            if warp_query.is_empty() {
+                commands.spawn((
+                    CurrentScene,
+                    WarpToFloatingIsland,
+                    Collider::cuboid(2.0, 2.0, 1.0),
+                    Transform::from_xyz(17.5, 1.0, -48.0),
+                    DespawnOnExit(GameScene::Desert),
+                ));
+            }
+        }
+
         if !state_timer.0.is_finished() {
             continue;
         }
@@ -467,16 +556,13 @@ fn update_choky_hurt_and_dead(
         match *enemy_state {
             EnemyState::Hurt => {
                 *enemy_state = EnemyState::Idle;
-
                 commands
                     .entity(choky_entity)
                     .remove::<EnemyStateTimer>();
             }
 
             EnemyState::Dead => {
-                commands
-                    .entity(choky_entity)
-                    .despawn();
+                commands.entity(choky_entity).despawn();
             }
 
             _ => {

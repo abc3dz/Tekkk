@@ -44,7 +44,7 @@ impl Plugin for EnemyMuanimPlugin {
     }
 }
 
-const MUANIM_SPAWN_POSITION: Vec3 = Vec3::new(-10.0, 1.0, -10.0);
+const MUANIM_SPAWN_POSITION: Vec3 = Vec3::new(-10.0, 1.0, 10.0);
 const MUANIM_STOP_DISTANCE: f32 = 1.0;
 const MUANIM_MOVE_SPEED: f32 = 3.0;
 const MUANIM_LOSE_INTEREST_DISTANCE: f32 = 10.0;

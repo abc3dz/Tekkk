@@ -18,6 +18,7 @@ mod cel_shader;
 mod pause_menu;
 mod save_load;
 mod settings;
+mod musical;
 
 fn main() {
     App::new()

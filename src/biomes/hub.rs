@@ -103,28 +103,110 @@ pub fn spawn_hub(
         Transform::from_xyz(-4.0, 0.75,-13.65),
         DespawnOnExit(GameScene::Hub),
     ));
-    //pillar back 
+    //pillar back 1
+    for i in 0..4 {
+        let x = -7.3 + (14.6 / 3.0) * i as f32;
+        commands.spawn((
+            RigidBody::Static,
+            Collider::cuboid(0.42, 3.0, 0.39),
+            Transform::from_xyz(x, 1.5, -9.5),
+            DespawnOnExit(GameScene::Hub),
+        ));
+    }
+    //pillar back 2
+    for x in [-2.81_f32, 2.81_f32] {
+        commands.spawn((
+            RigidBody::Static,
+            Collider::cuboid(0.42, 3.0, 0.39),
+            Transform::from_xyz(x, 1.5, -4.46),
+            DespawnOnExit(GameScene::Hub),
+        ));
+    }
+    //pillar back 3
+    for i in 0..4 {
+        let x = -7.3 + (14.6 / 3.0) * i as f32;
+        commands.spawn((
+            RigidBody::Static,
+            Collider::cuboid(0.42, 3.0, 0.39),
+            Transform::from_xyz(x, 1.5, 0.3),
+            DespawnOnExit(GameScene::Hub),
+        ));
+    }
+    //pillar back 4
+    for x in [-2.64_f32, 2.87_f32] {
+        commands.spawn((
+            RigidBody::Static,
+            Collider::cuboid(0.42, 3.0, 0.39),
+            Transform::from_xyz(x, 1.5, 5.05),
+            DespawnOnExit(GameScene::Hub),
+        ));
+    }
+    //pillar front
+    for x in [-7.39_f32, 7.29_f32] {
+        commands.spawn((
+            RigidBody::Static,
+            Collider::cuboid(0.42, 3.0, 0.39),
+            Transform::from_xyz(x, 1.5, 10.28),
+            DespawnOnExit(GameScene::Hub),
+        ));
+    }
+    //pipe
     commands.spawn((
         RigidBody::Static,
-        Collider::cuboid(0.42, 3.0, 0.39),
-        Transform::from_xyz(-7.3, 1.5,-9.5),
+        Collider::cuboid(1.62, 1.62, 2.86),
+        Transform::from_xyz(-9.0, 0.75,8.4),
         DespawnOnExit(GameScene::Hub),
     ));
-    //moutain back
+    //barail
+    commands.spawn((
+        RigidBody::Static,
+        Collider::cylinder(0.65, 1.0),
+        Transform::from_xyz(14.85, 0.6,-12.98),
+        DespawnOnExit(GameScene::Hub),
+    ));
+    //barai2
+    commands.spawn((
+        RigidBody::Static,
+        Collider::cylinder(0.65, 1.0),
+        Transform::from_xyz(14.85, 0.6,-10.89),
+        DespawnOnExit(GameScene::Hub),
+    ));
+    //barai3
+    commands.spawn((
+        RigidBody::Static,
+        Collider::cylinder(0.65, 1.0),
+        Transform::from_xyz(12.84, 0.6,-11.85),
+        DespawnOnExit(GameScene::Hub),
+    ));
+    //bush
+    let start_z = -7.77;
+    let end_z = 4.64;
+    let count = 8usize;
+    let step = (end_z - start_z) / (count - 1) as f32;
+    for i in 0..count {
+        let z = start_z + i as f32 * step;
+        commands.spawn((
+            RigidBody::Static,
+            Collider::cylinder(0.09, 0.7),
+            Transform::from_xyz(14.41, 0.55, z),
+            DespawnOnExit(GameScene::Hub),
+        ));
+    }
+    //mountain back
     commands.spawn((
         RigidBody::Static,
         Collider::cuboid(55.0, 15.0, 1.0),
         Transform::from_xyz(0.0, 0.0,-18.6),
         DespawnOnExit(GameScene::Hub),
     ));
-    //moutain left
+    //mountain left
     commands.spawn((
         RigidBody::Static,
         Collider::cuboid(1.0, 15.0, 55.0),
         Transform::from_xyz(-18.0, 0.0,0.0),
         DespawnOnExit(GameScene::Hub),
     ));
-    //moutain right
+    //mountain right
     commands.spawn((
         RigidBody::Static,
         Collider::cuboid(1.0, 15.0, 55.0),
@@ -174,7 +256,7 @@ pub fn spawn_hub(
         CurrentScene,
         Sensor,
         Collider::cuboid(2.0, 2.0, 1.0),
-        Transform::from_xyz(10.0, 1.0, -15.0),
+        Transform::from_xyz(16.0, 1.0, -16.0),
         DespawnOnExit(GameScene::Hub),
     ));
     //sound

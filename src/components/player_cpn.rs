@@ -170,3 +170,8 @@ pub struct CriticalHitParticle {
     pub lifetime: Timer,
     pub rotation_speed: f32, // เรเดียนต่อวินาที
 }
+#[derive(Component)]
+pub struct QuicksandDrainTimer(pub Timer);
+
+#[derive(Component)]
+pub struct QuicksandHurtTimer(pub Timer);
