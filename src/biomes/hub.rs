@@ -4,7 +4,7 @@ use avian3d::prelude::*;
 
 use crate::components::*;
 use crate::cel_shader::*;
-use crate::musical;
+use crate::musical::*;
 
 pub fn spawn_hub(
     mut commands: Commands,
@@ -220,28 +220,14 @@ pub fn spawn_hub(
         Transform::from_xyz(0.0, 0.0,19.35),
         DespawnOnExit(GameScene::Hub),
     ));
-
-    musical::spawn_drum_at(
-        &mut commands,
-        &asset_server,
-        Transform::from_xyz(0.0, 0.1, 7.5),
-    );
-    musical::spawn_bass_at(
-        &mut commands,
-        &asset_server,
-        Transform::from_xyz(-2.4, 0.1, 8.5),
-    );
-    musical::spawn_guitar_at(
-        &mut commands,
-        &asset_server,
-        Transform::from_xyz(-1.4, 0.1, 9.5),
-    );
-    musical::spawn_turntable_at(
-        &mut commands,
-        &asset_server,
-        Transform::from_xyz(2.4, 0.1, 8.5),
-    );
-
+    //musical instument
+    spawn_drum_at(&mut commands,&asset_server,Transform::from_xyz(0.0, 0.1, 7.5),);
+    spawn_bass_at(&mut commands,&asset_server,Transform::from_xyz(-2.4, 0.1, 8.5),);
+    spawn_guitar_at(&mut commands,&asset_server,Transform::from_xyz(-1.4, 0.1, 9.5),);
+    spawn_turntable_at(&mut commands,&asset_server,Transform::from_xyz(2.4, 0.1, 8.5),);
+    spawn_amp_bass_at(&mut commands, &asset_server, Transform::from_xyz(-2.4, 0.1, 10.0));
+    spawn_amp_guitar_at(&mut commands, &asset_server, Transform::from_xyz(-1.4, 0.1, 10.0));
+    spawn_amp_turntable_at(&mut commands, &asset_server, Transform::from_xyz(2.4, 0.1, 10.0));
     //warp
     commands.spawn((
         WarpToDesert,
