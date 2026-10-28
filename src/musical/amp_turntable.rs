@@ -21,13 +21,16 @@ pub fn spawn_amp_turntable_at(
         CurrentScene,
         ApplyToonMaterial,
         TextureOverride(asset_server.load(MUSICAL_TEXTURE_PATH)),
-        SceneRoot(
-            asset_server.load(
-                GltfAssetLabel::Scene(0).from_asset("musical/ampTurntable.glb"),
-            ),
-        ),
-        RigidBody::Static,
-        Collider::cuboid(0.35, 0.5, 0.25),
+        SceneRoot(asset_server.load(GltfAssetLabel::Scene(0).from_asset("musical/ampTurntable.glb"),),),
+        RigidBody::Dynamic,
+        ColliderDensity(30.0),
         transform,
-    ));
+    ))
+    .with_children(|parent| {
+        parent.spawn((
+            Name::new("MusicalBassCollider"),
+            Collider::cuboid(0.35, 0.3, 0.25),
+            Transform::from_translation(Vec3::new(0.0, 0.07, 0.0)),
+        ));
+    });
 }
