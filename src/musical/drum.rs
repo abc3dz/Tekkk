@@ -24,13 +24,13 @@ pub fn spawn_drum_at(
             TextureOverride(asset_server.load(MUSICAL_TEXTURE_PATH)),
             SceneRoot(asset_server.load(GltfAssetLabel::Scene(0).from_asset("musical/musical_drum.glb")),),
             RigidBody::Dynamic,
-            ColliderDensity(300.0),
             transform,
         ))
         .with_children(|parent| {
             parent.spawn((
                 Name::new("MusicalBassCollider"),
-                Collider::cuboid(2.2, 1.4, 1.5),                
+                Collider::cuboid(2.2, 1.4, 1.5),
+                ColliderDensity(10.0),             
                 Transform::from_translation(Vec3::new(0.0, 0.7, 0.0)),
             ));
         });

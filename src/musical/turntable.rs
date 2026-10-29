@@ -27,12 +27,12 @@ pub fn spawn_turntable_at(
         TextureOverride(musical_texture.clone()),
         SceneRoot(turntable_scene),
         RigidBody::Dynamic,
-        ColliderDensity(150.0),
         turntable_transform,
     ))
     .with_children(|parent| {
         parent.spawn((
             Name::new("MusicalTurntableCollider"),
+            ColliderDensity(50.0),
             Collider::cuboid(0.7, 0.1, 0.35),
             Transform::from_translation(Vec3::new(0.0, 0.7, 0.0)),
         ));
@@ -46,13 +46,13 @@ pub fn spawn_turntable_at(
         TextureOverride(musical_texture),
         SceneRoot(table_scene),
         RigidBody::Dynamic,
-        ColliderDensity(180.0),
         transform,
     ))
     .with_children(|parent| {
         parent.spawn((
             Name::new("MusicalTurntableTableCollider"),
             Collider::cuboid(1.0, 0.7, 0.6),
+            ColliderDensity(80.0),
             Transform::from_translation(Vec3::new(0.0, 0.3, 0.0)),
         ));
     });

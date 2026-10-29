@@ -23,14 +23,14 @@ pub fn spawn_guitar_at(
             ApplyToonMaterial,
             TextureOverride(asset_server.load(MUSICAL_TEXTURE_PATH)),
             SceneRoot(asset_server.load(GltfAssetLabel::Scene(0).from_asset("musical/musical_guitar.glb")),),
-            RigidBody::Dynamic,
-            ColliderDensity(70.0),
+            RigidBody::Dynamic,            
             transform,
         ))
         .with_children(|parent| {
             parent.spawn((
                 Name::new("MusicalGuitarCollider"),
                 Collider::cuboid(0.45, 1.4, 0.1),
+                ColliderDensity(100.0),
                 Transform::from_translation(Vec3::new(0.0, 0.7, 0.0)),
             ));
         });
