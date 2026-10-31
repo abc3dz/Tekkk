@@ -21,6 +21,7 @@ impl Plugin for VnDadaPlugin {
         app.insert_resource(DadaRespawnTimer(Timer::from_seconds(1.0, TimerMode::Once)))
             .init_resource::<DadaSpawnedCount>()
             .init_resource::<DadaDefeatedCount>()
+            .init_resource::<DadaGroupAggro>()
             .add_systems(
                 OnEnter(GameScene::Volcano),
                 (
@@ -33,6 +34,7 @@ impl Plugin for VnDadaPlugin {
                 (
                     spawn_enemy_dada,
                     setup_dada_animation_player,
+                    alert_dada_group_when_attacked,
                     enemy_dada_chase_player,
                     update_dada_animation,
                     update_dada_hurt_and_dead,
@@ -48,10 +50,11 @@ impl Plugin for VnDadaPlugin {
 
 const DADA_SPAWN_POSITION: Vec3 = Vec3::new(0.0, 1.0, -15.0);
 const DADA_MAX_ALIVE: usize = 3;
-const DADA_CHASE_RANGE: f32 = 10.0;
+//const DADA_CHASE_RANGE: f32 = 10.0;
 const DADA_STOP_DISTANCE: f32 = 1.0;
 const DADA_MOVE_SPEED: f32 = 3.0;
 const DADA_PATROL_RADIUS: f32 = 8.0;
+const DADA_AGGRO_DURATION: f32 = 8.0;
 
 fn spawn_enemy_dada(
     mut commands: Commands,
@@ -258,7 +261,6 @@ fn find_enemy_dada_root(
 }
 
 fn enemy_dada_chase_player(
-    mut commands: Commands,
     time: Res<Time>,
     player_query: Query<
         &Transform,
@@ -269,11 +271,9 @@ fn enemy_dada_chase_player(
     >,
     mut dada_query: Query<
         (
-            Entity,
             &mut Transform,
             &mut LinearVelocity,
             &mut EnemyState,
-            Option<&mut EnemyInvestigateDirection>,
             Option<&mut DadaPatrol>,
         ),
         (
@@ -281,21 +281,23 @@ fn enemy_dada_chase_player(
             Without<Player>,
         ),
     >,
+    mut aggro: ResMut<DadaGroupAggro>,
 ) {
+    // อัปเดตเวลา aggro ของกลุ่ม
+    aggro.tick(time.delta());
+
     let Ok(player_transform) = player_query.single() else {
         return;
     };
 
     for (
-        dada_entity,
         mut dada_transform,
         mut velocity,
         mut enemy_state,
-        investigate,
         patrol_data,
     ) in &mut dada_query
     {
-        // Hurt / Dead ยังหยุดเหมือนเดิม
+        // ถ้าเจ็บหรือตายอยู่ ยังไม่ให้เคลื่อนที่
         if matches!(*enemy_state, EnemyState::Hurt | EnemyState::Dead) {
             velocity.x = 0.0;
             velocity.z = 0.0;
@@ -306,13 +308,11 @@ fn enemy_dada_chase_player(
         let flat_direction = Vec3::new(to_player.x, 0.0, to_player.z);
         let distance = flat_direction.length();
 
-        // ==========================================
-        // 1. Player อยู่ในระยะมองเห็น (<= 10.0) -> ไล่ตามทันที
-        // ==========================================
-        if distance <= DADA_CHASE_RANGE {
-            commands.entity(dada_entity).remove::<EnemyInvestigateDirection>();
-
-            // Player อยู่ในระยะโจมตี
+        // ==========================================================
+        // ถ้า Aggro Active -> ไล่ล่าผู้เล่น
+        // ==========================================================
+        if aggro.active {
+            // ถ้าถึงระยะโจมตี -> หยุดและโจมตี
             if distance <= DADA_STOP_DISTANCE {
                 velocity.x = 0.0;
                 velocity.z = 0.0;
@@ -327,8 +327,13 @@ fn enemy_dada_chase_player(
                 continue;
             }
 
-            // ไล่ Player ตามปกติ
-            let direction = flat_direction.normalize();
+            // ถ้ายังไม่ถึงตัวผู้เล่น -> เดินไล่ตาม
+            let direction = if flat_direction.length_squared() > 0.0001 {
+                flat_direction.normalize()
+            } else {
+                Vec3::new(0.0, 0.0, 1.0)
+            };
+
             velocity.x = direction.x * DADA_MOVE_SPEED;
             velocity.z = direction.z * DADA_MOVE_SPEED;
 
@@ -339,53 +344,12 @@ fn enemy_dada_chase_player(
             continue;
         }
 
-        // ==========================================
-        // 2. Player อยู่นอกระยะ (> 10.0)
-        // ==========================================
-
-        // 2.1 โดนยิงมา (มี Investigate) -> เดินกลับไปจุดเกิด
-        if let Some(mut investigate) = investigate {
-            investigate.timer.tick(time.delta());
-
-            if investigate.timer.is_finished() {
-                let to_spawn = DADA_SPAWN_POSITION - dada_transform.translation;
-                let flat_to_spawn = Vec3::new(to_spawn.x, 0.0, to_spawn.z);
-
-                if flat_to_spawn.length() <= 0.3 {
-                    velocity.x = 0.0;
-                    velocity.z = 0.0;
-                    *enemy_state = EnemyState::Idle;
-
-                    commands
-                        .entity(dada_entity)
-                        .remove::<EnemyInvestigateDirection>();
-
-                    continue;
-                }
-
-                investigate.direction = flat_to_spawn.normalize();
-                investigate.timer = Timer::from_seconds(10.0, TimerMode::Once);
-            }
-
-            let direction = investigate.direction;
-
-            velocity.x = direction.x * DADA_MOVE_SPEED;
-            velocity.z = direction.z * DADA_MOVE_SPEED;
-
-            if direction.length_squared() > 0.0001 {
-                dada_transform.rotation =
-                    Quat::from_rotation_y(direction.x.atan2(direction.z));
-            }
-
-            *enemy_state = EnemyState::Chase;
-            continue;
-        }
-
-        // 2.2 ไม่ได้โดนยิง และ Player อยู่ไกล -> ลาดตระเวนสุ่มแบบจำกัดพื้นที่
+        // ==========================================================
+        // ถ้าไม่ Aggro -> Passive เดินลาดตระเวนเท่านั้น
+        // ==========================================================
         if let Some(mut patrol) = patrol_data {
             patrol.timer.tick(time.delta());
 
-            // ตัดแกน Y ออก ให้คิดแค่ระนาบ XZ
             let current_pos = Vec3::new(
                 dada_transform.translation.x,
                 0.0,
@@ -401,9 +365,7 @@ fn enemy_dada_chase_player(
             let from_center = current_pos - patrol_center;
             let distance_from_center = from_center.length();
 
-            // ==========================================================
-            // กรณีออกนอกพื้นที่แล้ว -> บังคับให้หันกลับเข้ากลางทันที
-            // ==========================================================
+            // ถ้าออกนอกพื้นที่ลาดตระเวน -> บังคับให้หันกลับเข้ากลาง
             if distance_from_center > patrol.radius {
                 let inward_direction = if from_center.length_squared() > 0.0001 {
                     (-from_center).normalize()
@@ -412,13 +374,9 @@ fn enemy_dada_chase_player(
                 };
 
                 patrol.direction = inward_direction;
-
-                // ถ้ากำลังออกนอกเขต อาจยังไม่จำเป็นต้องสุ่มทิศใหม่ตอนนี้
                 patrol.timer.reset();
             }
-            // ==========================================================
-            // กรณีอยู่ในพื้นที่ และครบเวลา -> สุ่มทิศใหม่
-            // ==========================================================
+            // ถ้าครบเวลา -> สุ่มทิศใหม่
             else if patrol.timer.just_finished() {
                 let random_angle = rand::random::<f32>() * std::f32::consts::TAU;
 
@@ -430,11 +388,9 @@ fn enemy_dada_chase_player(
                 .normalize();
 
                 // ถ้าอยู่ใกล้ขอบพื้นที่แล้ว อย่าให้สุ่มทิศที่หันออกนอกเขต
-                // เช่น อยู่ใกล้ขอบวงกลมแล้ว ถ้าทิศใหม่ชี้ออกนอกวงกลม ให้บังคับกลับเข้ากลาง
                 if patrol.radius > 0.0 && distance_from_center > patrol.radius * 0.75 {
                     let outward_direction = from_center.normalize();
 
-                    // dot > 0 แปลว่าทิศใหม่กำลังชี้ออกนอกศูนย์กลาง
                     if new_direction.dot(outward_direction) > 0.0 {
                         new_direction = -outward_direction;
                     }
@@ -443,7 +399,6 @@ fn enemy_dada_chase_player(
                 patrol.direction = new_direction;
             }
 
-            // ป้องกัน direction เป็น Vec3::ZERO
             let direction = if patrol.direction.length_squared() > 0.0001 {
                 patrol.direction.normalize()
             } else {
@@ -459,7 +414,10 @@ fn enemy_dada_chase_player(
             }
 
             *enemy_state = EnemyState::Patrol;
-            continue;
+        } else {
+            velocity.x = 0.0;
+            velocity.z = 0.0;
+            *enemy_state = EnemyState::Idle;
         }
     }
 }
@@ -753,16 +711,6 @@ fn despawn_dada_punch_hitbox(
     }
 }
 
-fn reset_enemy_dada_wave(
-    mut spawned_count: ResMut<DadaSpawnedCount>,
-    mut respawn_timer: ResMut<DadaRespawnTimer>,
-    mut defeated_count: ResMut<DadaDefeatedCount>,
-) {
-    spawned_count.0 = 0;
-    respawn_timer.0.reset();
-    defeated_count.0 = 0;
-}
-
 fn update_dada_hurt_and_dead(
     mut commands: Commands,
     time: Res<Time>,
@@ -833,5 +781,53 @@ fn update_dada_hurt_and_dead(
                     .remove::<EnemyStateTimer>();
             }
         }
+    }
+}
+
+fn reset_enemy_dada_wave(
+    mut spawned_count: ResMut<DadaSpawnedCount>,
+    mut respawn_timer: ResMut<DadaRespawnTimer>,
+    mut defeated_count: ResMut<DadaDefeatedCount>,
+    mut aggro: ResMut<DadaGroupAggro>,
+) {
+    spawned_count.0 = 0;
+    respawn_timer.0.reset();
+    defeated_count.0 = 0;
+
+    *aggro = DadaGroupAggro::default();
+}
+
+fn alert_dada_group_when_attacked(
+    mut commands: Commands,
+    mut aggro: ResMut<DadaGroupAggro>,
+    dada_query: Query<&EnemyState, With<EnemyDada>>,
+    investigate_query: Query<
+        Entity,
+        (
+            With<EnemyDada>,
+            With<EnemyInvestigateDirection>,
+        ),
+    >,
+) {
+    let mut provoked = false;
+
+    // กรณีระบบต่อสู้ของคุณอาจใส่ EnemyInvestigateDirection มาตอนโดนโจมตี
+    for entity in &investigate_query {
+        provoked = true;
+        commands
+            .entity(entity)
+            .remove::<EnemyInvestigateDirection>();
+    }
+
+    // กรณี Dada กำลังเจ็บหรือตาย แปลว่าถูกโจมตี
+    for state in &dada_query {
+        if matches!(state, EnemyState::Hurt | EnemyState::Dead) {
+            provoked = true;
+            break;
+        }
+    }
+
+    if provoked {
+        aggro.trigger(DADA_AGGRO_DURATION);
     }
 }
