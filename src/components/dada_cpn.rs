@@ -52,3 +52,37 @@ pub struct DadaSpawnedCount(pub u32);
 pub struct DadaDefeatedCount(pub u32);
 
 pub const DADA_DEFEAT_GOAL: u32 = 5;
+
+#[derive(Resource)]
+pub struct DadaGroupAggro {
+    pub active: bool,
+    pub timer: Timer,
+}
+
+impl Default for DadaGroupAggro {
+    fn default() -> Self {
+        Self {
+            active: false,
+            timer: Timer::from_seconds(0.0, TimerMode::Once),
+        }
+    }
+}
+
+impl DadaGroupAggro {
+    pub fn trigger(&mut self, duration: f32) {
+        self.active = true;
+        self.timer = Timer::from_seconds(duration, TimerMode::Once);
+    }
+
+    pub fn tick(&mut self, delta: std::time::Duration) {
+        if !self.active {
+            return;
+        }
+
+        self.timer.tick(delta);
+
+        if self.timer.is_finished() {
+            self.active = false;
+        }
+    }
+}
