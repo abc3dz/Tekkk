@@ -247,6 +247,7 @@ fn enemy_muanim_behavior(
             &mut EnemyState,
             Option<&mut PassivePatrol>,
             Option<&Provoked>,
+            Option<&CriticalKnockback>,    
         ),
         (
             With<EnemyMuanim>,
@@ -265,12 +266,16 @@ fn enemy_muanim_behavior(
         mut enemy_state,
         patrol_data,
         provoked,
+        critical_knockback
     ) in &mut muanim_query
     {
         // ถ้ากำลังเจ็บหรือตาย ให้หยุดก่อน
         if matches!(*enemy_state, EnemyState::Hurt | EnemyState::Dead) {
-            velocity.x = 0.0;
-            velocity.z = 0.0;
+            if critical_knockback.is_none() {
+                velocity.x = 0.0;
+                velocity.z = 0.0;
+            }
+
             continue;
         }
 
@@ -518,13 +523,13 @@ fn update_enemy_muanim_animation(
 fn update_muanim_hurt_and_dead(
     mut commands: Commands,
     time: Res<Time>,
-
     mut muanim_query: Query<
         (
             Entity,
             &mut EnemyState,
             &mut EnemyStateTimer,
             &mut LinearVelocity,
+            Option<&mut CriticalKnockback>,
         ),
         With<EnemyMuanim>,
     >,
@@ -534,25 +539,38 @@ fn update_muanim_hurt_and_dead(
         mut enemy_state,
         mut state_timer,
         mut velocity,
+        mut critical_knockback,
     ) in &mut muanim_query
     {
         state_timer.0.tick(time.delta());
 
+        let mut allow_knockback = false;
+
+        if let Some(mut knockback) = critical_knockback {
+            knockback.timer.tick(time.delta());
+
+            if knockback.timer.just_finished() {
+                commands
+                    .entity(muanim_entity)
+                    .remove::<CriticalKnockback>();
+            } else {
+                allow_knockback = true;
+            }
+        }
+
         match *enemy_state {
             EnemyState::Hurt => {
-                // Hurt ธรรมดาไม่กระเด็น
-                velocity.x = 0.0;
-                velocity.z = 0.0;
-            }
-
-            EnemyState::Dead => {
-                // ปล่อยให้กระเด็น 0.25 วินาที
-                if state_timer.0.elapsed_secs() >= 0.25 {
+                if !allow_knockback {
                     velocity.x = 0.0;
                     velocity.z = 0.0;
                 }
             }
-
+            EnemyState::Dead => {
+                if state_timer.0.elapsed_secs() >= 0.25 && !allow_knockback {
+                    velocity.x = 0.0;
+                    velocity.z = 0.0;
+                }
+            }
             _ => {}
         }
 
@@ -568,13 +586,11 @@ fn update_muanim_hurt_and_dead(
                     .entity(muanim_entity)
                     .remove::<EnemyStateTimer>();
             }
-
             EnemyState::Dead => {
                 commands
                     .entity(muanim_entity)
                     .despawn();
             }
-
             _ => {
                 commands
                     .entity(muanim_entity)

@@ -16,28 +16,38 @@ const CHOKY_CHASE_RANGE: f32 = 10.0;
 const CHOKY_STOP_DISTANCE: f32 = 1.0;
 const CHOKY_RETURN_STOP_DISTANCE: f32 = 0.25;
 const CHOKY_MOVE_SPEED: f32 = 3.0;
-
-#[derive(Component, Debug)]
-pub struct EnemyChoky;
+const CHOKY_WARP_POSITION: Vec3 = Vec3::new(17.5, 1.0, -48.0);
+const CHOKY_CRITICAL_KNOCKBACK_UP: f32 = 4.5;
 
 pub struct EnemyChokyPlugin;
 
 impl Plugin for EnemyChokyPlugin {
     fn build(&self, app: &mut App) {
         app.init_resource::<ChokyHasSpawned>()
-        .add_systems(OnEnter(GameScene::Desert),(setup_enemy_choky_animation_graph, reset_choky_spawn_once,))
-        .add_systems(Update,(
-                spawn_enemy_choky,
-                setup_enemy_choky_animation_player,
-                enemy_choky_chase_player,
-                update_enemy_choky_animation,
-                debug_enemy_choky_spawn,
-                update_choky_hurt_and_dead,
-                spawn_choky_punch_hitbox,
-                choky_punch_hit_player,
-                despawn_choky_punch_hitbox,
-            ).chain().run_if(in_state(GameScene::Desert).and(in_state(GameMode::Playing)))
-        );
+            .add_systems(
+                OnEnter(GameScene::Desert),
+                (
+                    setup_enemy_choky_animation_graph,
+                    reset_choky_spawn_once,
+                ),
+            )
+            .add_systems(
+                Update,
+                (
+                    spawn_enemy_choky,
+                    setup_enemy_choky_animation_player,
+                    enemy_choky_chase_player,
+                    update_enemy_choky_animation,
+                    debug_enemy_choky_spawn,
+                    update_choky_hurt_and_dead,
+                    spawn_choky_punch_hitbox,
+                    choky_punch_hit_player,
+                    despawn_choky_punch_hitbox,
+                    despawn_choky_temporary,
+                )
+                    .chain()
+                    .run_if(in_state(GameScene::Desert).and(in_state(GameMode::Playing))),
+            );
     }
 }
 
@@ -285,6 +295,7 @@ fn enemy_choky_chase_player(
             &mut EnemyState,
             Option<&EnemyInvestigateDirection>,
             Option<&ChokyHuntSoundPlayed>,
+            Option<&CriticalKnockback>,
         ),
         (With<EnemyChoky>, Without<Player>),
     >,
@@ -304,6 +315,7 @@ fn enemy_choky_chase_player(
         mut enemy_state,
         investigate,
         hunt_sound_played,
+        critical_knockback,
     ) in &mut choky_query
     {
         if investigate.is_some() {
@@ -313,12 +325,17 @@ fn enemy_choky_chase_player(
         }
 
         // ถ้าเจ็บหรือตายอยู่ ยังไม่ให้ไล่หรือเดินกลับ
+        // แต่ถ้ามี CriticalKnockback อยู่ ให้ปล่อยกระเด็นก่อน
         if matches!(
             *enemy_state,
             EnemyState::Hurt | EnemyState::Dead
         ) {
-            velocity.x = 0.0;
-            velocity.z = 0.0;
+            if critical_knockback.is_none() {
+                velocity.x = 0.0;
+                velocity.z = 0.0;
+                velocity.y = 0.0;
+            }
+
             continue;
         }
 
@@ -510,43 +527,193 @@ fn update_enemy_choky_animation(
     }
 }
 
+#[allow(clippy::too_many_arguments)]
 fn update_choky_hurt_and_dead(
     mut commands: Commands,
     time: Res<Time>,
+    mut meshes: ResMut<Assets<Mesh>>,
+    mut materials: ResMut<Assets<StandardMaterial>>,
     mut choky_query: Query<
         (
             Entity,
+            &mut Transform,
             &mut EnemyState,
             &mut EnemyStateTimer,
             &mut LinearVelocity,
+            Option<&ChokyDeathEffectSpawned>,
+            Option<&mut CriticalKnockback>,
         ),
         With<EnemyChoky>,
     >,
+    player_query: Query<&GlobalTransform, With<Player>>,
     warp_query: Query<(), With<WarpToFloatingIsland>>,
 ) {
     for (
         choky_entity,
+        mut choky_transform,
         mut enemy_state,
         mut state_timer,
         mut velocity,
+        death_effect_spawned,
+        mut critical_knockback,
     ) in &mut choky_query
     {
-        velocity.x = 0.0;
-        velocity.z = 0.0;
+         state_timer.0.tick(time.delta());
 
-        state_timer.0.tick(time.delta());
+        let mut allow_knockback = false;
+        let mut finished_ground_y: Option<f32> = None;
 
-        // ถ้าตายแล้ว ให้สร้างวาร์ปทันที
-        if matches!(*enemy_state, EnemyState::Dead) {
-            if warp_query.is_empty() {
-                commands.spawn((
-                    CurrentScene,
-                    WarpToFloatingIsland,
-                    Collider::cuboid(2.0, 2.0, 1.0),
-                    Transform::from_xyz(17.5, 1.0, -48.0),
-                    DespawnOnExit(GameScene::Desert),
-                ));
+        if let Some(mut kb) = critical_knockback {
+            kb.timer.tick(time.delta());
+
+            if kb.timer.just_finished() {
+                finished_ground_y = Some(kb.ground_y);
+
+                commands
+                    .entity(choky_entity)
+                    .remove::<CriticalKnockback>();
+            } else {
+                allow_knockback = true;
+
+                let elapsed = kb.timer.elapsed_secs();
+                let duration = kb.timer.duration().as_secs_f32();
+                let half_duration = duration * 0.5;
+
+                // ครึ่งแรกให้ลอยขึ้น ครึ่งหลังให้ตกลง
+                if elapsed < half_duration {
+                    velocity.y = CHOKY_CRITICAL_KNOCKBACK_UP;
+                } else {
+                    velocity.y = -CHOKY_CRITICAL_KNOCKBACK_UP;
+                }
+
+                // ถ้าลงมาถึงพื้นเดิมแล้ว ให้หยุดที่พื้นเดิม
+                if choky_transform.translation.y <= kb.ground_y {
+                    choky_transform.translation.y = kb.ground_y;
+                    velocity.y = 0.0;
+                }
             }
+        }
+
+        // ถ้าไม่ได้กระเด็นคริติคอล ให้หยุดนิ่ง
+        if !allow_knockback {
+            velocity.x = 0.0;
+            velocity.z = 0.0;
+            velocity.y = 0.0;
+
+            if let Some(ground_y) = finished_ground_y {
+                choky_transform.translation.y = ground_y;
+            }
+        }
+
+
+        // เมื่อ Choky ตาย ให้สร้าง effect ก่อน แล้วค่อยสร้างวาร์ป
+        if matches!(*enemy_state, EnemyState::Dead)
+            && death_effect_spawned.is_none()
+            && warp_query.is_empty()
+        {
+            // ป้องกันไม่ให้สร้างซ้ำ
+            commands
+                .entity(choky_entity)
+                .insert(ChokyDeathEffectSpawned);
+
+            // ---------------------------------------------------------
+            // 1) Cylinder mesh สีจาง ๆ ก่อนสร้างวาร์ป
+            // ---------------------------------------------------------
+            let cylinder_material = materials.add(StandardMaterial {
+                base_color: Color::srgba(0.65, 0.9, 1.0, 0.22),
+                alpha_mode: AlphaMode::Blend,
+                unlit: true,
+                ..default()
+            });
+
+            commands.spawn((
+                Name::new("Choky Warp Cylinder"),
+                Mesh3d(meshes.add(Cylinder::new(2.0, 0.05))),
+                MeshMaterial3d::<StandardMaterial>(cylinder_material),
+                Transform::from_xyz(
+                    CHOKY_WARP_POSITION.x,
+                    0.05,
+                    CHOKY_WARP_POSITION.z,
+                ),
+                DespawnOnExit(GameScene::Desert),
+            ));
+
+            // ---------------------------------------------------------
+            // 2) ลูกศรจากผู้เล่น ชี้ไปที่แท่นวาร์ป
+            // ---------------------------------------------------------
+            if let Some(player_transform) = player_query.iter().next() {
+                // จุดเริ่มของลูกศร: เหนือหัวผู้เล่นเล็กน้อย
+                let start = player_transform.translation() + Vec3::Y * 2.2;
+
+                // เป้าหมายคือแท่นวาร์ป
+                let target = CHOKY_WARP_POSITION;
+
+                let mut direction = target - start;
+
+                if direction.length_squared() > 0.0001 {
+                    direction = direction.normalize();
+
+                    // ลูกศรถูกสร้างให้ชี้ตามแกน +Y
+                    // จึงหมุนจาก Vec3::Y ไปยังทิศทางเป้าหมาย
+                    let rotation = if direction.dot(Vec3::Y) < -0.9999 {
+                        Quat::from_rotation_x(std::f32::consts::PI)
+                    } else {
+                        Quat::from_rotation_arc(Vec3::Y, direction)
+                    };
+
+                    let arrow_material = materials.add(StandardMaterial {
+                        base_color: Color::srgba(1.0, 0.0, 0.0, 0.95),
+                        alpha_mode: AlphaMode::Blend,
+                        unlit: true,
+                        ..default()
+                    });
+
+                    // ท่อยาว 1.5 เมตร => half_height = 0.75
+                    let shaft_mesh = meshes.add(Cylinder::new(0.05, 0.75));
+
+                    // หัวลูกศร ใช้ Cone แทนรูปทรงสามเหลี่ยม/หัวศร
+                    let head_mesh = meshes.add(Cone::new(0.18, 0.35));
+
+                    commands
+                        .spawn((
+                            Name::new("Choky Warp Arrow"),
+                            ChokyTemporaryLifetime(Timer::from_seconds(
+                                5.0,
+                                TimerMode::Once,
+                            )),
+                            DespawnOnExit(GameScene::Desert),
+                            Transform::from_translation(start).with_rotation(rotation),
+                        ))
+                        .with_children(|parent| {
+                            // ตัวท่อ
+                            parent.spawn((
+                                Name::new("Arrow Shaft"),
+                                Mesh3d(shaft_mesh),
+                                MeshMaterial3d::<StandardMaterial>(arrow_material.clone()),
+                                Transform::from_xyz(0.0, 0.75, 0.0),
+                            ));
+
+                            // หัวลูกศร
+                            parent.spawn((
+                                Name::new("Arrow Head"),
+                                Mesh3d(head_mesh),
+                                MeshMaterial3d::<StandardMaterial>(arrow_material),
+                                Transform::from_xyz(0.0, 1.5 + 0.175, 0.0),
+                            ));
+                        });
+                }
+            }
+
+            // ---------------------------------------------------------
+            // สร้างวาร์ป หลังสั่งสร้าง cylinder และลูกศร
+            // ---------------------------------------------------------
+            commands.spawn((
+                CurrentScene,
+                WarpToFloatingIsland,
+                Collider::cuboid(2.0, 2.0, 1.0),
+                Transform::from_translation(CHOKY_WARP_POSITION),
+                DespawnOnExit(GameScene::Desert),
+            ));
         }
 
         if !state_timer.0.is_finished() {
@@ -560,16 +727,28 @@ fn update_choky_hurt_and_dead(
                     .entity(choky_entity)
                     .remove::<EnemyStateTimer>();
             }
-
             EnemyState::Dead => {
                 commands.entity(choky_entity).despawn();
             }
-
             _ => {
                 commands
                     .entity(choky_entity)
                     .remove::<EnemyStateTimer>();
             }
+        }
+    }
+}
+
+fn despawn_choky_temporary(
+    mut commands: Commands,
+    time: Res<Time>,
+    mut query: Query<(Entity, &mut ChokyTemporaryLifetime)>,
+) {
+    for (entity, mut lifetime) in &mut query {
+        lifetime.0.tick(time.delta());
+
+        if lifetime.0.just_finished() {
+            commands.entity(entity).despawn();
         }
     }
 }

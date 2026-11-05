@@ -272,7 +272,8 @@ fn enemy_muamua_chase_player(
             &mut LinearVelocity,
             &mut EnemyState,
             Option<&mut EnemyInvestigateDirection>,
-            Option<&mut MuamuaPatrol>, // <-- ต้องมีบรรทัดนี้ใน Query
+            Option<&mut MuamuaPatrol>,
+            Option<&CriticalKnockback>,
         ),
         (
             With<EnemyMuamua>,
@@ -290,13 +291,17 @@ fn enemy_muamua_chase_player(
         mut velocity,
         mut enemy_state,
         investigate,
-        patrol_data, // <-- ตัวแปรรับค่า MuamuaPatrol
+        patrol_data,
+        critical_knockback
     ) in &mut muamua_query
     {
         // Hurt / Dead ยังหยุดเหมือนเดิม
         if matches!(*enemy_state, EnemyState::Hurt | EnemyState::Dead) {
-            velocity.x = 0.0;
-            velocity.z = 0.0;
+            if critical_knockback.is_none() {
+                velocity.x = 0.0;
+                velocity.z = 0.0;
+            }
+
             continue;
         }
 
@@ -745,6 +750,7 @@ fn update_muamua_hurt_and_dead(
             &mut EnemyState,
             &mut EnemyStateTimer,
             &mut LinearVelocity,
+            Option<&mut CriticalKnockback>,
         ),
         With<EnemyMuamua>,
     >,
@@ -755,18 +761,34 @@ fn update_muamua_hurt_and_dead(
         mut enemy_state,
         mut state_timer,
         mut velocity,
+        mut critical_knockback,
     ) in &mut muamua_query
     {
         state_timer.0.tick(time.delta());
 
+        let mut allow_knockback = false;
+
+        if let Some(mut kb) = critical_knockback {
+            kb.timer.tick(time.delta());
+
+            if kb.timer.just_finished() {
+                commands
+                    .entity(muamua_entity)
+                    .remove::<CriticalKnockback>();
+            } else {
+                allow_knockback = true;
+            }
+        }
+
         match *enemy_state {
             EnemyState::Hurt => {
-                velocity.x = 0.0;
-                velocity.z = 0.0;
+                if !allow_knockback {
+                    velocity.x = 0.0;
+                    velocity.z = 0.0;
+                }
             }
             EnemyState::Dead => {
-                // ปล่อยให้กระเด็นนิดนึงก่อน
-                if state_timer.0.elapsed_secs() >= 0.25 {
+                if state_timer.0.elapsed_secs() >= 0.25 && !allow_knockback {
                     velocity.x = 0.0;
                     velocity.z = 0.0;
                 }
@@ -781,13 +803,12 @@ fn update_muamua_hurt_and_dead(
         match *enemy_state {
             EnemyState::Hurt => {
                 *enemy_state = EnemyState::Idle;
+
                 commands
                     .entity(muamua_entity)
                     .remove::<EnemyStateTimer>();
             }
-
             EnemyState::Dead => {
-                // นับว่า Muamua ถูก defeat 1 ตัว
                 defeated_count.0 += 1;
 
                 info!(
@@ -800,7 +821,6 @@ fn update_muamua_hurt_and_dead(
                     .entity(muamua_entity)
                     .despawn();
             }
-
             _ => {
                 commands
                     .entity(muamua_entity)

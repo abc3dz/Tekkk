@@ -53,3 +53,9 @@ pub struct PassivePatrol {
 
 #[derive(Component)]
 pub struct Provoked;
+
+#[derive(Component)]
+pub struct CriticalKnockback {
+    pub timer: Timer,
+    pub ground_y: f32,
+}

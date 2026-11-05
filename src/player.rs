@@ -1676,6 +1676,13 @@ fn spawn_player_slap_hitbox(
     }
 }
 
+const SLAP_CRIT_KNOCKBACK_SPEED: f32 = 8.0;
+const SLAP_CRIT_KNOCKBACK_UP: f32 = 4.5;
+const SLAP_CRIT_KNOCKBACK_DURATION: f32 = 0.25;
+
+const SLAP_CRIT_DEATH_KNOCKBACK_SPEED: f32 = 9.0;
+const SLAP_CRIT_DEATH_KNOCKBACK_UP: f32 = 5.0;
+
 fn player_slap_hit_enemy(
     mut commands: Commands,
     time: Res<Time>,
@@ -1831,9 +1838,9 @@ fn player_slap_hit_enemy(
         // ยังไม่ตาย → เล่น Hurt
         // ==============================
         if target_health.current > 0 {
-            if let Some(state) = enemy_state.as_mut(){
+            if let Some(state) = enemy_state.as_mut() {
                 **state = EnemyState::Hurt;
-                
+
                 commands
                     .entity(target_entity)
                     .insert(
@@ -1844,6 +1851,36 @@ fn player_slap_hit_enemy(
                             ),
                         ),
                     );
+
+                // ==============================
+                // ถ้าติด Critical → กระเด็นถอยหลัง + ลอยขึ้น
+                // ==============================
+                if is_critical {
+                    let player_position = player_transform.translation();
+
+                    let knockback_direction = Vec3::new(
+                        target_position.x - player_position.x,
+                        0.0,
+                        target_position.z - player_position.z,
+                    )
+                    .normalize_or_zero();
+
+                    if let Some(velocity) = target_velocity.as_mut() {
+                        velocity.x = knockback_direction.x * SLAP_CRIT_KNOCKBACK_SPEED;
+                        velocity.z = knockback_direction.z * SLAP_CRIT_KNOCKBACK_SPEED;
+                        velocity.y = SLAP_CRIT_KNOCKBACK_UP;
+                    }
+
+                    commands
+                        .entity(target_entity)
+                        .insert(CriticalKnockback {
+                            timer: Timer::from_seconds(
+                                SLAP_CRIT_KNOCKBACK_DURATION,
+                                TimerMode::Once,
+                            ),
+                            ground_y: target_position.y,
+                        });
+                }
             }
 
             commands
@@ -1882,22 +1919,32 @@ fn player_slap_hit_enemy(
             )
             .normalize_or_zero();
 
-            // 2 m/s × 0.25 sec ≈ 0.5 เมตร
             if let Some(velocity) = target_velocity.as_mut() {
-                velocity.x = knockback_direction.x * 6.0;
-                velocity.z = knockback_direction.z * 6.0;
+                let death_knockback_speed = if is_critical {
+                    SLAP_CRIT_DEATH_KNOCKBACK_SPEED
+                } else {
+                    6.0
+                };
+
+                velocity.x = knockback_direction.x * death_knockback_speed;
+                velocity.z = knockback_direction.z * death_knockback_speed;
+
+                if is_critical {
+                    velocity.y = SLAP_CRIT_DEATH_KNOCKBACK_UP;
+                }
             }
-            
-            commands
-                .entity(target_entity)
-                .insert(
-                    EnemyStateTimer(
-                        Timer::from_seconds(
-                            1.20,
+
+            if is_critical {
+                commands
+                    .entity(target_entity)
+                    .insert(CriticalKnockback {
+                        timer: Timer::from_seconds(
+                            SLAP_CRIT_KNOCKBACK_DURATION,
                             TimerMode::Once,
                         ),
-                    ),
-                );
+                        ground_y: target_position.y,
+                    });
+            }
 
             // ป้องกัน Player ตบซ้ำระหว่างเล่น Dead
             commands

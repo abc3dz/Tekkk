@@ -39,3 +39,12 @@ pub struct ChokyHasSpawned(pub bool);
 
 #[derive(Component)]
 pub struct ChokyHuntSoundPlayed;
+
+#[derive(Component)]
+pub struct ChokyDeathEffectSpawned;
+
+#[derive(Component)]
+pub struct ChokyTemporaryLifetime(pub Timer);
+
+#[derive(Component, Debug)]
+pub struct EnemyChoky;
