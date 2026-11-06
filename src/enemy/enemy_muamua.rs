@@ -748,7 +748,7 @@ fn update_muamua_hurt_and_dead(
         (
             Entity,
             &mut EnemyState,
-            &mut EnemyStateTimer,
+            Option<&mut EnemyStateTimer>,
             &mut LinearVelocity,
             Option<&mut CriticalKnockback>,
         ),
@@ -759,11 +759,27 @@ fn update_muamua_hurt_and_dead(
     for (
         muamua_entity,
         mut enemy_state,
-        mut state_timer,
+        state_timer,
         mut velocity,
         mut critical_knockback,
     ) in &mut muamua_query
     {
+        // ถ้ากำลัง Hurt/Dead แต่ไม่มี timer ให้สร้าง timer ใหม่
+        let Some(mut state_timer) = state_timer else {
+            if matches!(*enemy_state, EnemyState::Hurt | EnemyState::Dead) {
+                let duration = if matches!(*enemy_state, EnemyState::Dead) {
+                    1.0
+                } else {
+                    0.25
+                };
+
+                commands.entity(muamua_entity).insert(
+                    EnemyStateTimer(Timer::from_seconds(duration, TimerMode::Once)),
+                );
+            }
+            continue;
+        };
+
         state_timer.0.tick(time.delta());
 
         let mut allow_knockback = false;
@@ -817,9 +833,7 @@ fn update_muamua_hurt_and_dead(
                     MUAMUA_DEFEAT_GOAL
                 );
 
-                commands
-                    .entity(muamua_entity)
-                    .despawn();
+                commands.entity(muamua_entity).despawn();
             }
             _ => {
                 commands
