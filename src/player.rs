@@ -2211,41 +2211,47 @@ fn update_player_energy_ball(
         }
     }
 }
+const ENERGY_KNOCKBACK_SPEED: f32 = 6.0;
+const ENERGY_CRIT_KNOCKBACK_SPEED: f32 = 8.0;
+const ENERGY_CRIT_KNOCKBACK_UP: f32 = 4.5;
+const ENERGY_CRIT_DEATH_KNOCKBACK_SPEED: f32 = 9.0;
+const ENERGY_CRIT_DEATH_KNOCKBACK_UP: f32 = 5.0;
 fn player_energy_hit_enemy(
     mut commands: Commands,
-    time: Res<Time>,
-    mut meshes: ResMut<Assets<Mesh>>,
-    mut materials: ResMut<Assets<StandardMaterial>>,
-    mut collision_reader: MessageReader<CollisionStart>,
-    mut energy_query: Query<&mut PlayerEnergyBall>,
-    mut player_query: Query<
-        (
-            &CombatStats,
-            &AtkAndDefElement,
-            &mut ElementMastery,
-        ),
-        (
-            With<Player>,
-            Without<CombatTarget>,
-        ),
-    >,
-    mut target_query: Query<
-        (
-            &mut Health,
-            &CombatStats,
-            &AtkAndDefElement,
-            &GlobalTransform,
-            Option<&ElementExpReward>,
-            Option<&mut EnemyState>,
-        ),
-        (
-            With<CombatTarget>,
-            Without<Player>,
-        ),
-    >,
-    camera_query: Query<Entity, With<MainCamera>>,
-    element_drop_assets: Res<ElementDropAssets>,
-    asset_server: Res<AssetServer>
+    time: Res <Time >,
+    mut meshes: ResMut <Assets <Mesh > >,
+    mut materials: ResMut <Assets <StandardMaterial > >,
+    mut collision_reader: MessageReader <CollisionStart >,
+    mut energy_query: Query < &mut PlayerEnergyBall >,
+    mut player_query: Query <
+    (
+     &CombatStats,
+     &AtkAndDefElement,
+     &mut ElementMastery,
+    ),
+    (
+    With <Player >,
+    Without <CombatTarget >,
+    ),
+     >,
+    mut target_query: Query <
+    (
+     &mut Health,
+     &CombatStats,
+     &AtkAndDefElement,
+     &GlobalTransform,
+    Option < &ElementExpReward >,
+    Option < &mut EnemyState >,
+    Option < &mut LinearVelocity >,       // ← เพิ่ม
+    ),
+    (
+    With <CombatTarget >,
+    Without <Player >,
+    ),
+     >,
+    camera_query: Query <Entity, With <MainCamera > >,
+    element_drop_assets: Res <ElementDropAssets >,
+    asset_server: Res <AssetServer >
 ) {
     let Ok((
         player_stats,
@@ -2255,11 +2261,9 @@ fn player_energy_hit_enemy(
     else {
         return;
     };
-
     let mut rng = rand::rng();
 
     for event in collision_reader.read() {
-        // ตรวจว่าฝั่งไหนเป็นลูกพลัง
         let (
             energy_entity,
             target_entity,
@@ -2268,7 +2272,6 @@ fn player_energy_hit_enemy(
         ) {
             (
                 event.collider1,
-
                 event.body2
                     .unwrap_or(event.collider2),
             )
@@ -2277,12 +2280,10 @@ fn player_energy_hit_enemy(
         ) {
             (
                 event.collider2,
-
                 event.body1
                     .unwrap_or(event.collider1),
             )
         } else {
-            // Collision นี้ไม่เกี่ยวกับลูกพลัง
             continue;
         };
 
@@ -2292,16 +2293,17 @@ fn player_energy_hit_enemy(
             continue;
         };
 
-        // ลูกพลังนี้ทำดาเมจไปแล้ว
         if energy.has_hit {
             continue;
         }
+
         let investigate_direction = Vec3::new(
             -energy.direction.x,
             0.0,
             -energy.direction.z,
         )
         .normalize_or_zero();
+
         let Ok((
             mut target_health,
             target_stats,
@@ -2309,6 +2311,7 @@ fn player_energy_hit_enemy(
             target_transform,
             reward,
             mut enemy_state,
+            mut target_velocity,            // ← เพิ่ม
         )) = target_query.get_mut(target_entity)
         else {
             continue;
@@ -2318,43 +2321,65 @@ fn player_energy_hit_enemy(
             commands
                 .entity(energy_entity)
                 .despawn();
-
             continue;
         }
 
         energy.has_hit = true;
 
-        // คำนวณดาเมจพื้นฐานและ Critical
-        let (base_damage,is_critical) = calculate_combat_damage(player_stats,target_stats,&mut rng);
+        let (base_damage, is_critical) =
+            calculate_combat_damage(
+                player_stats,
+                target_stats,
+                &mut rng,
+            );
 
-        // คำนวณตัวคูณธาตุ
-        let element_multiplier = elemental_multiplier(player_element.0,target_element.0);
+        let element_multiplier =
+            elemental_multiplier(
+                player_element.0,
+                target_element.0,
+            );
 
-        let damage = (base_damage as f32 * element_multiplier).round().max(1.0) as i32;
-        let target_position = target_transform.translation();
+        let damage = (base_damage as f32
+            * element_multiplier)
+            .round()
+            .max(1.0) as i32;
+
+        let target_position =
+            target_transform.translation();
+
         if is_critical {
-            commands.spawn((AudioPlayer::new(asset_server.load("sounds/moya_power_detection.ogg")), PlaybackSettings::DESPAWN));
-            if let Ok(camera_entity) = camera_query.single() {
-                commands.entity(camera_entity).insert(CameraShake::new(0.15, 0.08));
+            commands.spawn((
+                AudioPlayer::new(
+                    asset_server.load(
+                        "sounds/moya_power_detection.ogg",
+                    ),
+                ),
+                PlaybackSettings::DESPAWN,
+            ));
+            if let Ok(camera_entity) =
+                camera_query.single()
+            {
+                commands
+                    .entity(camera_entity)
+                    .insert(CameraShake::new(
+                        0.15, 0.08,
+                    ));
             }
-            
-            // === เพิ่มบรรทัดนี้เพื่อ Spawn Particle ===
             spawn_critical_hit_particle(
                 &mut commands,
                 &mut meshes,
                 &mut materials,
-                target_position + Vec3::new(0.0, 1.0, 0.0),
+                target_position
+                    + Vec3::new(0.0, 1.0, 0.0),
             );
         }
-        target_health.current -= damage;
 
+        target_health.current -= damage;
         target_health.current =
             target_health.current.clamp(
                 0,
                 target_health.max,
             );
-
-        
 
         let damage_kind =
             if is_critical {
@@ -2378,20 +2403,18 @@ fn player_energy_hit_enemy(
             target_health.max,
         );
 
-        // ลูกพลังโดนเป้าหมายแล้วให้หาย
         commands
             .entity(energy_entity)
             .despawn();
 
         // ==============================
-        // ศัตรูยังไม่ตาย
+        // ศัตรูยังไม่ตาย → Hurt + Knockback
         // ==============================
         if target_health.current > 0 {
             if let Some(state) =
                 enemy_state.as_mut()
             {
                 **state = EnemyState::Hurt;
-
                 commands
                     .entity(target_entity)
                     .insert((
@@ -2401,25 +2424,59 @@ fn player_energy_hit_enemy(
                                 TimerMode::Once,
                             ),
                         ),
-
-                        // จำว่าลูกพลังยิงมาจากทางไหน
                         EnemyInvestigateDirection {
-                            direction: investigate_direction,
-
-                            // เดินหาต้นทางได้นาน 3 วินาที
+                            direction:
+                                investigate_direction,
                             timer: Timer::from_seconds(
                                 3.0,
                                 TimerMode::Once,
                             ),
                         },
                     ));
-            }
 
+                // ★ Knockback ตามทิศลูกพลัง
+                if let Some(velocity) =
+                    target_velocity.as_mut()
+                {
+                    let knockback_speed =
+                        if is_critical {
+                            ENERGY_CRIT_KNOCKBACK_SPEED
+                        } else {
+                            ENERGY_KNOCKBACK_SPEED
+                        };
+
+                    velocity.x =
+                        energy.direction.x
+                            * knockback_speed;
+                    velocity.z =
+                        energy.direction.z
+                            * knockback_speed;
+
+                    if is_critical {
+                        velocity.y =
+                            ENERGY_CRIT_KNOCKBACK_UP;
+                    }
+                }
+
+                // ★ Critical → เพิ่ม CriticalKnockback
+                if is_critical {
+                    commands
+                        .entity(target_entity)
+                        .insert(CriticalKnockback {
+                            timer: Timer::from_seconds(
+                                SLAP_CRIT_KNOCKBACK_DURATION,
+                                TimerMode::Once,
+                            ),
+                            ground_y:
+                                target_position.y,
+                        });
+                }
+            }
             continue;
         }
 
         // ==============================
-        // ศัตรูตาย แจก EXP
+        // ศัตรูตาย → แจก EXP + Dead + Knockback
         // ==============================
         if let Some(reward) = reward {
             spawn_element_reward_drops(
@@ -2440,14 +2497,10 @@ fn player_energy_hit_enemy(
             time.elapsed_secs(),
         );
 
-        // ==============================
-        // Muamua มี EnemyState
-        // ==============================
         if let Some(state) =
             enemy_state.as_mut()
         {
             **state = EnemyState::Dead;
-
             commands
                 .entity(target_entity)
                 .insert(
@@ -2460,12 +2513,48 @@ fn player_energy_hit_enemy(
                 )
                 .remove::<CombatTarget>();
 
+            // ★ Knockback ตอนตาย
+            if let Some(velocity) =
+                target_velocity.as_mut()
+            {
+                let death_knockback_speed =
+                    if is_critical {
+                        ENERGY_CRIT_DEATH_KNOCKBACK_SPEED
+                    } else {
+                        ENERGY_KNOCKBACK_SPEED
+                    };
+
+                velocity.x =
+                    energy.direction.x
+                        * death_knockback_speed;
+                velocity.z =
+                    energy.direction.z
+                        * death_knockback_speed;
+
+                if is_critical {
+                    velocity.y =
+                        ENERGY_CRIT_DEATH_KNOCKBACK_UP;
+                }
+            }
+
+            // ★ Critical → เพิ่ม CriticalKnockback
+            if is_critical {
+                commands
+                    .entity(target_entity)
+                    .insert(CriticalKnockback {
+                        timer: Timer::from_seconds(
+                            SLAP_CRIT_KNOCKBACK_DURATION,
+                            TimerMode::Once,
+                        ),
+                        ground_y:
+                            target_position.y,
+                    });
+            }
+
             continue;
         }
 
-        // ==============================
         // Practice enemy ไม่มี EnemyState
-        // ==============================
         commands
             .entity(target_entity)
             .despawn();
