@@ -258,6 +258,7 @@ fn enemy_frogzy_behavior(
             &mut EnemyState,
             Option<&mut PassivePatrol>,
             Option<&Provoked>,
+            Option<&CriticalKnockback>, // ← เพิ่ม
         ),
         (
             With<EnemyFrogzy>,
@@ -276,12 +277,15 @@ fn enemy_frogzy_behavior(
         mut enemy_state,
         patrol_data,
         provoked,
+        critical_knockback, // ← เพิ่ม
     ) in &mut frogzy_query
     {
-        // ถ้ากำลังเจ็บหรือตาย ให้หยุดก่อน
+        // ถ้ากำลังเจ็บหรือตาย ให้หยุดก่อน (ยกเว้นกำลังถูกกระเด็นจากคริติคอล)
         if matches!(*enemy_state, EnemyState::Hurt | EnemyState::Dead) {
-            velocity.x = 0.0;
-            velocity.z = 0.0;
+            if critical_knockback.is_none() { // ← เพิ่มเงื่อนไข
+                velocity.x = 0.0;
+                velocity.z = 0.0;
+            }
             continue;
         }
 
@@ -531,8 +535,9 @@ fn update_frogzy_hurt_and_dead(
         (
             Entity,
             &mut EnemyState,
-            &mut EnemyStateTimer,
+            Option<&mut EnemyStateTimer>,       // ← เปลี่ยนเป็น Option
             &mut LinearVelocity,
+            Option<&mut CriticalKnockback>,     // ← เพิ่ม
         ),
         With<EnemyFrogzy>,
     >,
@@ -540,21 +545,49 @@ fn update_frogzy_hurt_and_dead(
     for (
         frogzy_entity,
         mut enemy_state,
-        mut state_timer,
+        state_timer,
         mut velocity,
+        mut critical_knockback,
     ) in &mut frogzy_query
     {
+        // ถ้ากำลัง Hurt/Dead แต่ไม่มี timer ให้สร้าง timer ใหม่
+        let Some(mut state_timer) = state_timer else {
+            if matches!(*enemy_state, EnemyState::Hurt | EnemyState::Dead) {
+                let duration = if matches!(*enemy_state, EnemyState::Dead) {
+                    1.0
+                } else {
+                    0.25
+                };
+                commands.entity(frogzy_entity).insert(
+                    EnemyStateTimer(Timer::from_seconds(duration, TimerMode::Once)),
+                );
+            }
+            continue;
+        };
+
         state_timer.0.tick(time.delta());
+
+        let mut allow_knockback = false;
+        if let Some(mut knockback) = critical_knockback {
+            knockback.timer.tick(time.delta());
+            if knockback.timer.just_finished() {
+                commands
+                    .entity(frogzy_entity)
+                    .remove::<CriticalKnockback>();
+            } else {
+                allow_knockback = true;
+            }
+        }
 
         match *enemy_state {
             EnemyState::Hurt => {
-                // Hurt ธรรมดาไม่กระเด็น
-                velocity.x = 0.0;
-                velocity.z = 0.0;
+                if !allow_knockback {
+                    velocity.x = 0.0;
+                    velocity.z = 0.0;
+                }
             }
             EnemyState::Dead => {
-                // ปล่อยให้กระเด็น 0.25 วินาที
-                if state_timer.0.elapsed_secs() >= 0.25 {
+                if state_timer.0.elapsed_secs() >= 0.25 && !allow_knockback {
                     velocity.x = 0.0;
                     velocity.z = 0.0;
                 }
@@ -574,14 +607,10 @@ fn update_frogzy_hurt_and_dead(
                     .remove::<EnemyStateTimer>();
             }
             EnemyState::Dead => {
-                commands
-                    .entity(frogzy_entity)
-                    .despawn();
+                commands.entity(frogzy_entity).despawn();
             }
             _ => {
-                commands
-                    .entity(frogzy_entity)
-                    .remove::<EnemyStateTimer>();
+                commands.entity(frogzy_entity).remove::<EnemyStateTimer>();
             }
         }
     }

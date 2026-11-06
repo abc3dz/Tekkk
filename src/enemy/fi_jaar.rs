@@ -46,7 +46,8 @@ impl Plugin for FiJaarPlugin {
     }
 }
 
-const JAAR_SPAWN_POSITION: Vec3 = Vec3::new(7.62,21.68, -8.23);
+//const JAAR_SPAWN_POSITION: Vec3 = Vec3::new(7.62,21.68, -8.23);
+const JAAR_SPAWN_POSITION: Vec3 = Vec3::new(0.0,0.0,0.0);
 const JAAR_STOP_DISTANCE: f32 = 1.0;
 const JAAR_MOVE_SPEED: f32 = 3.0;
 const JAAR_LOSE_INTEREST_DISTANCE: f32 = 10.0;
@@ -242,6 +243,7 @@ fn enemy_jaar_behavior(
             &mut EnemyState,
             Option<&mut PassivePatrol>,
             Option<&Provoked>,
+            Option<&CriticalKnockback>, // ← เพิ่ม
         ),
         (
             With<EnemyJaar>,
@@ -260,11 +262,15 @@ fn enemy_jaar_behavior(
         mut enemy_state,
         patrol_data,
         provoked,
+        critical_knockback, // ← เพิ่ม
     ) in &mut jaar_query
     {
+        // ถ้ากำลัง Hurt/Dead ให้หยุดก่อน (ยกเว้นกำลังถูกกระเด็นจากคริติคอล)
         if matches!(*enemy_state, EnemyState::Hurt | EnemyState::Dead) {
-            velocity.x = 0.0;
-            velocity.z = 0.0;
+            if critical_knockback.is_none() { // ← เพิ่มเงื่อนไข
+                velocity.x = 0.0;
+                velocity.z = 0.0;
+            }
             continue;
         }
 
@@ -475,8 +481,9 @@ fn update_jaar_hurt_and_dead(
         (
             Entity,
             &mut EnemyState,
-            &mut EnemyStateTimer,
+            Option<&mut EnemyStateTimer>,       // ← เปลี่ยนเป็น Option
             &mut LinearVelocity,
+            Option<&mut CriticalKnockback>,     // ← เพิ่ม
         ),
         With<EnemyJaar>,
     >,
@@ -484,19 +491,49 @@ fn update_jaar_hurt_and_dead(
     for (
         jaar_entity,
         mut enemy_state,
-        mut state_timer,
+        state_timer,
         mut velocity,
+        mut critical_knockback,
     ) in &mut jaar_query
     {
+        // ถ้ากำลัง Hurt/Dead แต่ไม่มี timer ให้สร้าง timer ใหม่
+        let Some(mut state_timer) = state_timer else {
+            if matches!(*enemy_state, EnemyState::Hurt | EnemyState::Dead) {
+                let duration = if matches!(*enemy_state, EnemyState::Dead) {
+                    1.0
+                } else {
+                    0.25
+                };
+                commands.entity(jaar_entity).insert(
+                    EnemyStateTimer(Timer::from_seconds(duration, TimerMode::Once)),
+                );
+            }
+            continue;
+        };
+
         state_timer.0.tick(time.delta());
+
+        let mut allow_knockback = false;
+        if let Some(mut knockback) = critical_knockback {
+            knockback.timer.tick(time.delta());
+            if knockback.timer.just_finished() {
+                commands
+                    .entity(jaar_entity)
+                    .remove::<CriticalKnockback>();
+            } else {
+                allow_knockback = true;
+            }
+        }
 
         match *enemy_state {
             EnemyState::Hurt => {
-                velocity.x = 0.0;
-                velocity.z = 0.0;
+                if !allow_knockback {
+                    velocity.x = 0.0;
+                    velocity.z = 0.0;
+                }
             }
             EnemyState::Dead => {
-                if state_timer.0.elapsed_secs() >= 0.25 {
+                if state_timer.0.elapsed_secs() >= 0.25 && !allow_knockback {
                     velocity.x = 0.0;
                     velocity.z = 0.0;
                 }
@@ -511,7 +548,9 @@ fn update_jaar_hurt_and_dead(
         match *enemy_state {
             EnemyState::Hurt => {
                 *enemy_state = EnemyState::Idle;
-                commands.entity(jaar_entity).remove::<EnemyStateTimer>();
+                commands
+                    .entity(jaar_entity)
+                    .remove::<EnemyStateTimer>();
             }
             EnemyState::Dead => {
                 commands.entity(jaar_entity).despawn();

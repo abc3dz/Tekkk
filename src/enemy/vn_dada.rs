@@ -275,6 +275,7 @@ fn enemy_dada_chase_player(
             &mut LinearVelocity,
             &mut EnemyState,
             Option<&mut DadaPatrol>,
+            Option<&CriticalKnockback>, // ← เพิ่ม
         ),
         (
             With<EnemyDada>,
@@ -295,12 +296,15 @@ fn enemy_dada_chase_player(
         mut velocity,
         mut enemy_state,
         patrol_data,
+        critical_knockback, // ← เพิ่ม
     ) in &mut dada_query
     {
-        // ถ้าเจ็บหรือตายอยู่ ยังไม่ให้เคลื่อนที่
+        // ถ้าเจ็บหรือตายอยู่ ยังไม่ให้เคลื่อนที่ (ยกเว้นกำลังถูกกระเด็นจากคริติคอล)
         if matches!(*enemy_state, EnemyState::Hurt | EnemyState::Dead) {
-            velocity.x = 0.0;
-            velocity.z = 0.0;
+            if critical_knockback.is_none() { // ← เพิ่มเงื่อนไข
+                velocity.x = 0.0;
+                velocity.z = 0.0;
+            }
             continue;
         }
 
@@ -718,8 +722,9 @@ fn update_dada_hurt_and_dead(
         (
             Entity,
             &mut EnemyState,
-            &mut EnemyStateTimer,
+            Option<&mut EnemyStateTimer>,       // ← เปลี่ยนเป็น Option
             &mut LinearVelocity,
+            Option<&mut CriticalKnockback>,     // ← เพิ่ม
         ),
         With<EnemyDada>,
     >,
@@ -728,20 +733,49 @@ fn update_dada_hurt_and_dead(
     for (
         dada_entity,
         mut enemy_state,
-        mut state_timer,
+        state_timer,
         mut velocity,
+        mut critical_knockback,
     ) in &mut dada_query
     {
+        // ถ้ากำลัง Hurt/Dead แต่ไม่มี timer ให้สร้าง timer ใหม่
+        let Some(mut state_timer) = state_timer else {
+            if matches!(*enemy_state, EnemyState::Hurt | EnemyState::Dead) {
+                let duration = if matches!(*enemy_state, EnemyState::Dead) {
+                    1.0
+                } else {
+                    0.25
+                };
+                commands.entity(dada_entity).insert(
+                    EnemyStateTimer(Timer::from_seconds(duration, TimerMode::Once)),
+                );
+            }
+            continue;
+        };
+
         state_timer.0.tick(time.delta());
+
+        let mut allow_knockback = false;
+        if let Some(mut knockback) = critical_knockback {
+            knockback.timer.tick(time.delta());
+            if knockback.timer.just_finished() {
+                commands
+                    .entity(dada_entity)
+                    .remove::<CriticalKnockback>();
+            } else {
+                allow_knockback = true;
+            }
+        }
 
         match *enemy_state {
             EnemyState::Hurt => {
-                velocity.x = 0.0;
-                velocity.z = 0.0;
+                if !allow_knockback {
+                    velocity.x = 0.0;
+                    velocity.z = 0.0;
+                }
             }
             EnemyState::Dead => {
-                // ปล่อยให้กระเด็นนิดนึงก่อน
-                if state_timer.0.elapsed_secs() >= 0.25 {
+                if state_timer.0.elapsed_secs() >= 0.25 && !allow_knockback {
                     velocity.x = 0.0;
                     velocity.z = 0.0;
                 }
@@ -756,7 +790,6 @@ fn update_dada_hurt_and_dead(
         match *enemy_state {
             EnemyState::Hurt => {
                 *enemy_state = EnemyState::Idle;
-
                 commands
                     .entity(dada_entity)
                     .remove::<EnemyStateTimer>();
@@ -764,13 +797,11 @@ fn update_dada_hurt_and_dead(
             EnemyState::Dead => {
                 // นับว่า Dada ถูก defeat 1 ตัว
                 defeated_count.0 += 1;
-
                 info!(
                     "Dada defeated: {}/{}",
                     defeated_count.0,
                     DADA_DEFEAT_GOAL
                 );
-
                 commands
                     .entity(dada_entity)
                     .despawn();
