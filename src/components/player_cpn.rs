@@ -175,3 +175,9 @@ pub struct QuicksandDrainTimer(pub Timer);
 
 #[derive(Component)]
 pub struct QuicksandHurtTimer(pub Timer);
+
+#[derive(Component)]
+pub struct PlayerChaseTarget {
+    pub target: Entity,   // ศัตรูที่เพิ่งตบโดน
+    pub timer: Timer,     // หน้าต่างเวลาไล่ตามต่อการตบ 1 ครั้ง
+}

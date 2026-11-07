@@ -61,14 +61,16 @@ impl From<BaseStats> for CombatStats {
 }
 
 impl BaseStats {
+    //protagonist
     pub const PLAYER: Self = Self {
         max_hp: 300.0,
         max_mp: 300.0,
         attack: 15.0,
         defense: 15.0,
-        critical_rate: 0.05,
+        critical_rate: 0.95,
         critical_damage: 1.5,
     };
+
     //hub
     pub const BASIC_PRACTICE_GUN: Self = Self {
         max_hp: 100.0,

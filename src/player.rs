@@ -39,6 +39,7 @@ impl Plugin for PlayerPlugin {
             player_combo_input,
             player_dash_input,
             player_dash_move,
+            player_chase_enemy, 
             spawn_player_dash_trail_during_dash,
             player_combo_update,
             player_dash_update,
@@ -1507,7 +1508,8 @@ pub fn respawn_player_when_defeated(
             .entity(player_entity)
             .remove::<PlayerDashMove>()
             .remove::<PlayerDashTrailTimer>()
-            .remove::<PlayerHurtTimer>();
+            .remove::<PlayerHurtTimer>()
+            .remove::<PlayerChaseTarget>();
 
         commands
             .entity(animation_entity)
@@ -1692,6 +1694,7 @@ fn player_slap_hit_enemy(
     mut hitbox_query: Query<&mut PlayerSlapHitbox>,
     mut player_query: Query<
         (
+            Entity,
             &CombatStats,
             &AtkAndDefElement,
             &mut ElementMastery,
@@ -1721,6 +1724,7 @@ fn player_slap_hit_enemy(
     element_drop_assets: Res<ElementDropAssets>,
 ) {
     let Ok((
+        player_entity,
         player_stats,
         player_element,
         mut element_mastery,
@@ -1882,7 +1886,10 @@ fn player_slap_hit_enemy(
                         });
                 }
             }
-
+            commands.entity(player_entity).insert(PlayerChaseTarget {
+                target: target_entity,
+                timer: Timer::from_seconds(PLAYER_CHASE_WINDOW, TimerMode::Once),
+            });
             commands
                 .entity(hitbox_entity)
                 .despawn();
@@ -2746,5 +2753,84 @@ fn update_quicksand_hurt_timer(
         if timer.0.is_finished() {
             commands.entity(entity).remove::<QuicksandHurtTimer>();
         }
+    }
+}
+const PLAYER_CHASE_SPEED: f32 = 10.0;        // ต้องเร็วกว่า knockback ศัตรู (คริต = 8.0)
+const PLAYER_CHASE_STOP_DISTANCE: f32 = 1.0;  // ถึงระยะตบแล้วเบรก
+const PLAYER_CHASE_WINDOW: f32 = 0.5;         // เวลาไล่ตามต่อการตบ 1 ครั้ง
+
+fn player_chase_enemy(
+    mut commands: Commands,
+    time: Res<Time>,
+    keyboard: Res<ButtonInput<KeyCode>>,
+    gamepads: Query<&Gamepad>,
+    mut player_query: Query<
+        (
+            Entity,
+            &mut LinearVelocity,
+            &mut Transform,
+            &mut PlayerChaseTarget,
+            Option<&PlayerDashMove>,
+        ),
+        With<Player>,
+    >,
+    target_query: Query<(&GlobalTransform, &Health), With<CombatTarget>>,
+) {
+    let Ok((player_entity, mut velocity, mut transform, mut chase, dash_move)) =
+        player_query.single_mut()
+    else { return };
+
+    chase.timer.tick(time.delta());
+
+    // 1) เป้าหมายหาย/ตาย/หมดเวลา → เลิกตาม
+    let Ok((target_gt, target_health)) = target_query.get(chase.target) else {
+        commands.entity(player_entity).remove::<PlayerChaseTarget>();
+        return;
+    };
+    if chase.timer.is_finished() || target_health.current <= 0 {
+        commands.entity(player_entity).remove::<PlayerChaseTarget>();
+        return;
+    }
+
+    // 2) ผู้เล่นกดเดินเอง → เคารพผู้เล่น จบการตามทันที
+    let mut manual_input = Vec2::ZERO;
+    if keyboard.pressed(KeyCode::KeyW) { manual_input.y += 1.0; }
+    if keyboard.pressed(KeyCode::KeyS) { manual_input.y -= 1.0; }
+    if keyboard.pressed(KeyCode::KeyA) { manual_input.x -= 1.0; }
+    if keyboard.pressed(KeyCode::KeyD) { manual_input.x += 1.0; }
+    if let Some(gamepad) = gamepads.iter().next() {
+        let stick = apply_gamepad_deadzone(gamepad.left_stick(), GAMEPAD_DEADZONE);
+        manual_input += if stick.length_squared() > 0.0 { stick } else { gamepad.dpad() };
+    }
+    if manual_input.length_squared() > 0.0001 {
+        commands.entity(player_entity).remove::<PlayerChaseTarget>();
+        return;
+    }
+
+    // 3) กำลัง dash อยู่ → ไม่ยุ่งกับความเร็ว dash
+    if dash_move.is_some() { return; }
+
+    let to_target = target_gt.translation() + Vec3::Y * 0.4 - transform.translation;
+    let flat = Vec3::new(to_target.x, 0.0, to_target.z);
+    let distance = flat.length();
+
+    // หันหน้าหาศัตรูเสมอ (เหมือนเดินในโค้ดเดิมของนาย)
+    if flat.length_squared() > 0.0001 {
+        transform.rotation = Quat::from_rotation_y(flat.x.atan2(flat.z));
+    }
+
+    // 4) ถึงระยะตบ → เบรก / ยังไม่ถึง → ไล่ตาม
+    if distance <= PLAYER_CHASE_STOP_DISTANCE {
+        velocity.x = 0.0;
+        velocity.z = 0.0;
+    } else {
+        let direction = flat / distance;
+        velocity.x = direction.x * PLAYER_CHASE_SPEED;
+        velocity.z = direction.z * PLAYER_CHASE_SPEED;
+    }
+
+    // 5) ศัตรูลอยขึ้นจากคริต → บินตามขึ้นไปด้วย (DBZ!)
+    if to_target.y > 0.6 {
+        velocity.y = (to_target.y * 3.0).clamp(0.0, 8.0);
     }
 }
