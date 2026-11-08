@@ -37,7 +37,7 @@ pub struct JaarAttackTimer(pub Timer);
 #[derive(Resource)]
 pub struct JaarRespawnTimer(pub Timer);
 
-pub const JAAR_SPAWN_LIMIT: u32 = 5;
+pub const JAAR_SPAWN_LIMIT: u32 = 8;
 
 #[derive(Resource, Default, Debug)]
 pub struct JaarSpawnedCount(pub u32);

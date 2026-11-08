@@ -16,7 +16,7 @@ const CHOKY_CHASE_RANGE: f32 = 10.0;
 const CHOKY_STOP_DISTANCE: f32 = 1.0;
 const CHOKY_RETURN_STOP_DISTANCE: f32 = 0.25;
 const CHOKY_MOVE_SPEED: f32 = 3.0;
-const CHOKY_WARP_POSITION: Vec3 = Vec3::new(17.5, 1.0, -48.0);
+//const CHOKY_WARP_POSITION: Vec3 = Vec3::new(17.5, 1.0, -48.0);
 const CHOKY_CRITICAL_KNOCKBACK_UP: f32 = 4.5;
 
 pub struct EnemyChokyPlugin;
@@ -92,7 +92,7 @@ fn spawn_enemy_choky(
             CombatStats::from(base_stats),
             AtkAndDefElement(Element::Earth),
             ElementExpReward::CHOKY,
-            RigidBody::Kinematic,
+            RigidBody::Dynamic,
             Collider::capsule(0.45, 1.0),
             LockedAxes::ROTATION_LOCKED,
             LinearVelocity::ZERO,
@@ -619,101 +619,101 @@ fn update_choky_hurt_and_dead(
             // ---------------------------------------------------------
             // 1) Cylinder mesh สีจาง ๆ ก่อนสร้างวาร์ป
             // ---------------------------------------------------------
-            let cylinder_material = materials.add(StandardMaterial {
-                base_color: Color::srgba(0.65, 0.9, 1.0, 0.22),
-                alpha_mode: AlphaMode::Blend,
-                unlit: true,
-                ..default()
-            });
+            // let cylinder_material = materials.add(StandardMaterial {
+            //     base_color: Color::srgba(0.65, 0.9, 1.0, 0.44),
+            //     alpha_mode: AlphaMode::Blend,
+            //     unlit: true,
+            //     ..default()
+            // });
 
-            commands.spawn((
-                Name::new("Choky Warp Cylinder"),
-                Mesh3d(meshes.add(Cylinder::new(2.0, 0.05))),
-                MeshMaterial3d::<StandardMaterial>(cylinder_material),
-                Transform::from_xyz(
-                    CHOKY_WARP_POSITION.x,
-                    0.05,
-                    CHOKY_WARP_POSITION.z,
-                ),
-                DespawnOnExit(GameScene::Desert),
-            ));
+            // commands.spawn((
+            //     Name::new("Choky Warp Cylinder"),
+            //     Mesh3d(meshes.add(Cylinder::new(2.0, 1.0))),
+            //     MeshMaterial3d::<StandardMaterial>(cylinder_material),
+            //     Transform::from_xyz(
+            //         CHOKY_WARP_POSITION.x,
+            //         0.05,
+            //         CHOKY_WARP_POSITION.z,
+            //     ),
+            //     DespawnOnExit(GameScene::Desert),
+            // ));
 
             // ---------------------------------------------------------
             // 2) ลูกศรจากผู้เล่น ชี้ไปที่แท่นวาร์ป
             // ---------------------------------------------------------
-            if let Some(player_transform) = player_query.iter().next() {
-                // จุดเริ่มของลูกศร: เหนือหัวผู้เล่นเล็กน้อย
-                let start = player_transform.translation() + Vec3::Y * 2.2;
+            // if let Some(player_transform) = player_query.iter().next() {
+            //     // จุดเริ่มของลูกศร: เหนือหัวผู้เล่นเล็กน้อย
+            //     let start = player_transform.translation() + Vec3::Y * 1.2;
 
-                // เป้าหมายคือแท่นวาร์ป
-                let target = CHOKY_WARP_POSITION;
+            //     // เป้าหมายคือแท่นวาร์ป
+            //     let target = CHOKY_WARP_POSITION;
 
-                let mut direction = target - start;
+            //     let mut direction = target - start;
 
-                if direction.length_squared() > 0.0001 {
-                    direction = direction.normalize();
+            //     if direction.length_squared() > 0.0001 {
+            //         direction = direction.normalize();
 
-                    // ลูกศรถูกสร้างให้ชี้ตามแกน +Y
-                    // จึงหมุนจาก Vec3::Y ไปยังทิศทางเป้าหมาย
-                    let rotation = if direction.dot(Vec3::Y) < -0.9999 {
-                        Quat::from_rotation_x(std::f32::consts::PI)
-                    } else {
-                        Quat::from_rotation_arc(Vec3::Y, direction)
-                    };
+            //         // ลูกศรถูกสร้างให้ชี้ตามแกน +Y
+            //         // จึงหมุนจาก Vec3::Y ไปยังทิศทางเป้าหมาย
+            //         let rotation = if direction.dot(Vec3::Y) < -0.9999 {
+            //             Quat::from_rotation_x(std::f32::consts::PI)
+            //         } else {
+            //             Quat::from_rotation_arc(Vec3::Y, direction)
+            //         };
 
-                    let arrow_material = materials.add(StandardMaterial {
-                        base_color: Color::srgba(1.0, 0.0, 0.0, 0.95),
-                        alpha_mode: AlphaMode::Blend,
-                        unlit: true,
-                        ..default()
-                    });
+            //         let arrow_material = materials.add(StandardMaterial {
+            //             base_color: Color::srgba(1.0, 0.0, 0.0, 0.95),
+            //             alpha_mode: AlphaMode::Blend,
+            //             unlit: true,
+            //             ..default()
+            //         });
 
-                    // ท่อยาว 1.5 เมตร => half_height = 0.75
-                    let shaft_mesh = meshes.add(Cylinder::new(0.05, 0.75));
+            //         // ท่อยาว 1.5 เมตร => half_height = 0.75
+            //         let shaft_mesh = meshes.add(Cylinder::new(0.05, 0.75));
 
-                    // หัวลูกศร ใช้ Cone แทนรูปทรงสามเหลี่ยม/หัวศร
-                    let head_mesh = meshes.add(Cone::new(0.18, 0.35));
+            //         // หัวลูกศร ใช้ Cone แทนรูปทรงสามเหลี่ยม/หัวศร
+            //         let head_mesh = meshes.add(Cone::new(0.18, 0.35));
 
-                    commands
-                        .spawn((
-                            Name::new("Choky Warp Arrow"),
-                            ChokyTemporaryLifetime(Timer::from_seconds(
-                                5.0,
-                                TimerMode::Once,
-                            )),
-                            DespawnOnExit(GameScene::Desert),
-                            Transform::from_translation(start).with_rotation(rotation),
-                        ))
-                        .with_children(|parent| {
-                            // ตัวท่อ
-                            parent.spawn((
-                                Name::new("Arrow Shaft"),
-                                Mesh3d(shaft_mesh),
-                                MeshMaterial3d::<StandardMaterial>(arrow_material.clone()),
-                                Transform::from_xyz(0.0, 0.75, 0.0),
-                            ));
+            //         commands
+            //             .spawn((
+            //                 Name::new("Choky Warp Arrow"),
+            //                 ChokyTemporaryLifetime(Timer::from_seconds(
+            //                     5.0,
+            //                     TimerMode::Once,
+            //                 )),
+            //                 DespawnOnExit(GameScene::Desert),
+            //                 Transform::from_translation(start).with_rotation(rotation),
+            //             ))
+            //             .with_children(|parent| {
+            //                 // ตัวท่อ
+            //                 parent.spawn((
+            //                     Name::new("Arrow Shaft"),
+            //                     Mesh3d(shaft_mesh),
+            //                     MeshMaterial3d::<StandardMaterial>(arrow_material.clone()),
+            //                     Transform::from_xyz(0.0, 0.75, 0.0),
+            //                 ));
 
-                            // หัวลูกศร
-                            parent.spawn((
-                                Name::new("Arrow Head"),
-                                Mesh3d(head_mesh),
-                                MeshMaterial3d::<StandardMaterial>(arrow_material),
-                                Transform::from_xyz(0.0, 1.5 + 0.175, 0.0),
-                            ));
-                        });
-                }
-            }
+            //                 // หัวลูกศร
+            //                 parent.spawn((
+            //                     Name::new("Arrow Head"),
+            //                     Mesh3d(head_mesh),
+            //                     MeshMaterial3d::<StandardMaterial>(arrow_material),
+            //                     Transform::from_xyz(-1.0, 1.5 + 0.175, 0.0),
+            //                 ));
+            //             });
+            //     }
+            // }
 
-            // ---------------------------------------------------------
-            // สร้างวาร์ป หลังสั่งสร้าง cylinder และลูกศร
-            // ---------------------------------------------------------
-            commands.spawn((
-                CurrentScene,
-                WarpToFloatingIsland,
-                Collider::cuboid(2.0, 2.0, 1.0),
-                Transform::from_translation(CHOKY_WARP_POSITION),
-                DespawnOnExit(GameScene::Desert),
-            ));
+            // // ---------------------------------------------------------
+            // // สร้างวาร์ป หลังสั่งสร้าง cylinder และลูกศร
+            // // ---------------------------------------------------------
+            // commands.spawn((
+            //     CurrentScene,
+            //     WarpToFloatingIsland,
+            //     Collider::cuboid(2.0, 2.0, 1.0),
+            //     Transform::from_translation(CHOKY_WARP_POSITION),
+            //     DespawnOnExit(GameScene::Desert),
+            // ));
         }
 
         if !state_timer.0.is_finished() {

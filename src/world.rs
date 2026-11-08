@@ -22,6 +22,7 @@ impl Plugin for WorldPlugin {
         .add_plugins(MaterialPlugin::<QuicksandMaterial>::default())
         //flaoting island
         .add_plugins(FiJaarPlugin)
+        .add_plugins(FiJookPlugin)
         //lagoon
         .add_plugins(LgFrogzyPlugin)
         //volcano

@@ -6,6 +6,8 @@ pub mod enemy_muanim;
 pub use enemy_muanim::*;
 pub mod fi_jaar;
 pub use fi_jaar::*;
+pub mod fi_jook;
+pub use fi_jook::*;
 pub mod lg_frogzy;
 pub use lg_frogzy::*;
 pub mod vn_dada;

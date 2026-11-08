@@ -23,6 +23,13 @@ pub fn spawn_hub(
         Transform::from_xyz(0.0, 0.0, 0.0),
         DespawnOnExit(GameScene::Hub),
     ));
+    //floor
+    commands.spawn((
+        RigidBody::Static,
+        Collider::cuboid(15.0, 0.1, 20.0),
+        Transform::from_xyz(0.0, 0.05, 1.0),
+        DespawnOnExit(GameScene::Hub),
+    ));
     //wall back
     commands.spawn((
         RigidBody::Static,
@@ -58,16 +65,30 @@ pub fn spawn_hub(
         Transform::from_xyz(9.5, 1.5, 16.0),
         DespawnOnExit(GameScene::Hub),
     ));
+    
     //doorstopper
     commands.spawn((
         RigidBody::Static,
-        Collider::cylinder(0.3, 5.0),
-        //Transform::from_xyz(9.5, 1.0, 16.0),
+        Collider::cylinder(0.3, 6.0),
         Transform::from_xyz(0.0, 1.2, 16.5)
         .with_rotation(Quat::from_rotation_z(std::f32::consts::FRAC_PI_2)),
-         // หมุน 90° รอบแกน X → cylinder จะนอนตามแกน Z
         DespawnOnExit(GameScene::Hub),
     ));
+    //wall doorstopper right
+    commands.spawn((
+        RigidBody::Static,
+        Collider::cuboid(0.5, 1.4, 0.3),
+        Transform::from_xyz(-3.25, 1.0, 16.4),
+        DespawnOnExit(GameScene::Hub),
+    ));
+    //wall front left
+    commands.spawn((
+        RigidBody::Static,
+        Collider::cuboid(0.5, 1.4, 0.3),
+        Transform::from_xyz(3.35, 1.0, 16.4),
+        DespawnOnExit(GameScene::Hub),
+    ));
+
     //chair wood
     commands.spawn((
         RigidBody::Static,
@@ -114,11 +135,11 @@ pub fn spawn_hub(
         ));
     }
     //pillar back 2
-    for x in [-2.81_f32, 2.81_f32] {
+    for x in [-2.4_f32, 2.29_f32] {
         commands.spawn((
             RigidBody::Static,
             Collider::cuboid(0.42, 3.0, 0.39),
-            Transform::from_xyz(x, 1.5, -4.46),
+            Transform::from_xyz(x, 1.5, -4.3),
             DespawnOnExit(GameScene::Hub),
         ));
     }
@@ -133,11 +154,11 @@ pub fn spawn_hub(
         ));
     }
     //pillar back 4
-    for x in [-2.64_f32, 2.87_f32] {
+    for x in [-2.4_f32, 2.35_f32] {
         commands.spawn((
             RigidBody::Static,
             Collider::cuboid(0.42, 3.0, 0.39),
-            Transform::from_xyz(x, 1.5, 5.05),
+            Transform::from_xyz(x, 1.5, 5.2),
             DespawnOnExit(GameScene::Hub),
         ));
     }
@@ -221,13 +242,13 @@ pub fn spawn_hub(
         DespawnOnExit(GameScene::Hub),
     ));
     //musical instument
-    spawn_drum_at(&mut commands,&asset_server,Transform::from_xyz(0.0, 0.1, 7.5),);
-    spawn_bass_at(&mut commands,&asset_server,Transform::from_xyz(-2.4, 0.1, 8.5),);
-    spawn_guitar_at(&mut commands,&asset_server,Transform::from_xyz(-1.4, 0.1, 9.5),);
-    spawn_turntable_at(&mut commands,&asset_server,Transform::from_xyz(2.4, 0.1, 8.5),);
-    spawn_amp_bass_at(&mut commands, &asset_server, Transform::from_xyz(-2.4, 0.1, 10.0));
-    spawn_amp_guitar_at(&mut commands, &asset_server, Transform::from_xyz(-1.4, 0.1, 10.0));
-    spawn_amp_turntable_at(&mut commands, &asset_server, Transform::from_xyz(2.4, 0.1, 10.0));
+    spawn_drum_at(&mut commands,&asset_server,Transform::from_xyz(0.0, 0.05, 7.5),);
+    spawn_bass_at(&mut commands,&asset_server,Transform::from_xyz(-2.4, 0.05, 8.5),);
+    spawn_guitar_at(&mut commands,&asset_server,Transform::from_xyz(-1.4, 0.05, 9.5),);
+    spawn_turntable_at(&mut commands,&asset_server,Transform::from_xyz(2.4, 0.05, 8.5),);
+    spawn_amp_bass_at(&mut commands, &asset_server, Transform::from_xyz(-2.4, 0.05, 10.0));
+    spawn_amp_guitar_at(&mut commands, &asset_server, Transform::from_xyz(-1.4, 0.05, 10.0));
+    spawn_amp_turntable_at(&mut commands, &asset_server, Transform::from_xyz(2.4, 0.05, 10.0));
     //warp
     commands.spawn((
         WarpToDesert,
@@ -260,7 +281,7 @@ pub fn spawn_hub(
             right: Val::Px(12.0),
             ..default()
         },
-        Text::new("Tekkk V.0.0.1"),
+        Text::new("Tekkk V.0.0.2"),
         TextFont {
             font_size: 24.0,
             ..default()

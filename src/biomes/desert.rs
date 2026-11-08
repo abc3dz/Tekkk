@@ -8,6 +8,8 @@ use crate::cel_shader::*;
 pub fn spawn_desert(
     mut commands: Commands,
     asset_server: Res<AssetServer>,
+    mut meshes: ResMut<Assets<Mesh>>,
+    mut materials: ResMut<Assets<StandardMaterial>>,
 ) {
     commands.spawn((
         SceneRoot(asset_server.load(GltfAssetLabel::Scene(0).from_asset("maps/EvrmDesert.glb"))),
@@ -26,18 +28,31 @@ pub fn spawn_desert(
     commands.spawn((
         CurrentScene,
         WarpToHub,
-        Collider::cuboid(2.0, 2.0, 1.0),
-        Transform::from_xyz(0.0, 1.0, 30.0),
+        Collider::cuboid(53.0, 2.0, 0.5),
+        Transform::from_xyz(0.0, 0.5, 35.0),
         DespawnOnExit(GameScene::Desert),
     ));
-    //warp to floating island
-    // commands.spawn((
-    //     CurrentScene,
-    //     WarpToFloatingIsland,
-    //     Collider::cuboid(2.0, 2.0, 1.0),
-    //     Transform::from_xyz(17.5, 1.0, -48.0),
-    //     DespawnOnExit(GameScene::Desert),
-    // ));
+    //warp to Floating Island
+    commands.spawn((
+        CurrentScene,
+        WarpToFloatingIsland,
+        Collider::cuboid(2.0, 2.0, 1.0),
+        Transform::from_xyz(17.5, 1.0, -48.0),
+        DespawnOnExit(GameScene::Desert),
+    ));
+    let cylinder_material = materials.add(StandardMaterial {
+        base_color: Color::srgba(0.65, 0.9, 1.0, 0.22),
+        alpha_mode: AlphaMode::Blend,
+        unlit: true,
+        ..default()
+    });
+    commands.spawn((
+        Name::new("Warp Cylinder"),
+        Mesh3d(meshes.add(Cylinder::new(1.0, 5.0))),
+        MeshMaterial3d::<StandardMaterial>(cylinder_material),
+        Transform::from_xyz(17.5, 0.0, -48.0),
+        DespawnOnExit(GameScene::Desert),
+    ));
     
     //mountain left
     commands.spawn((

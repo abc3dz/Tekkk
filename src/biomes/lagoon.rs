@@ -4,18 +4,11 @@ use crate::components::*;
 use crate::cel_shader::*;
 use std::f32::consts::TAU;
 
-// ---------------------------------------------------------------------
-// ค่าทั่วไป
-// ---------------------------------------------------------------------
 const WARP_DISTANCE: f32 = 2.5;
 
-// เผื่อโค้ดอื่นเคยเรียก lagoon::STEP มาก่อน
 #[allow(dead_code)]
 pub const STEP: f32 = 11.2;
 
-// ---------------------------------------------------------------------
-// โครงสร้างฉาก
-// ---------------------------------------------------------------------
 const GROUND_SIZE: f32 = 120.0;
 const GROUND_HEIGHT: f32 = 0.2;
 
@@ -629,12 +622,12 @@ fn spawn_cone(
             Mesh3d(mesh),
             MeshMaterial3d(material),
             transform,
-            RigidBody::Static,
+            //RigidBody::Static,
 
             // ใช้ cylinder เป็น collider กันเดินทะลุภูเขา
             // ถ้าต้องการให้ตรงกับรูปกรวยมากกว่านี้ สามารถเปลี่ยนเป็น
             // Collider::cone(height, radius) ได้ หาก Avian เวอร์ชันของคุณรองรับ
-            Collider::cylinder(height, radius),
+            //Collider::cylinder(height, radius),
             CurrentScene,
         ));
     } else {

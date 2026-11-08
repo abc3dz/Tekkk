@@ -67,7 +67,7 @@ impl BaseStats {
         max_mp: 300.0,
         attack: 15.0,
         defense: 15.0,
-        critical_rate: 0.95,
+        critical_rate: 0.05,
         critical_damage: 1.5,
     };
 
@@ -124,6 +124,31 @@ impl BaseStats {
         critical_rate: 0.0,
         critical_damage: 0.0,
     };
+    pub const JOOK: Self = Self {
+        max_hp: 120.0,
+        max_mp: 0.0,
+        attack: 11.0,
+        defense: 6.0,
+        critical_rate: 0.0,
+        critical_damage: 0.0,
+    };
+    pub const JEEK: Self = Self {
+        max_hp: 120.0,
+        max_mp: 0.0,
+        attack: 11.0,
+        defense: 6.0,
+        critical_rate: 0.0,
+        critical_damage: 0.0,
+    };
+    pub const MQTQUEEN: Self = Self {
+        max_hp: 120.0,
+        max_mp: 0.0,
+        attack: 11.0,
+        defense: 6.0,
+        critical_rate: 0.0,
+        critical_damage: 0.0,
+    };
+    
     //lagoon
     pub const FROGZY: Self = Self {
         max_hp: 140.0,
@@ -235,6 +260,27 @@ impl ElementExpReward {
     };
     //floating_island
     pub const JAAR: Self = Self {
+        water: ExpRange::new(1, 1),
+        fire: ExpRange::new(0, 0),
+        wind: ExpRange::new(10, 10),
+        earth: ExpRange::new(0, 0),
+        inw: ExpRange::new(1,1),
+    };
+    pub const JOOK: Self = Self {
+        water: ExpRange::new(1, 1),
+        fire: ExpRange::new(0, 0),
+        wind: ExpRange::new(10, 10),
+        earth: ExpRange::new(0, 0),
+        inw: ExpRange::new(1,1),
+    };
+    pub const JEEK: Self = Self {
+        water: ExpRange::new(1, 1),
+        fire: ExpRange::new(0, 0),
+        wind: ExpRange::new(10, 10),
+        earth: ExpRange::new(0, 0),
+        inw: ExpRange::new(1,1),
+    };
+    pub const MQTQUEEN: Self = Self {
         water: ExpRange::new(1, 1),
         fire: ExpRange::new(0, 0),
         wind: ExpRange::new(10, 10),

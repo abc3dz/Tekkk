@@ -128,7 +128,7 @@ pub fn spawn_floating_island(
         Transform::from_xyz(41.0, 34.4,-17.12),
         DespawnOnExit(GameScene::FloatingIsland),
     ));
-    //three 2/2
+    //three 3/1
     commands.spawn((
         RigidBody::Static,
         Collider::cuboid(0.3, 5.1, 0.3),
@@ -144,7 +144,7 @@ pub fn spawn_floating_island(
         // base_color_texture: Some(asset_server.load("textures/tt2.png")), // ถ้าอยากได้ลายสีพื้นผิวด้วยค่อยเปิดบรรทัดนี้
         perceptual_roughness: 0.03,  // ผิวกึ่งมัน = ไฮไลต์วิ่งตามลายนูนชัดขึ้นมาก
         metallic: 0.03,
-        unlit: false,        // ⚠️ สำคัญมาก: ต้องเป็น false ไม่งั้น normal map จะไม่มีผลเลย
+        unlit: false,
         double_sided: true,
         cull_mode: None,
         flip_normal_map_y: true,
@@ -152,52 +152,35 @@ pub fn spawn_floating_island(
         ..default()
     });
 
-    // ประตูชั้นที่ 1 -> ไปออกประตูชั้นที่ 2/1
+    // ประตูชั้นที่ 1 -> ไปออกชั้นที่ 2/1
     commands.spawn((
         LocalWarpGate {
-            destination: Vec3::new(0.464, 21.680, -3.793),
+            destination: Vec3::new(8.98, 23.68, -13.25),
             radius: 1.5,
         },
         Sensor,
         Collider::cuboid(2.0, 3.0, 1.0),
         Mesh3d(warp_gate_mesh.clone()),
         MeshMaterial3d(warp_gate_material.clone()),
-        Transform::from_xyz(0.829, 0.830, 7.027),
+        Transform::from_xyz(8.0, 0.830, -11.0),
         CurrentScene,
         DespawnOnExit(GameScene::FloatingIsland),
     ));
 
-    // จุดออกประตูชั้นที่ 2/1
-    // อันนี้เป็นแค่ภาพประตูปลายทาง ไม่มีระบบวาร์ปกลับ
-    // commands.spawn((
-    //     Mesh3d(warp_gate_mesh.clone()),
-    //     MeshMaterial3d(warp_gate_material.clone()),
-    //     Transform::from_xyz(0.464, 21.680, -3.793),
-    //     DespawnOnExit(GameScene::FloatingIsland),
-    // ));
-
-    // ประตูชั้นที่ 2/2 -> ไปออกประตูชั้นที่ 3
+    // ประตูชั้นที่ 2/2 -> ไปออกชั้นที่ 3
     commands.spawn((
         LocalWarpGate {
-            destination: Vec3::new(29.989, 35.230, -22.517),
+            destination: Vec3::new(29.989, 35.230, -24.517),
             radius: 1.5,
         },
         Sensor,
         Collider::cuboid(2.0, 3.0, 1.0),
         Mesh3d(warp_gate_mesh.clone()),
         MeshMaterial3d(warp_gate_material.clone()),
-        Transform::from_xyz(15.858, 21.680, -22.981),
+        Transform::from_xyz(15.858, 21.680, -29.0),
         CurrentScene,
         DespawnOnExit(GameScene::FloatingIsland),
     ));
-
-    // จุดออกประตูชั้นที่ 3
-    // commands.spawn((
-    //     Mesh3d(warp_gate_mesh.clone()),
-    //     MeshMaterial3d(warp_gate_material.clone()),
-    //     Transform::from_xyz(29.989, 35.230, -22.517),
-    //     DespawnOnExit(GameScene::FloatingIsland),
-    // ));
     
     //warp to desert
     commands.spawn((
@@ -205,9 +188,29 @@ pub fn spawn_floating_island(
         CurrentScene,
         Sensor,
         Collider::cuboid(2.0, 2.0, 1.0),
-        Transform::from_xyz(5.0, 1.0, -5.0),
+        Transform::from_xyz(-10.0, 1.0, -11.0),
         DespawnOnExit(GameScene::FloatingIsland),
     ));
+    let cylinder_material = materials.add(StandardMaterial {
+        base_color: Color::srgba(0.65, 0.9, 1.0, 0.22),
+        alpha_mode: AlphaMode::Blend,
+        unlit: true,
+        ..default()
+    });
+    commands.spawn((
+        Name::new("Warp Cylinder"),
+        Mesh3d(meshes.add(Cylinder::new(1.0, 3.0))),
+        MeshMaterial3d::<StandardMaterial>(cylinder_material),
+        Transform::from_xyz(-10.0, 1.0, -11.0),
+        DespawnOnExit(GameScene::FloatingIsland),
+    ));
+    commands.spawn((
+        RigidBody::Static,
+        Collider::cylinder(1.5, 0.2),
+        Transform::from_xyz(-10.0, 0.0,-11.0),
+        DespawnOnExit(GameScene::FloatingIsland),
+    ));
+
     //warp to lagoon
     commands.spawn((
         WarpToLagoon,
