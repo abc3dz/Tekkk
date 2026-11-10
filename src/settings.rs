@@ -386,22 +386,25 @@ fn settings_input(
         }
 
         SettingsItem::DisplayMode => {
-            if left && settings.pending_display_mode_index > 0 {
-                settings.pending_display_mode_index -= 1;
+            if left {
+                settings.pending_display_mode_index =
+                    (settings.pending_display_mode_index + DISPLAY_MODES.len() - 1) % DISPLAY_MODES.len();
+
                 commands.spawn((
                     AudioPlayer::new(asset_server.load("sounds/setting/resolution.ogg")),
                     PlaybackSettings::ONCE.with_speed(2.4),
                 ));
             }
 
-            if right && settings.pending_display_mode_index < DISPLAY_MODES.len() - 1{
-                settings.pending_display_mode_index += 1;
+            if right {
+                settings.pending_display_mode_index =
+                    (settings.pending_display_mode_index + 1) % DISPLAY_MODES.len();
+
                 commands.spawn((
                     AudioPlayer::new(asset_server.load("sounds/setting/resolution.ogg")),
                     PlaybackSettings::ONCE.with_speed(2.8),
                 ));
             }
-            
         }
 
         SettingsItem::MasterVolume => {
