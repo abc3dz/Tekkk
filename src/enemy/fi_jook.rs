@@ -316,21 +316,28 @@ fn enemy_jook_chase_player(
         let distance = flat_direction.length();
 
         // ==========================================
-        // 1. Player อยู่ในระยะมองเห็น (<= 10.0) -> ไล่ตามทันที
+        // ✨ เช็คความสูงของ Player ก่อน
+        //    จะไล่ล่าเฉพาะเมื่อ Player อยู่ในช่วง 20.0 < y < 34.0
         // ==========================================
-        if distance <= JOOK_CHASE_RANGE {
+        let player_y = player_transform.translation.y;
+        let player_in_chase_height = player_y > 20.0 && player_y < 34.0;
+
+        // ==========================================
+        // 1. Player อยู่ในระยะมองเห็น (<= 10.0)
+        //    ✨ && อยู่ในช่วงความสูงที่กำหนด -> ไล่ตาม
+        // ==========================================
+        if player_in_chase_height && distance <= JOOK_CHASE_RANGE {
             commands.entity(jook_entity).remove::<EnemyInvestigateDirection>();
 
             // Player อยู่ในระยะโจมตี
             if distance <= JOOK_STOP_DISTANCE {
                 velocity.x = 0.0;
                 velocity.z = 0.0;
-
                 if flat_direction.length_squared() > 0.0001 {
                     let direction = flat_direction.normalize();
-                    jook_transform.rotation = Quat::from_rotation_y(direction.x.atan2(direction.z));
+                    jook_transform.rotation =
+                        Quat::from_rotation_y(direction.x.atan2(direction.z));
                 }
-
                 *enemy_state = EnemyState::Attack;
                 continue;
             }
@@ -339,23 +346,23 @@ fn enemy_jook_chase_player(
             let direction = flat_direction.normalize();
             velocity.x = direction.x * JOOK_MOVE_SPEED;
             velocity.z = direction.z * JOOK_MOVE_SPEED;
-            jook_transform.rotation = Quat::from_rotation_y(direction.x.atan2(direction.z));
+            jook_transform.rotation =
+                Quat::from_rotation_y(direction.x.atan2(direction.z));
             *enemy_state = EnemyState::Chase;
             continue;
         }
 
         // ==========================================
         // 2. Player อยู่นอกระยะ (> 10.0)
+        //    ✨ หรืออยู่นอกช่วงความสูง -> ไม่ไล่ตาม
         // ==========================================
 
         // 2.1 โดนยิงมา (มี Investigate) -> เดินกลับไปจุดเกิด
         if let Some(mut investigate) = investigate {
             investigate.timer.tick(time.delta());
-
             if investigate.timer.is_finished() {
                 let to_spawn = JOOK_SPAWN_POSITION - jook_transform.translation;
                 let flat_to_spawn = Vec3::new(to_spawn.x, 0.0, to_spawn.z);
-
                 if flat_to_spawn.length() <= 0.3 {
                     velocity.x = 0.0;
                     velocity.z = 0.0;
@@ -363,19 +370,16 @@ fn enemy_jook_chase_player(
                     commands.entity(jook_entity).remove::<EnemyInvestigateDirection>();
                     continue;
                 }
-
                 investigate.direction = flat_to_spawn.normalize();
                 investigate.timer = Timer::from_seconds(10.0, TimerMode::Once);
             }
-
             let direction = investigate.direction;
             velocity.x = direction.x * JOOK_MOVE_SPEED;
             velocity.z = direction.z * JOOK_MOVE_SPEED;
-
             if direction.length_squared() > 0.0001 {
-                jook_transform.rotation = Quat::from_rotation_y(direction.x.atan2(direction.z));
+                jook_transform.rotation =
+                    Quat::from_rotation_y(direction.x.atan2(direction.z));
             }
-
             *enemy_state = EnemyState::Chase;
             continue;
         }
@@ -384,61 +388,41 @@ fn enemy_jook_chase_player(
         if let Some(mut patrol) = patrol_data {
             patrol.timer.tick(time.delta());
 
-            // ตัดแกน Y ออก ให้คิดแค่ระนาบ XZ
             let current_pos = Vec3::new(
                 jook_transform.translation.x,
                 0.0,
                 jook_transform.translation.z,
             );
-
             let patrol_center = Vec3::new(
                 patrol.center.x,
                 0.0,
                 patrol.center.z,
             );
-
             let from_center = current_pos - patrol_center;
             let distance_from_center = from_center.length();
 
-            // ==========================================================
-            // กรณีออกนอกพื้นที่แล้ว -> บังคับให้หันกลับเข้ากลางทันที
-            // ==========================================================
             if distance_from_center > patrol.radius {
                 let inward_direction = if from_center.length_squared() > 0.0001 {
                     (-from_center).normalize()
                 } else {
                     Vec3::new(0.0, 0.0, 1.0)
                 };
-
                 patrol.direction = inward_direction;
                 patrol.timer.reset();
-            }
-            // ==========================================================
-            // กรณีอยู่ในพื้นที่ และครบเวลา -> สุ่มทิศใหม่
-            // ==========================================================
-            else if patrol.timer.just_finished() {
+            } else if patrol.timer.just_finished() {
                 let random_angle = rand::random::<f32>() * std::f32::consts::TAU;
-                let mut new_direction = Vec3::new(
-                    random_angle.cos(),
-                    0.0,
-                    random_angle.sin(),
-                )
-                .normalize();
+                let mut new_direction =
+                    Vec3::new(random_angle.cos(), 0.0, random_angle.sin()).normalize();
 
-                // ถ้าอยู่ใกล้ขอบพื้นที่แล้ว อย่าให้สุ่มทิศที่หันออกนอกเขต
                 if patrol.radius > 0.0 && distance_from_center > patrol.radius * 0.75 {
                     let outward_direction = from_center.normalize();
-
-                    // dot > 0 แปลว่าทิศใหม่กำลังชี้ออกนอกศูนย์กลาง
                     if new_direction.dot(outward_direction) > 0.0 {
                         new_direction = -outward_direction;
                     }
                 }
-
                 patrol.direction = new_direction;
             }
 
-            // ป้องกัน direction เป็น Vec3::ZERO
             let direction = if patrol.direction.length_squared() > 0.0001 {
                 patrol.direction.normalize()
             } else {
@@ -447,12 +431,10 @@ fn enemy_jook_chase_player(
 
             velocity.x = direction.x * JOOK_MOVE_SPEED;
             velocity.z = direction.z * JOOK_MOVE_SPEED;
-
             if direction.length_squared() > 0.0001 {
                 jook_transform.rotation =
                     Quat::from_rotation_y(direction.x.atan2(direction.z));
             }
-
             *enemy_state = EnemyState::Patrol;
             continue;
         }
