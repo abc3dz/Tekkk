@@ -46,6 +46,21 @@ https://freesound.org/people/qubodup/sounds/442957/
 https://freesound.org/people/rafaelzimrp/sounds/570858/
 (CC0)
 
+https://freesound.org/people/Darsycho/sounds/442183/
+(CC0)
+
+https://freesound.org/people/qubodup/sounds/160365/
+(CC BY 4.0)
+
+https://freesound.org/people/qubodup/sounds/744792/
+(CC0)
+
+https://freesound.org/people/Breviceps/sounds/468442/
+(CC0)
+
+https://freesound.org/people/markb258/sounds/245807/
+(CC BY 3.0)
+
 # Tools
 
 Blender, Krita, LMMS, VSC, Audacity, FontForge
