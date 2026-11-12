@@ -29,6 +29,10 @@ pub mod jaar_cpn;
 pub use jaar_cpn::*;
 pub mod jook_cpn;
 pub use jook_cpn::*;
+pub mod jeek_cpn;
+pub use jeek_cpn::*;
+pub mod mqtqueen_cpn;
+pub use mqtqueen_cpn::*;
 
 pub mod frogzy_cpn;
 pub use frogzy_cpn::*;

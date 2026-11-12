@@ -23,6 +23,8 @@ impl Plugin for WorldPlugin {
         //flaoting island
         .add_plugins(FiJaarPlugin)
         .add_plugins(FiJookPlugin)
+        .add_plugins(FiJeekPlugin)
+        .add_plugins(FiMqtqueenPlugin)
         //lagoon
         .add_plugins(LgFrogzyPlugin)
         //volcano
